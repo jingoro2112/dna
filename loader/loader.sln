@@ -1,0 +1,29 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual C++ Express 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "loader", "loader.vcxproj", "{278E3E48-F89C-4EE3-8408-4C3CD8C7F556}"
+	ProjectSection(ProjectDependencies) = postProject
+		{1150AB53-6DA2-4A97-9DA7-2BD38E0B551D} = {1150AB53-6DA2-4A97-9DA7-2BD38E0B551D}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "dnausb", "..\dnausb\win32\dnausb.vcxproj", "{1150AB53-6DA2-4A97-9DA7-2BD38E0B551D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{278E3E48-F89C-4EE3-8408-4C3CD8C7F556}.Debug|Win32.ActiveCfg = Debug|Win32
+		{278E3E48-F89C-4EE3-8408-4C3CD8C7F556}.Debug|Win32.Build.0 = Debug|Win32
+		{278E3E48-F89C-4EE3-8408-4C3CD8C7F556}.Release|Win32.ActiveCfg = Release|Win32
+		{278E3E48-F89C-4EE3-8408-4C3CD8C7F556}.Release|Win32.Build.0 = Release|Win32
+		{1150AB53-6DA2-4A97-9DA7-2BD38E0B551D}.Debug|Win32.ActiveCfg = Debug|Win32
+		{1150AB53-6DA2-4A97-9DA7-2BD38E0B551D}.Debug|Win32.Build.0 = Debug|Win32
+		{1150AB53-6DA2-4A97-9DA7-2BD38E0B551D}.Release|Win32.ActiveCfg = Release|Win32
+		{1150AB53-6DA2-4A97-9DA7-2BD38E0B551D}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
