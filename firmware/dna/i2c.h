@@ -17,6 +17,7 @@
 	TWBR = (c);  \
 	TWCR = (1<<TWEN); \
 
+void i2cWaitLoop();
 #define i2cWait() if ( !(TWCR & (1<<TWINT)) ) { i2cWaitLoop(); }
 
 unsigned char i2cStartRead( unsigned char address );
@@ -25,6 +26,7 @@ unsigned char i2cStartWrite( unsigned char address );
 #define i2cStop() (TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWSTO)) // place a stop condition on the bus
 
 unsigned char i2cWrite( unsigned char data );
+void i2cWriteNoWait( unsigned char data ); // do not wait for an ack, don't poll for completion
 unsigned char i2cReadStream(); // Read a bye, expecting more
 unsigned char i2cReadByte(); // Read a single byte and terminate transmission
 

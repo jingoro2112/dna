@@ -1,15 +1,24 @@
-#include "dna.h"
-#include "usb.h"
-#include "oled.h"
-#include "i2c.h"
-#include "24c512.h"
+/* Copyright: (c) 2013 by Curt Hartung
+ * This work is released under the Creating Commons 3.0 license
+ * found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
+ * and in the LICENCE.txt file included with this distribution
+ */
+
+#include <dna.h>
+#include <usb.h>
+#include <oled.h>
+#include <i2c.h>
+#include <24c512.h>
+
+#include "sram.h"
 
 #include <util/delay.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
 
+volatile unsigned char oledBusy = 0;
+
 unsigned char d[8];
-unsigned char column = 0;
 //------------------------------------------------------------------------------
 unsigned char dnaUsbInputSetup( unsigned char *data, unsigned char len )
 {
@@ -17,15 +26,18 @@ unsigned char dnaUsbInputSetup( unsigned char *data, unsigned char len )
 	{
 		case 1:
 		{
-			column++;
-			if ( column > 7 )
-			{
-				column = 0;
-			}
-			d[0] = 0x5B;
-			d[1] = 0x6B;
-			d[2] = 0x7B;
-			d[3] = 0x8B;
+			d[0] = 0xA1;
+			d[1] = 0xB2;
+			d[2] = 0xC1;
+			d[3] = 0xD1;
+			while( oledBusy );
+			oledBusy = 1;
+			sramWrite( 120, d[0] );
+			sramWrite( 130, d[1] );
+			sramWrite( 140, d[2] );
+			sramWrite( 150, d[3] );
+			oledBusy = 0;
+
 //			write24c512( 0xA0, 100, d, 4 );
 //			write24c512( 0xA0, 101, d+1, 1 );
 //			write24c512( 0xA0, 102, d+2, 1 );
@@ -39,6 +51,13 @@ unsigned char dnaUsbInputSetup( unsigned char *data, unsigned char len )
 			d[1] = 2;
 			d[2] = 3;
 			d[3] = 4;
+			while( oledBusy );
+			oledBusy = 1;
+			d[0] = sramRead( 120 );
+			d[1] = sramRead( 130 );
+			d[2] = sramRead( 140 );
+			d[3] = sramRead( 150 );
+			oledBusy = 0;
 //			read24c512( 0xA0, 100, d, 4 );
 //			read24c512( 0xA0, 101, d+1, 1 );
 //			read24c512( 0xA0, 102, d+2, 1 );
@@ -111,6 +130,7 @@ uint8_t logo2[4][132] =
 	{0x00,0x0F,0x30,0x40,0x40,0x40,0x20,0x18,0x00,0x00,0x00,0x7F,0x41,0x41,0x41,0x41,0x40,0x00,0x00,0x01,0x3F,0x40,0x3E,0x01,0x00,0x00,0x00,0x7F,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x18,0x30,0xFF,0x00,0x00,0x00,0x00,0x30,0xC0,0x80,0x80,0xC3,0x3E,0x00,0x00,0x3E,0xC3,0x81,0x81,0x43,0x3E,0x00,0x00,0x60,0x80,0x81,0x81,0xC3,0x3C,0x00,0x00,0x30,0xC0,0x80,0x80,0xC3,0x3E,0x00,0x00,0x00,0x7F,0x40,0x40,0x40,0x40,0x30,0x0F,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x3E,0x61,0x41,0x40,0x60,0x18,0x00,0x00,0x00,0x01,0x06,0x04,0x06,0x01,0x00,0x00,0x00,0x07,0x03,0x06,0x00,0x00,0x47,0x00,0x00,0x00,0x01,0x06,0x04,0x06,0x01,0x00,0x00,0x03,0x04,0x04,0x04,0x03,0x00},
 };
 
+//------------------------------------------------------------------------------
 void show_bitmap(unsigned char bitmap)
 {
 	unsigned int i;
@@ -130,19 +150,103 @@ void show_bitmap(unsigned char bitmap)
 	{
 		counter = counter + 2;
 		i2cWrite( 0xC0 ); // data setup
-		i2cWrite( counter );
+		i2cWrite( bitmap );
 	}
 
 	i2cStop();
 }
 
+//------------------------------------------------------------------------------
+void sram2oled( unsigned int address )
+{
+	i2cStartWrite( OLED_ADDRESS );
+	i2cWrite( 0x80 ); // command setup
+	i2cWrite( 0x00 );
+	i2cWrite( 0x80 ); // command setup
+	i2cWrite( 0x10 );
+	i2cWrite( 0x80 ); // command setup
+	i2cWrite( 0xB0 );
+
+	while( oledBusy );
+	oledBusy = 1;
+
+	sramStartRead( address );
+
+	unsigned int i;
+	unsigned char ret;
+	for( i=0; i<512; i++ )
+	{
+		ret = 0;
+		sramSetSCKHigh();
+		if ( sramGetSO() )
+		{
+			ret |= 0b10000000;
+		}
+		sramSetSCKLow();
+		sramSetSCKHigh();
+		if ( sramGetSO() )
+		{
+			ret |= 0b01000000;
+		}
+		sramSetSCKLow();
+		sramSetSCKHigh();
+		if ( sramGetSO() )
+		{
+			ret |= 0b00100000;
+		}
+		sramSetSCKLow();
+		sramSetSCKHigh();
+		if ( sramGetSO() )
+		{
+			ret |= 0b00010000;
+		}
+		sramSetSCKLow();
+		sramSetSCKHigh();
+		if ( sramGetSO() )
+		{
+			ret |= 0b00001000;
+		}
+		sramSetSCKLow();
+		sramSetSCKHigh();
+		if ( sramGetSO() )
+		{
+			ret |= 0b00000100;
+		}
+		sramSetSCKLow();
+		sramSetSCKHigh();
+		if ( sramGetSO() )
+		{
+			ret |= 0b00000010;
+		}
+		sramSetSCKLow();
+		sramSetSCKHigh();
+		if ( sramGetSO() )
+		{
+			ret |= 0b00000001;
+		}
+		sramSetSCKLow();
+		i2cWriteNoWait( 0xC0 ); // data setup
+		i2cWriteNoWait( ret );
+	}
+
+	sramStop();
+
+	i2cWait();
+	i2cStop();
+	
+	oledBusy = 0;
+}
 
 //------------------------------------------------------------------------------
 int __attribute__((noreturn)) main(void)
 {
 	DDRB = 0b00000111;
-	DDRC = 0b00110000;
+	DDRC = 0b00110001;
+	DDRD = 0b10100000;
+	PORTD = 0b01000000;
 
+	sramInit();
+	
 	ledOff();
 
 	i2cInit( 10 );
@@ -161,13 +265,26 @@ int __attribute__((noreturn)) main(void)
 
 	sei();
 
-
+	unsigned char counter;
 	for(;;)
 	{
-//		ledOn();
-//		show_bitmap(0xFF);
-//		ledOff();
-//		oledClear();
+/*
+		ledOn();
+		sram2oled( counter );
+		counter += 10;
+		ledOff();
+		_delay_ms(10);
+*/
+/*
+		sram2oled( 0x0 );
+		ledOn();
+//		_delay_ms(1000);
+		oledClear();
+		ledOff();
+//		_delay_ms(1000);
+		
+//		show_bitmap( counter++ );
+//		*/
 	}
 }
 

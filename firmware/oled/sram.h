@@ -21,9 +21,11 @@
 
 void sramClock( unsigned char c );
 void sramClockAddress( unsigned int address );
+void sramStartRead( unsigned int address );
 unsigned char sramRead( unsigned int address );
 void sramWrite( unsigned int address, unsigned char data );
 void sramInit();
+#define sramStop() sramSetCSHigh();
 
 #endif
 

@@ -1,3 +1,8 @@
+#* Copyright: (c) 2013 by Curt Hartung
+#* This work is released under the Creating Commons 3.0 license
+#* found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
+#* and in the LICENCE.txt file included with this distribution
+
 TARGET = oled
 
 OBJS = \
@@ -8,6 +13,7 @@ OBJS = \
 	objs/usb.o \
 	objs/oled.o \
 	objs/24c512.o \
+	objs/sram.o \
 
 MCU = atmega88
 CPU_FREQUENCY = 12000000
@@ -48,4 +54,7 @@ objs/oled.o: oled.c
 	$(CC) -c $< -o $@
 
 objs/24c512.o: ../dna/24c512.c
+	$(CC) -c $< -o $@
+
+objs/sram.o: sram.c
 	$(CC) -c $< -o $@

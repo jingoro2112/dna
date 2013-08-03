@@ -46,7 +46,7 @@ void sramClockAddress( unsigned int address )
 }
 
 //------------------------------------------------------------------------------
-unsigned char sramRead( unsigned int address )
+void sramStartRead( unsigned int address )
 {
 	sramSetCSLow();
 
@@ -60,7 +60,13 @@ unsigned char sramRead( unsigned int address )
 	sramClock( 1 );
 
 	sramClockAddress( address );
+}
 
+//------------------------------------------------------------------------------
+unsigned char sramRead( unsigned int address )
+{
+	sramStartRead( address );
+	
 	unsigned char ret = 0;
 	sramSetSCKHigh();
 	if ( sramGetSO() )
@@ -149,4 +155,33 @@ void sramInit()
 {
 	sramSetCSHigh();
 	sramSetSCKLow();
+
+	sramSetCSLow();
+
+	sramClock( 0 );
+	sramClock( 0 );
+	sramClock( 0 );
+	sramClock( 0 );
+	sramClock( 0 );
+	sramClock( 0 );
+	sramClock( 0 );
+	sramClock( 1 );
+
+	sramClock( 0 );
+	sramClock( 1 );
+	sramClock( 0 );
+	sramClock( 0 );
+	sramClock( 0 );
+	sramClock( 0 );
+	sramClock( 0 );
+	sramClock( 1 );
+
+	sramSetCSHigh();
+
+	unsigned int i;
+	for( i=0; i<0xEFFF; i++ )
+	{
+		sramWrite( i, i );
+	}
+	
 }

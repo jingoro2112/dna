@@ -53,6 +53,16 @@ unsigned char i2cWrite( unsigned char data )
 }
 
 //------------------------------------------------------------------------------
+void i2cWriteNoWait( unsigned char data )
+{	
+	i2cWait();
+
+	// send data to the previously addressed device
+	TWDR = data;
+	TWCR = (1<<TWINT) | (1<<TWEN);
+}
+
+//------------------------------------------------------------------------------
 // Read a bye, expecting more
 unsigned char i2cReadStream()
 {
