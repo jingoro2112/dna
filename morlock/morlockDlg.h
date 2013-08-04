@@ -10,15 +10,16 @@ public:
 // Dialog Data
 	enum { IDD = IDD_MORLOCK_DIALOG };
 
-	protected:
+protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
 
 	void buildFireCycleGraphic();
+	void populateDialogFromConstants();
+	
+	static void morlockCommThread( void* arg );
 
 	Canvas m_fireCycle;
 
-	// Implementation
-protected:
 	HICON m_hIcon;
 
 	// Generated message map functions

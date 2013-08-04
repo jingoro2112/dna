@@ -8,7 +8,8 @@
 #include "../firmware/morlock/eeprom_consts.h"
 #include "../util/str.hpp"
 
-EEPROMConstants morlockConstants;
+EEPROMConstants g_morlockConstants;
+bool g_morlockConstantsDirty = false;
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -49,10 +50,10 @@ BOOL CMorlockDlg::OnInitDialog()
 
 	m_fireCycle.init( 200, 50, 20, 20 );
 
-	memset( &morlockConstants, 0, sizeof(morlockConstants) );
-//	char product[32];
-//	DNAUSB::openDevice( 0x16C0, 0x05DF, "dna@northarc.com", product );
+	memset( &g_morlockConstants, 0, sizeof(g_morlockConstants) );
 
+	_beginthread( morlockCommThread, 0, this );
+	
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -117,16 +118,87 @@ void CMorlockDlg::buildFireCycleGraphic()
 }
 
 //------------------------------------------------------------------------------
+void CMorlockDlg::populateDialogFromConstants()
+{
+	Cstr buf;
+	
+	buf.format( "%d", g_morlockConstants.dwell1 );
+	SetDlgItemText( IDC_DWELL1, buf );
+}
+
+
+//------------------------------------------------------------------------------
+void CMorlockDlg::morlockCommThread( void* arg )
+{
+	CMorlockDlg *md = (CMorlockDlg *)arg;
+	
+	unsigned char buffer[64];
+	Cstr temp;
+	DNADEVICE device = INVALID_DNADEVICE_VALUE;
+	for( ;; )
+	{
+		if ( device == INVALID_DNADEVICE_VALUE )
+		{
+			md->SetDlgItemText( IDC_PRODUCT, "n/a" );
+			md->SetDlgItemText( IDC_STATUS, "DISCONNECTED" );
+			
+			if ( !(device = DNAUSB::openDevice(0x16C0, 0x05DF, "dna@northarc.com", (char  *)buffer)) )
+			{
+				Sleep( 500 );
+				continue;
+			}
+
+			unsigned char id;
+			if ( !DNAUSB::getProductId(device, &id) )
+			{
+				goto disconnected;
+			}
+			
+			md->SetDlgItemText( IDC_PRODUCT, temp.format("%s [%d]", buffer, (int)id) );
+			md->SetDlgItemText( IDC_STATUS, "connected" );
+
+			buffer[0] = ceCommandGetConstants;
+			if ( !DNAUSB::sendData(device, buffer) )
+			{
+				goto disconnected;
+			}
+
+			if ( !DNAUSB::getData(device, buffer) )
+			{
+				goto disconnected;
+			}
+
+			memcpy( &g_morlockConstants, buffer, sizeof(g_morlockConstants) );
+			md->populateDialogFromConstants();
+			
+			md->SetDlgItemText( IDC_STATUS, "connected" );
+		}
+
+		if ( g_morlockConstantsDirty )
+		{
+			md->SetDlgItemText( IDC_STATUS, "sending..." );
+
+			g_morlockConstantsDirty = false;
+		}
+
+		continue;
+		
+disconnected:
+		DNAUSB::closeDevice( device );
+		device = INVALID_DNADEVICE_VALUE;
+	}
+}
+
+//------------------------------------------------------------------------------
 void CMorlockDlg::OnDeltaposSpin1(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	LPNMUPDOWN pNMUpDown = reinterpret_cast<LPNMUPDOWN>(pNMHDR);
 
-	morlockConstants.dwell1 -= pNMUpDown->iDelta;
+	g_morlockConstants.dwell1 -= pNMUpDown->iDelta;
 
-	Cstr buf;
-	buf.format( "%d", morlockConstants.dwell1 );
-	SetDlgItemText( IDC_DWELL1, buf );
+	populateDialogFromConstants();
 
+/*
 	buf.fileToBuffer( "digital_16.mwl" );
 	Cstr out;
 	for( int i=0; i<128; i++ )
@@ -139,7 +211,7 @@ void CMorlockDlg::OnDeltaposSpin1(NMHDR *pNMHDR, LRESULT *pResult)
 		out += "\n";
 	}
 	out.bufferToFile( "header.h" );
-	
+*/	
 	
 	*pResult = 0;
 }
