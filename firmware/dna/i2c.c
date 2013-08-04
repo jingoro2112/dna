@@ -8,6 +8,6 @@
 #if defined ( _AVR_IOMX8_H_ )
 	#include "i2c_atmega.c"
 #elif defined ( _AVR_IOTNX4_H_ )
-	#include "i2c_tiny.c"
+	#include "i2c_attiny.c"
 #endif
 

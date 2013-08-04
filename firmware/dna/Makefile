@@ -5,7 +5,6 @@
 
 OBJS = \
 	objs/usbdrvasm.o \
-	objs/usbdrv.o \
 	objs/dna.o \
 	objs/usb.o \
 	objs/a2d.o \
@@ -27,9 +26,6 @@ clean:
 
 libdna.a: $(OBJS)
 	avr-ar rcs libdna.a $(OBJS)
-
-objs/usbdrv.o: ../../usbdrv/usbdrv.c
-	$(CC) -c $< -o $@
 
 objs/usbdrvasm.o: ../../usbdrv/usbdrvasm.S
 	$(CC) -c -x assembler-with-cpp $< -o $@

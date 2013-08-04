@@ -288,7 +288,7 @@ section at the end of this file).
  * Don't forget to keep the array and this define in sync!
  */
 
-/* #define USB_PUBLIC static */
+#define USB_PUBLIC static
 /* Use the define above if you #include usbdrv.c instead of linking against it.
  * This technique saves a couple of bytes in flash memory.
  */

@@ -1,7 +1,8 @@
 #include <dna.h>
 #include <usb.h>
-
-#include "../a2d/a2d.h"
+#include <a2d.h>
+#include <i2c.h>
+#include <24c512.h>
 
 #include <avr/interrupt.h>
 #include <avr/eeprom.h>
@@ -104,6 +105,8 @@ uchar accessoryRunTime;
 uchar timesToBlinkLight;
 uchar blinkBox;
 uchar dimmerBox;
+uchar debounceBox;
+uchar burstCount;
 
 
 //------------------------------------------------------------------------------
@@ -112,6 +115,7 @@ struct EEPROMConstants
 {
 	uchar fireMode; // what fire mode we're in
 	uint refireCounter; // minimum time between shots
+	uchar eyeOffRefireCounter;
 	uchar antiMechanicalDebounce; //  how long a trigger state must remain stable before it is believed
 	uchar debounce;
 	uchar dwell1;
@@ -127,6 +131,7 @@ struct EEPROMConstants
 	uchar TriggerEyeDisable;
 	uchar dimmer;
 	uchar accessoryRunTime;
+	uchar singleSolenoid;
 	
 	uchar locked;
 	
@@ -136,21 +141,15 @@ struct EEPROMConstants
 #define FAST_TIMER_ISR_PRESCALE 23
 
 // these are approximations
-#define msToFastTimerCounts( ms ) (ms * 6) 
-#define msToSlowTimerCounts( ms ) ((ms * 255) / 1000)
-
-//------------------------------------------------------------------------------
-uint msToSlowTimerCounts( uint ms )
-{
-	return ((FAST_TIMER_COUNTS_PER_SECOND / FAST_TIMER_ISR_PRESCALE) / ms) / 1000;
-}
+#define msToFastTimerCounts( ms ) ((ms) * 6) 
+#define msToSlowTimerCounts( ms ) (((ms) * 255) / 1000)
 
 //------------------------------------------------------------------------------
 // source up the profile
 void loadEEPROMConstants()
 {
-	uchar i;
-	for( i=0; i<sizeof(EEPROMConstants); i++ )
+	unsigned int i;
+	for( i=0; i<sizeof(consts); i++ )
 	{
 		*(((uchar*)&consts) + i) = eeprom_read_byte( (uchar*)i );
 	}
@@ -159,22 +158,12 @@ void loadEEPROMConstants()
 //------------------------------------------------------------------------------
 void saveEEPROMConstants()
 {
-	uchar i;
-	for( i=0; i<sizeof(EEPROMConstants); i++ )
+	unsigned int i;
+	for( i=0; i<sizeof(consts); i++ )
 	{
 		eeprom_write_byte( (uchar*)i, *(((uchar*)&consts) + i) );
 		eeprom_busy_wait();
 	}
-}
-
-//------------------------------------------------------------------------------
-void dnaUsbInputSetup( unsigned char *data, unsigned char len )
-{
-}
-
-//------------------------------------------------------------------------------
-void dnaUsbInputStream( unsigned char *data, unsigned char len )
-{
 }
 
 //------------------------------------------------------------------------------
@@ -192,7 +181,7 @@ void cycleSingleSolenoid()
 				// modes to function within a ~400ms window (AR and
 				// Turbo)
 				if ( !triggerState
-					 && ((countBox < msToFastTimerCounts(350)) || fireMode == ceENSemi) )
+					 && ((countBox < msToFastTimerCounts(350)) || consts.fireMode == ceENSemi) )
 				{
 					startFireCycle = false;
 					return;
@@ -217,16 +206,11 @@ void cycleSingleSolenoid()
 
 	if ( consts.accessoryRunTime )
 	{
+		accessoryRunTime = consts.accessoryRunTime;
 		fet2On();
-		accessoryRunTime = consts.accesoryRunTime;
-		if ( ubAccessoryRunTime )
-	//		{
-	//			ubAccessoryRunTimeBox = ubAccessoryRunTime;
-	//			output_high( FET_2 );
-	//		}
-#endif
+	}
 
-	uiCountBox = ubDwell1;
+//	uiCountBox = ubDwell1;
 
 #ifdef MORLOCK
 	if ( !uiABSTimeBox && ubABSTime != 1 )
@@ -238,10 +222,11 @@ void cycleSingleSolenoid()
 	}
 #endif
 
-	while( uiCountBox );
+//	while( uiCountBox );
 
-	output_low( FET_1 );
+	fet1Off();
 
+/*
 	if ( bUseEye )
 	{
 		// okay the bolt is on its way forward or already forward,
@@ -261,12 +246,14 @@ void cycleSingleSolenoid()
 	}
 
 	while( ubRefireBox );
+*/
 	
 }
 
 //------------------------------------------------------------------------------
 void cycleDoubleSolenoid()
 {
+/*
 	uiCountBox = ubDwell1; 
 	output_high( FET_1 );
 	while( uiCountBox );
@@ -333,22 +320,129 @@ void cycleDoubleSolenoid()
 
 
 	output_low( FET_2 ); // close bolt
-
+*/
 }
+
+unsigned char d[8];
+
+//------------------------------------------------------------------------------
+unsigned char dnaUsbInputSetup( unsigned char *data, unsigned char len )
+{
+	switch( data[0] )
+	{
+		case 1:
+		{
+			d[0] = 0xA1;
+			d[1] = 0xB2;
+			d[2] = 0xC1;
+			d[3] = 0xD1;
+			write24c512( 0xA0, 100, d, 4 );
+			write24c512( 0xA0, 101, d+1, 1 );
+			write24c512( 0xA0, 102, d+2, 1 );
+			write24c512( 0xA0, 103, d+3, 1 );
+			break;
+		}
+
+		case 2:
+		{
+			d[0] = 1;
+			d[1] = 2;
+			d[2] = 3;
+			d[3] = 4;
+//			read24c512( 0xA0, 100, d, 4 );
+//			read24c512( 0xA0, 101, d+1, 1 );
+//			read24c512( 0xA0, 102, d+2, 1 );
+//			read24c512( 0xA0, 103, d+3, 1 );
+			dnaUsbQueueData( d, 4 );
+
+			break;
+		}
+	}
+
+
+	return 0;
+}
+
+//------------------------------------------------------------------------------
+void dnaUsbInputStream( unsigned char *data, unsigned char len )
+{
+}
+
 
 //------------------------------------------------------------------------------
 int __attribute__((noreturn)) main(void)
 {
 	dnaUsbInit();
+	i2cInit(10);
 
+//	DDRA = 0b10000000;
+//	PORTA = 0b00000001;
+	
+//	TCCR0B = 1<<CS01; // set 8-bit timer prescaler to /8 for 5859.375 intterupts per second @12mHz
+//	TIMSK0 = 1<<TOIE0; // fire off an interrupt every time it overflows, this is our tick (~170 microseconds per)
+
+	sei();
+
+	for(;;)
+	{
+		usbPoll();
+	}
+	/*
+		while ( i2cStartWrite(0xA0) );
+		i2cWrite( 0 );
+		i2cWrite( 100 );
+
+		i2cStartRead( 0xA0 );
+
+		i2cReadByte();
+		i2cReadByte();
+		i2cReadByte();
+		
+//		if ( !i2cWrite( 0x55 ) )
+//		{
+//			PORTA &= 0b01111111;
+//		}
+//		else
+//		{
+//			PORTA |= 0b10000000;
+//		}
+
+
+//		i2cWrite( 0x23 );
+
+		i2cStop();
+
+		
+
+//		read24c512( 0xA0, 100, d, 4 );
+
+		_delay_ms(5);
+
+				
+
+//		usbPoll();
+		
+	}
+
+*/
+
+
+
+
+
+
+
+
+
+
+
+	
 	loadEEPROMConstants();
 	
 	a2dSetChannel( 6 );
 	a2dSetPrescaler( A2D_PRESCALE_16 ); 
 	a2dEnableInterrupt(); // latch in the value as an interrupt rather than polling
 
-	TCCR0B = 1<<CS01; // set 8-bit timer prescaler to /8 for 5859.375 intterupts per second @12mHz
-	TIMSK0 = 1<<TOIE0; // fire off an interrupt every time it overflows, this is our tick (~170 microseconds per)
 
 	sei();
 
@@ -371,7 +465,7 @@ int __attribute__((noreturn)) main(void)
 			}
 		}
 
-		countsToReactiveTriggerDisable = msToSlowTimerCounts( 500 );
+//		countsToReactiveTriggerDisable = msToSlowTimerCounts( 500 );
 
 		autoShot = false;
 
@@ -389,7 +483,7 @@ int __attribute__((noreturn)) main(void)
 			{
 				if ( consts.fireMode == ceENSmooth )
 				{
-					debounce = 1;
+					debounceBox = 1;
 				}
 
 				if ( consts.fireMode == ceENFast || consts.fireMode == ceENPSP )
@@ -449,7 +543,7 @@ ISR( ADC_vect, ISR_NOBLOCK )
 	eyeDisable(); // done with emitter
 
 	// latch it in
-	if ( a2dReadResultNoPoll() > eyeTransitionLevel )
+	if ( a2dReadResultNoPoll() > consts.eyeTransitionLevel )
 	{
 		eyeBlocked = eyeHighBlocked;
 	}
@@ -470,7 +564,7 @@ ISR( ADC_vect, ISR_NOBLOCK )
 // three!) is lost. 
 ISR( TIM0_OVF_vect, ISR_NOBLOCK )
 {
-	usbPoll();
+//	usbPoll();
 
 	// timers at the top have a very high resolution
 	if ( refireBox )
@@ -494,10 +588,10 @@ ISR( TIM0_OVF_vect, ISR_NOBLOCK )
 		{
 			triggerState = !readTrigger();
 			
-			debounceBox = antiMechanicalDebounce;
+			debounceBox = consts.antiMechanicalDebounce;
 			triggerStateChangeValid = true; // next time around it counts
 
-			lastTriggerStateTransition = msToSlowTimerCounts( 750 );
+//			lastTriggerStateTransition = msToSlowTimerCounts( 750 );
 
 			
 

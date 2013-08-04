@@ -63,10 +63,8 @@ void sramStartRead( unsigned int address )
 }
 
 //------------------------------------------------------------------------------
-unsigned char sramRead( unsigned int address )
+unsigned char sramClockOutByte()
 {
-	sramStartRead( address );
-	
 	unsigned char ret = 0;
 	sramSetSCKHigh();
 	if ( sramGetSO() )
@@ -117,6 +115,13 @@ unsigned char sramRead( unsigned int address )
 	}
 	sramSetSCKLow();
 
+	return ret;
+}
+//------------------------------------------------------------------------------
+unsigned char sramRead( unsigned int address )
+{
+	sramStartRead( address );
+	unsigned char ret = sramClockOutByte();
 	sramSetCSHigh();
 	return ret;
 }

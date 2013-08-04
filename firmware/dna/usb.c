@@ -5,10 +5,13 @@
  */
 
 #include "usb.h"
+#include "../../usbdrv/usbdrv.c"
+
 #include "dna.h"
 
 #include <util/delay.h>
 #include <avr/interrupt.h>
+#include <avr/wdt.h>
 
 //------------------------------------------------------------------------------
 const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] =
@@ -44,17 +47,13 @@ unsigned char usbFunctionSetup( unsigned char data[8] )
 	
 	if( request->bRequest == USBRQ_HID_SET_REPORT )
 	{
-		s_dataTransferRemaining = 66;
 		s_status |= Status_CommandToMCUSetup;
 		return USB_NO_MSG;
 	}
-	else //if ( request->bRequest == USBRQ_HID_GET_REPORT )
-	{
-		s_status |= Status_DataFromMCUSetup;
-		return 0xFF;
-	}
+	// USBRQ_HID_GET_REPORT is the only other supported message
 
-	return 0;
+	s_status |= Status_DataFromMCUSetup;
+	return 0xFF;
 }
 
 //------------------------------------------------------------------------------
@@ -62,12 +61,12 @@ unsigned char usbFunctionWrite( unsigned char *data, unsigned char len )
 {
 	if ( s_status & Status_CommandToMCUSetup ) // a command is being sent down
 	{
+		s_dataTransferRemaining = 66;
 		s_status &= ~Status_CommandToMCUSetup;
 
 		if ( data[1] == USBCommandEnterBootloader ) // soft entry to bootloader?
 		{
-			cli();
-			asm volatile ("ijmp" ::"z" (BOOTLOADER_ENTRY));
+			wdt_enable( WDTO_15MS ); // light the fuse
 		}
 
 		if ( data[1] == USBCommandWriteData ) // data send?

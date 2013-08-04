@@ -1,10 +1,17 @@
+/* Copyright: (c) 2013 by Curt Hartung
+ * This work is released under the Creating Commons 3.0 license
+ * found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
+ * and in the LICENCE.txt file included with this distribution
+ */
+
 #include "../dna_defs.h"
-#include "../../../usbdrv/usbdrv.h"
+#include "../../../usbdrv/usbdrv.c"
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/boot.h>
 #include <avr/pgmspace.h>
+#include <avr/wdt.h>
 #include <util/delay.h>
 
 //------------------------------------------------------------------------------
@@ -34,7 +41,7 @@ const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
 	0xc0					// END_COLLECTION
 };
 
-static int g_addressBase = 0;
+static int g_addressBase;
 static int g_byteCountIn;
 static int g_pageZero[32];
 static int g_pageZeroCounter;
@@ -48,35 +55,32 @@ void commitPage( unsigned int page )
 	boot_spm_busy_wait();
 }
 
-static unsigned char s_replyBuffer[66];
+static unsigned char s_replyBuffer[4];
 
 //------------------------------------------------------------------------------
 unsigned char usbFunctionSetup( unsigned char data[8] )
 {
-	usbRequest_t *request = (usbRequest_t *)data;
-
-	if( request->bRequest == USBRQ_HID_SET_REPORT )
+	if( ((usbRequest_t *)data)->bRequest == USBRQ_HID_SET_REPORT )
 	{
 		g_byteCountIn = 0;
 		return USB_NO_MSG;
 	}
-	else// if ( request->bRequest == USBRQ_HID_GET_REPORT )
-	{
-		// Report_Command implied only one command is legal, so don't
-		// bother parsing it
-		s_replyBuffer[0] = Report_Command;
-		s_replyBuffer[1] = BOOTLOADER_DNA_AT84_v1_00;
+
+//	USBRQ_HID_GET_REPORT is the only other supported method
+
+	// Report_Command implied only one command is legal, so don't
+	// bother parsing it
+	s_replyBuffer[0] = Report_Command;
+	s_replyBuffer[1] = BOOTLOADER_DNA_AT84_v1_00;
 		
 #ifdef RELOCATE
-		g_addressBase = 0; // reset loader
+	g_addressBase = 0; // reset loader
 #else
-		g_addressBase = 0x800; // reset loader
+	g_addressBase = 0x800; // reset loader
 #endif
-		usbMsgPtr = (usbMsgPtr_t)s_replyBuffer;
-		return 4;
-	}
 	
-	return 0;
+	usbMsgPtr = (usbMsgPtr_t)s_replyBuffer;
+	return 4;
 }
 
 //------------------------------------------------------------------------------
@@ -153,14 +157,18 @@ void ResetVector (void)
 // PC space, not address space!
 const PROGMEM int isrJump[] =
 {
-	0x93EF, // ef 93  push r30
+	0x08C0, // c0 08  rjmp +8    -- rjmp to the second ijmp
+	0x93EF, // ef 93  push r30   -- INT0, push r30/31
 	0x93FF, // ff 93  push r31
-	0xEDE8, // e8 ed  ldi r30, 0xD8
+	0xEEEC, // ec ee  ldi r30, 0xEC -- load them with the ISR vector for..
 	0xE0FC, // fc e0  ldi r31, 0x0C
-	0x9509, // 09 95  icall
+	0x9509, // 09 95  icall         -- an icall, so it can be reached WAAAY at the top of Flash
 	0x91FF, // ff 91  pop r31
 	0x91EF, // ef 91  pop r30
 	0x9508, // 08 95  ret
+	0xE6E0, // e0 e6  ldi r30, 0x60	-- ijmp to the bootloader
+	0xE0FC, // fc e0  ldi r31, 0x0C
+	0x9409, // 09 94  ijmp
 };
 
 #endif
@@ -168,27 +176,25 @@ const PROGMEM int isrJump[] =
 //------------------------------------------------------------------------------
 int __attribute__((noreturn)) main(void)
 {
-	unsigned char i;
+	wdt_disable(); // don't know how we got here, but make sure this is OFF
+	MCUSR = 0;
 
 #ifdef RELOCATE
-	// preserve reset vector in case it all goes pear-shaped.. since
-	// tha DNA spec requires __init to be the very first thing called
-	// in all cases, if the bootloader exits, the main app will be
-	// called again. it will be screwed because we rewrote its INT0,
-	// BUT since __init has to be called first, the bootloader can
-	// still be entered with the programming dongle, but only if we
-	// write back what was there by reading it first
-	boot_page_fill( 0, pgm_read_word(0) );
+	// Once the bootloader has been entered its for good, replace the
+	// reset vector with an rjmp to an ijmp that puts us back into it
 
 	const int* isr = isrJump; // read array from program memory, saves copy step
-	for( i=2; i<18; i+=2 )
+	unsigned char i;
+	for( i=0; i<24; i+=2 )
 	{
 		boot_page_fill( i, pgm_read_word(isr++) ); // rewrite the ISR to jump way up to our USB int0 routine
 	}
 
 	commitPage( 0 );
 #endif
-	
+
+	DDRA = 0b10000000;
+
 	usbInit();
 	usbDeviceDisconnect();
 	_delay_ms(250);
@@ -196,8 +202,18 @@ int __attribute__((noreturn)) main(void)
 
 	sei();
 
+	unsigned char c;
 	for(;;)
 	{
-		usbPoll();
+		PORTA = 0b00000000;
+		while( c++ )
+		{
+			usbPoll();
+		}
+		PORTA = 0b10000000;
+		while( c++ )
+		{
+			usbPoll();
+		}
 	}
 }

@@ -1,5 +1,5 @@
-#ifndef I2C_H
-#define I2C_H
+#ifndef I2C_ATTINY_H
+#define I2C_ATTINY_H
 /*------------------------------------------------------------------------------*/
 /* Copyright: (c) 2013 by Curt Hartung
  * This work is released under the Creating Commons 3.0 license
@@ -14,25 +14,23 @@ unsigned char i2cStartWrite( unsigned char address );
 unsigned char i2cWrite( unsigned char data );
 unsigned char i2cReadStream(); // Read a bye, expecting more
 unsigned char i2cReadByte(); // Read a single byte and terminate transmission
+void i2cInit( unsigned char c );
+void i2cStart();
+void i2cStop();
 
-#if defined ( _AVR_IOMX8_H_ ) // defines for the ATMega series
+#define i2cWait()
 
-#include <util/twi.h>
+//#define i2cSetSCLLow() (DDRA |=  0b00010000); asm volatile("nop"); asm volatile("nop"); asm volatile("nop")//_delay_us(1)
+//#define i2cSetSCLHigh() (DDRA &= 0b11101111); asm volatile("nop"); asm volatile("nop"); asm volatile("nop")//_delay_us(1)
+//#define i2cSetSDALow() (DDRA |=  0b01000000); asm volatile("nop"); asm volatile("nop"); asm volatile("nop")//_delay_us(1)
+//#define i2cSetSDAHigh() (DDRA &= 0b10111111); asm volatile("nop"); asm volatile("nop"); asm volatile("nop")//_delay_us(1)
 
-// ((F_CPU/I2C_CLOCK_IN_HZ)-16)/2;
+#define i2cSetSCLLow() (DDRA |=  0b00010000); _delay_us(5)
+#define i2cSetSCLHigh() (DDRA &= 0b11101111); _delay_us(5)
+#define i2cSetSDALow() (DDRA |=  0b01000000); _delay_us(5)
+#define i2cSetSDAHigh() (DDRA &= 0b10111111); _delay_us(5)
 
-#define i2cInit( c ) \
-	TWSR = 0; \
-	TWBR = (c);  \
-	TWCR = (1<<TWEN); \
 
-#define i2cWait() if ( !(TWCR & (1<<TWINT)) ) { i2cWaitLoop(); }
-
-#define i2cStart() TWCR = (1<<TWINT) | (1<<TWSTA) | (1<<TWEN) i2cWait() 
-#define i2cStop() (TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWSTO)) // place a stop condition on the bus
-
-#elif defined ( _AVR_IOTNX4_H_ ) // defined for the ATTiny series
-
-#endif
+#define i2cGetSDA() (PINA & 0b01000000)
 
 #endif

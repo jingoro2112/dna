@@ -8,26 +8,11 @@
  */
 
 #include <avr/io.h>
-#include <util/twi.h>
 
-// ((F_CPU/I2C_CLOCK_IN_HZ)-16)/2;
-
-#define i2cInit( c ) \
-	TWSR = 0; \
-	TWBR = (c);  \
-	TWCR = (1<<TWEN); \
-
-void i2cWaitLoop();
-#define i2cWait() if ( !(TWCR & (1<<TWINT)) ) { i2cWaitLoop(); }
-
-unsigned char i2cStartRead( unsigned char address );
-unsigned char i2cStartWrite( unsigned char address );
-#define i2cStart() TWCR = (1<<TWINT) | (1<<TWSTA) | (1<<TWEN) i2cWait() 
-#define i2cStop() (TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWSTO)) // place a stop condition on the bus
-
-unsigned char i2cWrite( unsigned char data );
-void i2cWriteNoWait( unsigned char data ); // do not wait for an ack, don't poll for completion
-unsigned char i2cReadStream(); // Read a bye, expecting more
-unsigned char i2cReadByte(); // Read a single byte and terminate transmission
+#if defined ( _AVR_IOMX8_H_ )
+#include "i2c_atmega.h"
+#elif defined ( _AVR_IOTNX4_H_ )
+#include "i2c_attiny.h"
+#endif
 
 #endif

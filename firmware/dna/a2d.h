@@ -19,7 +19,7 @@
 #define A2D_PRESCALE_64 0b110
 #define A2D_PRESCALE_128 0b111
 #define a2dSetPrescaler( f ) (ADCSRA = (1<<ADEN) | (f))
-#define a2dEnableInterrupt() (ADCSRA |= (1<<ADIE)
+#define a2dEnableInterrupt() (ADCSRA |= (1<<ADIE))
 
 unsigned int a2dReadResult();
 unsigned int a2dReadResultNoPoll();

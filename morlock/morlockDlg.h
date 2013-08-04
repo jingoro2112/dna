@@ -1,4 +1,5 @@
 #pragma once
+#include "../util/canvas.hpp"
 
 //------------------------------------------------------------------------------
 class CMorlockDlg : public CDialogEx
@@ -12,8 +13,11 @@ public:
 	protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
 
-	
-// Implementation
+	void buildFireCycleGraphic();
+
+	Canvas m_fireCycle;
+
+	// Implementation
 protected:
 	HICON m_hIcon;
 

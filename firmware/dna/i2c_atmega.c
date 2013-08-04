@@ -21,7 +21,7 @@ unsigned char i2cStartRead( unsigned char address )
 	TWCR = (1<<TWINT) | (1<<TWEN); // put address on bus
 	i2cWait();
 
-	return TW_STATUS == TW_MR_SLA_ACK ? 0 : 1; // was there someone out there?
+	return TW_STATUS == TW_MR_SLA_ACK;
 }
 
 //------------------------------------------------------------------------------
@@ -35,7 +35,7 @@ unsigned char i2cStartWrite( unsigned char address )
 
 	i2cWait();
 
-	return TW_STATUS == TW_MT_SLA_ACK ? 0 : 1; // was there someone out there?
+	return TW_STATUS == TW_MT_SLA_ACK; // was there someone out there?
 }
 
 //------------------------------------------------------------------------------
@@ -49,7 +49,7 @@ unsigned char i2cWrite( unsigned char data )
 
 	i2cWait();
 
-	return TW_STATUS != TW_MT_SLA_ACK;
+	return TW_STATUS == TW_MT_SLA_ACK;
 }
 
 //------------------------------------------------------------------------------

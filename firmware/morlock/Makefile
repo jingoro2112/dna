@@ -1,12 +1,18 @@
+#* Copyright: (c) 2013 by Curt Hartung
+#* This work is released under the Creating Commons 3.0 license
+#* found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
+#* and in the LICENCE.txt file included with this distribution
+
 TARGET = morlock
 
 OBJS = \
 	objs/usbdrvasm.o \
-	objs/usbdrv.o \
 	objs/dna.o \
 	objs/usb.o \
 	objs/main.o \
 	objs/a2d.o \
+	objs/i2c.o \
+	objs/24c512.o \
 
 MCU = attiny84
 CPU_FREQUENCY = 12000000
@@ -28,9 +34,6 @@ $(TARGET).hex: $(OBJS)
 	avr-objdump -d $(TARGET).elf >> $(TARGET).disassembly
 #	..\..\loader\loader -i $(TARGET).hex
 
-objs/usbdrv.o: ../../usbdrv/usbdrv.c
-	$(CC) -c $< -o $@
-
 objs/usbdrvasm.o: ../../usbdrv/usbdrvasm.S
 	$(CC) -c -x assembler-with-cpp $< -o $@
 
@@ -46,5 +49,11 @@ objs/main.o: main.c
 objs/rna_master.o: ../rna/rna_master.c
 	$(CC) -c $< -o $@
 
-objs/a2d.o: ../a2d/a2d.c
+objs/a2d.o: ../dna/a2d.c
+	$(CC) -c $< -o $@
+
+objs/i2c.o: ../dna/i2c.c
+	$(CC) -c $< -o $@
+
+objs/24c512.o: ../dna/24c512.c
 	$(CC) -c $< -o $@

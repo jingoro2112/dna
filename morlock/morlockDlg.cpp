@@ -3,13 +3,16 @@
 #include "morlockDlg.h"
 #include "afxdialogex.h"
 
-#include "../util/canvas.hpp"
+#include "../dnausb/dnausb.h"
+#include "../firmware/dna/dna_defs.h"
+#include "../firmware/morlock/eeprom_consts.h"
+#include "../util/str.hpp"
+
+EEPROMConstants morlockConstants;
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
-
-Canvas canvas;
 
 //------------------------------------------------------------------------------
 CMorlockDlg::CMorlockDlg(CWnd* pParent /*=NULL*/)
@@ -44,7 +47,11 @@ BOOL CMorlockDlg::OnInitDialog()
 	SetIcon(m_hIcon, TRUE);			// Set big icon
 	SetIcon(m_hIcon, FALSE);		// Set small icon
 
-	canvas.init( 100, 100 );
+	m_fireCycle.init( 200, 50, 20, 20 );
+
+	memset( &morlockConstants, 0, sizeof(morlockConstants) );
+//	char product[32];
+//	DNAUSB::openDevice( 0x16C0, 0x05DF, "dna@northarc.com", product );
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -72,7 +79,7 @@ void CMorlockDlg::OnPaint()
 	else
 	{
 		CDialogEx::OnPaint();
-		canvas.blit( ::GetDC(GetSafeHwnd()) );
+		m_fireCycle.blit( ::GetDC(GetSafeHwnd()) );
 	}
 }
 
@@ -103,11 +110,36 @@ void CMorlockDlg::OnBnClickedButton1()
 }
 
 //------------------------------------------------------------------------------
+void CMorlockDlg::buildFireCycleGraphic()
+{
+
+	m_fireCycle.blit( ::GetDC(GetSafeHwnd()) );
+}
+
+//------------------------------------------------------------------------------
 void CMorlockDlg::OnDeltaposSpin1(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	LPNMUPDOWN pNMUpDown = reinterpret_cast<LPNMUPDOWN>(pNMHDR);
-	// TODO: Add your control notification handler code here
-	*pResult = 0;
 
-	canvas.blit( ::GetDC(GetSafeHwnd()) );
+	morlockConstants.dwell1 -= pNMUpDown->iDelta;
+
+	Cstr buf;
+	buf.format( "%d", morlockConstants.dwell1 );
+	SetDlgItemText( IDC_DWELL1, buf );
+
+	buf.fileToBuffer( "digital_16.mwl" );
+	Cstr out;
+	for( int i=0; i<128; i++ )
+	{
+		for ( int j=0; j<128; j++ )
+		{
+			out.appendFormat( "0x%02X, ", (unsigned char)buf[j + i*128 + 8] );
+		}
+
+		out += "\n";
+	}
+	out.bufferToFile( "header.h" );
+	
+	
+	*pResult = 0;
 }

@@ -1,5 +1,5 @@
-#ifndef I2C_H
-#define I2C_H
+#ifndef I2C_ATMEGA_H
+#define I2C_ATMEGA_H
 /*------------------------------------------------------------------------------*/
 /* Copyright: (c) 2013 by Curt Hartung
  * This work is released under the Creating Commons 3.0 license
