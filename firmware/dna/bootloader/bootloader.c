@@ -45,6 +45,7 @@ static int g_addressBase;
 static int g_byteCountIn;
 static int g_pageZero[32];
 static int g_pageZeroCounter;
+unsigned char g_zeroBlockChecksum;
 
 //------------------------------------------------------------------------------
 void commitPage( unsigned int page )
@@ -55,7 +56,7 @@ void commitPage( unsigned int page )
 	boot_spm_busy_wait();
 }
 
-static unsigned char s_replyBuffer[4];
+static unsigned char s_replyBuffer[4];// = { 0, 0 };
 
 //------------------------------------------------------------------------------
 unsigned char usbFunctionSetup( unsigned char data[8] )
@@ -68,17 +69,19 @@ unsigned char usbFunctionSetup( unsigned char data[8] )
 
 //	USBRQ_HID_GET_REPORT is the only other supported method
 
-	// Report_Command implied only one command is legal, so don't
-	// bother parsing it
 	s_replyBuffer[0] = Report_Command;
 	s_replyBuffer[1] = BOOTLOADER_DNA_AT84_v1_00;
+
+	// Report_Command inferred; only one command is legal, so don't
+	// bother parsing it
 		
 #ifdef RELOCATE
 	g_addressBase = 0; // reset loader
 #else
 	g_addressBase = 0x800; // reset loader
 #endif
-	
+
+	g_zeroBlockChecksum = 0;
 	usbMsgPtr = (usbMsgPtr_t)s_replyBuffer;
 	return 4;
 }
@@ -88,7 +91,7 @@ unsigned char usbFunctionWrite( unsigned char *data, unsigned char len )
 {
 	if ( !g_byteCountIn ) // a command is being sent down
 	{
-		if ( data[1] == USBCommandEnterApp )
+		if ( (data[1] == USBCommandEnterApp) && (data[2] == g_zeroBlockChecksum) )
 		{
 			cli();
 
@@ -118,6 +121,9 @@ unsigned char usbFunctionWrite( unsigned char *data, unsigned char len )
 
 		if ( g_addressBase == 0 )
 		{
+			g_zeroBlockChecksum += w;
+			g_zeroBlockChecksum += w >> 8;
+
 			g_pageZero[g_pageZeroCounter++] = w;
 		}
 		else
@@ -157,10 +163,10 @@ void ResetVector (void)
 // PC space, not address space!
 const PROGMEM int isrJump[] =
 {
-	0x08C0, // c0 08  rjmp +8    -- rjmp to the second ijmp
+	0x08C0, // c0 08  rjmp +8    -- rjmp to trampoline
 	0x93EF, // ef 93  push r30   -- INT0, push r30/31
 	0x93FF, // ff 93  push r31
-	0xEEEC, // ec ee  ldi r30, 0xEC -- load them with the ISR vector for..
+	0xEEE7, // e7 ee  ldi r30, 0xE7 -- load them with the ISR vector for..
 	0xE0FC, // fc e0  ldi r31, 0x0C
 	0x9509, // 09 95  icall         -- an icall, so it can be reached WAAAY at the top of Flash
 	0x91FF, // ff 91  pop r31
@@ -176,9 +182,6 @@ const PROGMEM int isrJump[] =
 //------------------------------------------------------------------------------
 int __attribute__((noreturn)) main(void)
 {
-	wdt_disable(); // don't know how we got here, but make sure this is OFF
-	MCUSR = 0;
-
 #ifdef RELOCATE
 	// Once the bootloader has been entered its for good, replace the
 	// reset vector with an rjmp to an ijmp that puts us back into it
@@ -193,8 +196,6 @@ int __attribute__((noreturn)) main(void)
 	commitPage( 0 );
 #endif
 
-	DDRA = 0b10000000;
-
 	usbInit();
 	usbDeviceDisconnect();
 	_delay_ms(250);
@@ -202,17 +203,15 @@ int __attribute__((noreturn)) main(void)
 
 	sei();
 
-	unsigned char c;
+	DDRA |= 0b10000000;
+	unsigned int c;
 	for(;;)
 	{
-		PORTA = 0b00000000;
-		while( c++ )
+		c = 0;
+		PORTA ^= 0b10000000;
+		while( c < 15000 )
 		{
-			usbPoll();
-		}
-		PORTA = 0b10000000;
-		while( c++ )
-		{
+			c++;
 			usbPoll();
 		}
 	}

@@ -55,7 +55,7 @@ int main( int argc, char *argv[] )
 	char image[256] = "application.hex";
 	args.isStringSet( "-i", image );
 
-	Cstr vendor( "dna@northarc.com" );
+	Cstr vendor( "p@northarc.com" );
 	if ( args.isSet("-oled") )
 	{
 		vendor = "oled@northarc.com";
@@ -84,7 +84,7 @@ int main( int argc, char *argv[] )
 			continue;
 		}
 
-		Log( "Found: %s", product );
+		Log( "Found: %s[0x%02X]", product, (unsigned char)product[0] );
 
 		unsigned char id;
 		DNAUSB::getProductId( handle, &id );
@@ -125,7 +125,6 @@ int main( int argc, char *argv[] )
 			break;
 		}
 
-		char page[256];
 		switch( id )
 		{
 			case OLED_AM88_v1_00:
@@ -173,25 +172,16 @@ int main( int argc, char *argv[] )
 				}
 				ReadHex::Chunk *chunk = chunklist.getFirst();
 
-				int pos = 0;
-				while( pos < chunk->size )
+				if ( chunk->size > 0x18e0 )
 				{
-					for( unsigned char i=0; i<64; i++ )
-					{
-						if ( pos < chunk->size )
-						{
-							page[i] = chunk->data[pos++];
-						}
-						else
-						{
-							page[i] = 0;
-						}
-					}
-
-					DNAUSB::sendCodePage( handle, (unsigned char *)page );
+					Log( "code too large" );
+					return -1;
 				}
 
-				DNAUSB::sendEnterApp( handle );
+				// todo: check to see that the reset vector is there
+
+				DNAUSB::sendCode( handle, (unsigned char *)(chunk->data), chunk->size );
+				DNAUSB::sendEnterApp( handle, DNAUSB::getPageZeroChecksum((unsigned char *)(chunk->data)) );
 
 				trying = false;
 				break;

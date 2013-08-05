@@ -1,6 +1,6 @@
 #include "dna.h"
 #include <avr/io.h>
-#include <avr/wdt.h>
+#include <util/delay.h>
 /* Copyright: (c) 2013 by Curt Hartung
  * This work is released under the Creating Commons 3.0 license
  * found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
@@ -20,31 +20,38 @@
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 void __init()
 {
+/*
+	DDRB = 0; // juuust in case it has been screwed with (this is primarily
+	// to make sure this code still works in warm-reset situations
+	PORTB = 0b00001000; // turn on pullup and see if it has been shorted
+*/
+
+	// start the pin rising as quickly as possible, if it's going to
+	DDRA = 0; // all input (if they're not)
+	PORTA = 0b0000001; // turn on pullup
+
 	// some non-trivial code here, make sure c's assumptions are valid
-	asm volatile ( ".set __stack, %0" :: "i" (RAMEND) ); 
+	
+//	asm volatile ( ".set __stack, %0" :: "i" (RAMEND) );  // not using the stack, but if we do, comment this back in!
 	asm volatile ( "clr __zero_reg__" );
 	
 	// if the source of the reset was a watchdog timeout, indicating a software
 	// request of bootloader entry, disable the watchdog and enter the
 	// bootloader
-	if ( MCUSR & (1<<WDRF) )
+
+	if ( WDTCSR & (1<<WDE) )
 	{
-		wdt_disable();
-		MCUSR = 0;	
+		MCUSR = 0;
+		WDTCSR |= (1<<WDCE) | (1<<WDE);
+		WDTCSR = 0x00;
 		goto bootloader_jump;
 	}
 	MCUSR = 0;	
 	
 /*
-	DDRB = 0; // juuust in case it has been screwed with (this is primarily
-			  // to make sure this code still works in warm-reset situations
-	PORTB = 0b00001000; // turn on pullup and see if it has been shorted
 
 	// give it a chance to stabilize and clock in, can't be too careful
-	asm volatile( "nop" );
-	asm volatile( "nop" );
-	asm volatile( "nop" );
-	asm volatile( "nop" ); 
+	_delay_us(50); // make sure we give the pin plenty of time to rise if necessary, it is a weak pullup
 	
 	if ( PINB & 0b00001000 )
 	{
@@ -52,14 +59,8 @@ void __init()
 	}
 */
 
-	DDRA = 0;
-	PORTA = 0b0000001; // turn on pullup and see if it has been shorted
-
 	// give it a chance to stabilize and clock in, can't be too careful
-	asm volatile( "nop" );
-	asm volatile( "nop" );
-	asm volatile( "nop" );
-	asm volatile( "nop" ); 
+	_delay_us(50); // make sure we give the pin plenty of time to rise if necessary, it is a weak pullup
 
 	if ( PINA & 0b00000001 )
 	{

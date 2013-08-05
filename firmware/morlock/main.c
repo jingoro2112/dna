@@ -564,8 +564,6 @@ ISR( ADC_vect, ISR_NOBLOCK )
 // three!) is lost. 
 ISR( TIM0_OVF_vect, ISR_NOBLOCK )
 {
-//	usbPoll();
-
 	// timers at the top have a very high resolution
 	if ( refireBox )
 	{
