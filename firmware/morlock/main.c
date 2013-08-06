@@ -129,7 +129,7 @@ void loadEEPROMConstants()
 	unsigned int i;
 	for( i=0; i<sizeof(consts); i++ )
 	{
-		*(((uchar*)&consts) + i) = eeprom_read_byte( (uchar*)i );
+		((uchar*)&consts)[i] = eeprom_read_byte( (uchar*)i );
 	}
 }
 
@@ -404,7 +404,8 @@ int __attribute__((noreturn)) main(void)
 {
 	dnaUsbInit();
 	i2cInit(10);
-
+	loadEEPROMConstants();
+	
 //	DDRA = 0b10000000;
 //	PORTA = 0b00000001;
 	

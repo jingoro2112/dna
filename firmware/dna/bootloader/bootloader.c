@@ -41,11 +41,12 @@ const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
 	0xc0					// END_COLLECTION
 };
 
-int g_addressBase;
-static int g_byteCountIn;
-static int g_pageZero[32];
-static int g_pageZeroCounter;
-unsigned char g_zeroBlockChecksum;
+int g_addressBase; // page base currently being loaded
+static int g_byteCountIn; // how much data is remaining to tranfer in the current code page
+static int g_pageZero[32]; // retain page zero (ISR) in RAM, commit only after load is complete and validated
+static int g_pageZeroIndex;
+unsigned char g_codeChecksum; // must match before user app is entered
+static unsigned char s_replyBuffer[4];
 
 //------------------------------------------------------------------------------
 void commitPage( unsigned int page )
@@ -55,8 +56,6 @@ void commitPage( unsigned int page )
 	boot_page_write( page );
 	boot_spm_busy_wait();
 }
-
-static unsigned char s_replyBuffer[4];
 
 //------------------------------------------------------------------------------
 unsigned char usbFunctionSetup( unsigned char data[8] )
@@ -81,7 +80,7 @@ unsigned char usbFunctionSetup( unsigned char data[8] )
 	g_addressBase = 0x800; // reset loader
 #endif
 
-//	g_zeroBlockChecksum = 0;
+//	g_codeChecksum = 0;
 	usbMsgPtr = (usbMsgPtr_t)s_replyBuffer;
 	return 4;
 }
@@ -95,7 +94,7 @@ unsigned char usbFunctionWrite( unsigned char *data, unsigned char len )
 		{
 			cli();
 
-			if (  data[2] == g_zeroBlockChecksum ) // was the checksum accurate?
+			if (  data[2] == g_codeChecksum ) // was the checksum accurate?
 			{
 				// now safe to install page 0 (interrupt vector table)
 				// overwriting our USB hack
@@ -129,11 +128,11 @@ unsigned char usbFunctionWrite( unsigned char *data, unsigned char len )
 	{
 		uint16_t w = *data++;
 		w += (*data++) << 8;
-		g_zeroBlockChecksum += (w >> 8) + w;
+		g_codeChecksum += (w >> 8) + w;
 
 		if ( g_addressBase == 0 ) // don't commit page zero until very last, or our interrupts will be lost
 		{
-			g_pageZero[g_pageZeroCounter++] = w;
+			g_pageZero[g_pageZeroIndex++] = w;
 		}
 		else
 		{
