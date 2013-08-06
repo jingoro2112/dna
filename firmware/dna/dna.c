@@ -1,6 +1,7 @@
 #include "dna.h"
 #include <avr/io.h>
 #include <util/delay.h>
+#include <avr/wdt.h>
 /* Copyright: (c) 2013 by Curt Hartung
  * This work is released under the Creating Commons 3.0 license
  * found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
@@ -20,15 +21,11 @@
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 void __init()
 {
-/*
-	DDRB = 0; // juuust in case it has been screwed with (this is primarily
-	// to make sure this code still works in warm-reset situations
-	PORTB = 0b00001000; // turn on pullup and see if it has been shorted
-*/
-
 	// start the pin rising as quickly as possible, if it's going to
-	DDRA = 0; // all input (if they're not)
-	PORTA = 0b0000001; // turn on pullup
+
+	DDRB = 0; // juuust in case it has been screwed with (this is primarily
+			  // to make sure this code still works in warm-reset situations
+	PORTB = 0b00001000; // turn on pullup
 
 	// some non-trivial code here, make sure c's assumptions are valid
 	
@@ -38,31 +35,17 @@ void __init()
 	// if the source of the reset was a watchdog timeout, indicating a software
 	// request of bootloader entry, disable the watchdog and enter the
 	// bootloader
-
 	if ( WDTCSR & (1<<WDE) )
 	{
 		MCUSR = 0;
 		WDTCSR |= (1<<WDCE) | (1<<WDE);
 		WDTCSR = 0x00;
-		goto bootloader_jump;
+		goto bootloader_jump; // waste not, want not, this saves a few bytes (ijmp take 3 instructions, goto only 1)
 	}
-	MCUSR = 0;	
 	
-/*
-
-	// give it a chance to stabilize and clock in, can't be too careful
-	_delay_us(50); // make sure we give the pin plenty of time to rise if necessary, it is a weak pullup
-	
+	// give the pin a chance to stabilize and clock in, can't be too careful
+	_delay_us(50);
 	if ( PINB & 0b00001000 )
-	{
-	asm volatile ("rjmp __ctors_end" ); // return to our regularly scheduled C program
-	}
-*/
-
-	// give it a chance to stabilize and clock in, can't be too careful
-	_delay_us(50); // make sure we give the pin plenty of time to rise if necessary, it is a weak pullup
-
-	if ( PINA & 0b00000001 )
 	{
 		asm volatile ("rjmp __ctors_end" ); // return to our regularly scheduled C program
 	}

@@ -9,6 +9,9 @@
 
 #include <util/delay.h>
 
+#include "eeprom_consts.h"
+#include "morlock_defs.h"
+
 #ifndef true
 #define true 1
 #endif
@@ -108,34 +111,9 @@ uchar dimmerBox;
 uchar debounceBox;
 uchar burstCount;
 
-
-//------------------------------------------------------------------------------
-// loaded and saved as a flat structure
-struct EEPROMConstants 
-{
-	uchar fireMode; // what fire mode we're in
-	uint refireCounter; // minimum time between shots
-	uchar eyeOffRefireCounter;
-	uchar antiMechanicalDebounce; //  how long a trigger state must remain stable before it is believed
-	uchar debounce;
-	uchar dwell1;
-	uchar dwell2;
-	uchar AFACount;
-	uchar AFARate;
-	uint eyeTransitionLevel; // the point at which the eye is considered to have gone from high to low
-	uchar fireHoldoff;
-	uchar eyeHoldoff;
-	uchar ABSTime;
-	uchar ABSAddition;
-	uint EyeOffRefireCounter;
-	uchar TriggerEyeDisable;
-	uchar dimmer;
-	uchar accessoryRunTime;
-	uchar singleSolenoid;
-	
-	uchar locked;
-	
-} volatile consts;
+uchar usbCommand = ceCommandIdle;
+uchar eepromLoadPointer;
+volatile struct EEPROMConstants consts;
 
 #define FAST_TIMER_COUNTS_PER_SECOND 5859
 #define FAST_TIMER_ISR_PRESCALE 23
@@ -328,9 +306,35 @@ unsigned char d[8];
 //------------------------------------------------------------------------------
 unsigned char dnaUsbInputSetup( unsigned char *data, unsigned char len )
 {
-	switch( data[0] )
+	/*
+	if ( usbCommand != ceCommandIdle )
 	{
-		case 1:
+		return 0; // must be part of a multi-command, pass through
+	}
+	
+	usbCommand = data[0];
+	switch( usbCommand )
+	{
+		case ceCommandSetEEPROMConstants:
+		{
+			eepromLoadPointer = 0;
+			break;
+		}
+		
+		case ceCommandGetEEPROMConstants:
+		{
+			dnaUsbQueueData( (unsigned char *)&consts, sizeof(consts) );
+			usbCommand = ceCommandIdle;
+			break;
+		}
+		
+		default:
+			usbCommand = ceCommandIdle; // yeek
+			break;
+	}
+	*/
+	/*
+		case 10:
 		{
 			d[0] = 0xA1;
 			d[1] = 0xB2;
@@ -343,7 +347,7 @@ unsigned char dnaUsbInputSetup( unsigned char *data, unsigned char len )
 			break;
 		}
 
-		case 2:
+		case 20:
 		{
 			d[0] = 1;
 			d[1] = 2;
@@ -357,8 +361,8 @@ unsigned char dnaUsbInputSetup( unsigned char *data, unsigned char len )
 
 			break;
 		}
-	}
-
+*/
+	
 
 	return 0;
 }
@@ -366,6 +370,32 @@ unsigned char dnaUsbInputSetup( unsigned char *data, unsigned char len )
 //------------------------------------------------------------------------------
 void dnaUsbInputStream( unsigned char *data, unsigned char len )
 {
+	/*
+	switch( usbCommand )
+	{
+		case ceCommandSetEEPROMConstants:
+		{
+			unsigned char i;
+			for( i=0; i<len; i++ )
+			{
+				((unsigned char *)&consts)[eepromLoadPointer++] = data[i];
+			}
+			
+			if ( eepromLoadPointer >= sizeof(consts) )
+			{
+				usbCommand = ceCommandIdle;
+				saveEEPROMConstants();
+			}
+			break;
+		}
+		
+		default:
+		{
+			usbCommand = ceCommandIdle;
+			break;
+		}
+	}
+	*/
 }
 
 

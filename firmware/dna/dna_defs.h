@@ -39,7 +39,7 @@ enum USBReports
 };
 
 //------------------------------------------------------------------------------
-enum USBCommands
+enum DNAUSBCommands
 {
 	USBCommandCodePage = 1,
 	USBCommandEnterApp,

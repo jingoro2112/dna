@@ -31,7 +31,7 @@ clean:
 $(TARGET).hex: $(OBJS)
 	$(CC) -o $(TARGET).elf -Wl,-gc-sections $(OBJS) 
 	avr-objcopy -j .text -j .data -O ihex $(TARGET).elf $(TARGET).hex
-	avr-objdump -d $(TARGET).elf >> $(TARGET).disassembly
+	avr-objdump -d $(TARGET).elf > $(TARGET).disassembly
 #	..\..\loader\loader -i $(TARGET).hex
 
 objs/usbdrvasm.o: ../../usbdrv/usbdrvasm.S

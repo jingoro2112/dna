@@ -19,9 +19,9 @@ namespace ReadHex
 //------------------------------------------------------------------------------
 struct Chunk
 {
-	int addressBase;
-	char data[65545];
-	int size;
+	unsigned int addressBase;
+	unsigned char data[65545];
+	unsigned int size;
 };
 
 //------------------------------------------------------------------------------
@@ -93,7 +93,7 @@ bool parse( CLinkList<Chunk>& chunklist, const char* data, const int size )
 						goto parse_fail;
 					}
 
-					int offset = (offsetAddress + i) - chunk->addressBase;
+					unsigned int offset = (offsetAddress + i) - chunk->addressBase;
 					if ( offset >= chunk->size )
 					{
 						chunk->size = offset + 1;

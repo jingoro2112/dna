@@ -41,7 +41,7 @@ const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
 	0xc0					// END_COLLECTION
 };
 
-static int g_addressBase;
+int g_addressBase;
 static int g_byteCountIn;
 static int g_pageZero[32];
 static int g_pageZeroCounter;
@@ -56,7 +56,7 @@ void commitPage( unsigned int page )
 	boot_spm_busy_wait();
 }
 
-static unsigned char s_replyBuffer[4];// = { 0, 0 };
+static unsigned char s_replyBuffer[4];
 
 //------------------------------------------------------------------------------
 unsigned char usbFunctionSetup( unsigned char data[8] )
@@ -81,7 +81,7 @@ unsigned char usbFunctionSetup( unsigned char data[8] )
 	g_addressBase = 0x800; // reset loader
 #endif
 
-	g_zeroBlockChecksum = 0;
+//	g_zeroBlockChecksum = 0;
 	usbMsgPtr = (usbMsgPtr_t)s_replyBuffer;
 	return 4;
 }
@@ -91,20 +91,31 @@ unsigned char usbFunctionWrite( unsigned char *data, unsigned char len )
 {
 	if ( !g_byteCountIn ) // a command is being sent down
 	{
-		if ( (data[1] == USBCommandEnterApp) && (data[2] == g_zeroBlockChecksum) )
+		if ( data[1] == USBCommandEnterApp ) // being asked to commit the code update and jump to the app
 		{
 			cli();
 
-			// now safe to install page 0 (interrupt vector table)
-			// overwriting our USB hack
-			for( len=0; len<32; len++ ) // re-using param saves stack-frame constructions opcodes
+			if (  data[2] == g_zeroBlockChecksum ) // was the checksum accurate?
 			{
-				boot_page_fill( len*2, g_pageZero[len] );
+				// now safe to install page 0 (interrupt vector table)
+				// overwriting our USB hack
+				for( len=0; len<32; len++ ) // re-using param saves stack-frame constructions opcodes
+				{
+					boot_page_fill( len*2, g_pageZero[len] );
+				}
+				
+				commitPage( 0 );
+				
+				asm volatile ("ijmp" ::"z" (0)); // jump to code start
 			}
 
-			commitPage( 0 );
-
-			asm volatile ("ijmp" ::"z" (0)); // jump to code start
+			// okay here is the thing, if the checksum is not accurate,
+			// there should be some cleanup to give 'another chance'
+			// but there is not enough program space left to do that,
+			// so I am settling for leaving interrupts disabled. This
+			// will have the effect of leaving the board 'frozen',
+			// requiring a power cycle. messy but 100% safe, and an
+			// indication that "something has gone wrong"
 		}
 
 		// else it is a code page, the only other recognized command
@@ -118,12 +129,10 @@ unsigned char usbFunctionWrite( unsigned char *data, unsigned char len )
 	{
 		uint16_t w = *data++;
 		w += (*data++) << 8;
+		g_zeroBlockChecksum += (w >> 8) + w;
 
-		if ( g_addressBase == 0 )
+		if ( g_addressBase == 0 ) // don't commit page zero until very last, or our interrupts will be lost
 		{
-			g_zeroBlockChecksum += w;
-			g_zeroBlockChecksum += w >> 8;
-
 			g_pageZero[g_pageZeroCounter++] = w;
 		}
 		else
@@ -132,9 +141,9 @@ unsigned char usbFunctionWrite( unsigned char *data, unsigned char len )
 		}
 	}
 
-	if ( g_byteCountIn & 0x40 )
+	if ( g_byteCountIn & 0x40 ) // done with this block?
 	{
-		if ( g_addressBase )
+		if ( g_addressBase && (g_addressBase <= 0x18C0) )
 		{
 			commitPage( g_addressBase );
 		}
@@ -172,7 +181,7 @@ const PROGMEM int isrJump[] =
 	0x91FF, // ff 91  pop r31
 	0x91EF, // ef 91  pop r30
 	0x9508, // 08 95  ret
-	0xE6E0, // e0 e6  ldi r30, 0x60	-- ijmp to the bootloader
+	0xE6E0, // e0 e7  ldi r30, 0x60	-- ijmp to the bootloader
 	0xE0FC, // fc e0  ldi r31, 0x0C
 	0x9409, // 09 94  ijmp
 };
@@ -183,9 +192,9 @@ const PROGMEM int isrJump[] =
 int __attribute__((noreturn)) main(void)
 {
 #ifdef RELOCATE
-	// Once the bootloader has been entered its for good, replace the
-	// reset vector with an rjmp to an ijmp that puts us back into it
-
+	
+	// Once the bootloader has been entered, hack up the interrupt vector table
+	
 	const int* isr = isrJump; // read array from program memory, saves copy step
 	unsigned char i;
 	for( i=0; i<24; i+=2 )
@@ -194,11 +203,12 @@ int __attribute__((noreturn)) main(void)
 	}
 
 	commitPage( 0 );
+	
 #endif
 
 	usbInit();
 	usbDeviceDisconnect();
-	_delay_ms(250);
+	_delay_ms( 250 );
 	usbDeviceConnect();
 
 	sei();
@@ -209,7 +219,7 @@ int __attribute__((noreturn)) main(void)
 	{
 		c = 0;
 		PORTA ^= 0b10000000;
-		while( c < 15000 )
+		while( c < 13000 ) // 13000 experimentally determined to be "omg feed me!" blink rate
 		{
 			c++;
 			usbPoll();
