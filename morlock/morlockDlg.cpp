@@ -11,7 +11,7 @@
 
 #include "../dnausb/dnausb.h"
 #include "../firmware/dna/dna_defs.h"
-#include "../firmware/morlock/eeprom_consts.h"
+#include "../firmware/morlock/morlock_defs.h"
 #include "../util/str.hpp"
 
 EEPROMConstants g_morlockConstants;
@@ -132,6 +132,23 @@ void CMorlockDlg::populateDialogFromConstants()
 	SetDlgItemText( IDC_DWELL1, buf );
 }
 
+//------------------------------------------------------------------------------
+void CMorlockDlg::rigForMorlock()
+{
+	
+}
+
+//------------------------------------------------------------------------------
+void CMorlockDlg::rigForUnknown()
+{
+	
+}
+
+//------------------------------------------------------------------------------
+void CMorlockDlg::rigForDisconnected()
+{
+	
+}
 
 //------------------------------------------------------------------------------
 void CMorlockDlg::morlockCommThread( void* arg )
@@ -141,14 +158,16 @@ void CMorlockDlg::morlockCommThread( void* arg )
 	unsigned char buffer[64];
 	Cstr temp;
 	DNADEVICE device = INVALID_DNADEVICE_VALUE;
-	for( ;; )
+	for(;;)
 	{
 		if ( device == INVALID_DNADEVICE_VALUE )
 		{
 			md->SetDlgItemText( IDC_PRODUCT, "n/a" );
 			md->SetDlgItemText( IDC_STATUS, "DISCONNECTED" );
+			ms->rigForDisconnected();
+
 			
-			if ( !(device = DNAUSB::openDevice(0x16C0, 0x05DF, "dna@northarc.com", (char  *)buffer)) )
+			if ( !(device = DNAUSB::openDevice(0x16C0, 0x05DF, "p@northarc.com", (char  *)buffer)) )
 			{
 				Sleep( 500 );
 				continue;
@@ -159,8 +178,25 @@ void CMorlockDlg::morlockCommThread( void* arg )
 			{
 				goto disconnected;
 			}
+
+			unsigned char productId;
+			DNAUSB::getProductId( handle, &productId );
+
+			if ( productId == BOOTLOADER_DNA_AT84_v1_00 )
+			{
+				md->SetDlgItemText( IDC_PRODUCT, "DNA BOOTLOADER Hardware v1.0" );
+				md->rigForBootloader();
+			}
+			else if ( productId == DNA_AT84_v1_00 )
+			{
+				md->SetDlgItemText( IDC_PRODUCT, "DNA Hardware v1.0" );
+				md->rigForMorlock();
+			}
+			else
+			{
+				ms->rigForUnknown();
+			}
 			
-			md->SetDlgItemText( IDC_PRODUCT, temp.format("%s [%d]", buffer, (int)id) );
 			md->SetDlgItemText( IDC_STATUS, "connected" );
 
 			buffer[0] = ceCommandGetConstants;
@@ -186,6 +222,8 @@ void CMorlockDlg::morlockCommThread( void* arg )
 
 			g_morlockConstantsDirty = false;
 		}
+
+		Sleep( 500 ); // basically polling for changes
 
 		continue;
 		

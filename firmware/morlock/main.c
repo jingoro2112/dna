@@ -1,15 +1,11 @@
 #include <dna.h>
 #include <usb.h>
 #include <a2d.h>
-#include <i2c.h>
-#include <24c512.h>
 
 #include <avr/interrupt.h>
 #include <avr/eeprom.h>
-
 #include <util/delay.h>
 
-#include "eeprom_consts.h"
 #include "morlock_defs.h"
 
 #ifndef true
@@ -19,48 +15,22 @@
 #define false 0
 #endif
 
-#define TRIGGER	(PORTA & 0b00000100)
-#define DIP		(PORTA & 0b00000100)
-#define LED		(PORTA & 0b00000100)
-#define EYE		(PINA & 0b00000100)
-#define FET_1	(PORTA & 0b00000100)
-#define FET_2	(PORTA & 0b00000100)
-
 // some macros to make program flow a bit easier, also facilitates
 // stubbing
 #define eyeEnable()  (PORTA |= 0b00000000)
 #define eyeDisable() (PORTA &= 0b11111111)
 #define readTrigger() (PORTA & 0b00000000)
-#define setLedOn()  (PORTA &= 0b11111111)
-#define setLedOff() (PORTA |= 0b00000000)
+#define setLedOn()  (PORTA &= 0b01111111)
+#define setLedOff() (PORTA |= 0b10000000)
 #define fet1On()
 #define fet1Off()
 #define fet2On()
 #define fet2Off()
 
-#define LIGHT_ON_FOR					  40
-#define LIGHT_OFF_FOR					  50
-#define LIGHT_ON_FOR_FAST				  15
-#define LIGHT_OFF_FOR_FAST				  20
-
-//------------------------------------------------------------------------------
-enum // FireModes
-{
-	ceENSemi =0,   // 1 semi auto, standard
-	ceENAutoresponse, // 2 autoresponse
-	ceENFA,        // 3 FA
-	ceENSmooth,    // 4 smooth ramping
-	ceENSteady,    // 5 assist ramping
-	ceENFast,      // 6 fast ramping
-	ceENSuperTriple, // 7 WDP triple
-	ceENPSP,       // 8 PSP mode 3 shots then ramp
-	ceENPSP2,      // 9 PSP2
-	ceENPSP3,      // 10 triple
-	ceENNXL,       // 11 NXL code 3 shots then FA
-	ceFAFast,      // 12 FA off break then fast ramping
-	ceENUNSAFE,    // 13 Unsafe
-	ceBONXL        // 14 breakout then NXL
-};
+#define LIGHT_ON_FOR					  400
+#define LIGHT_OFF_FOR					  500
+#define LIGHT_ON_FOR_FAST				  150
+#define LIGHT_OFF_FOR_FAST				  200
 
 //------------------------------------------------------------------------------
 // a little maintenance but worth it for the memory effeciency, the
@@ -77,7 +47,7 @@ struct Bits
 	uchar b7:1;
 } volatile bits[10];
 
-volatile uint refireCounter;
+uint refireTime;
 volatile uint refireBox;
 
 // I can't think of a pre-compiler way to properly manage this
@@ -89,38 +59,45 @@ volatile uint refireBox;
 #define triggerStateChangeValid	(bits[0].b3) // did the state change last long enough to 'count'?
 #define startFireCycle			(bits[0].b4) // signal to the main loop to begine a single shot cycle
 #define inProgramMode			(bits[0].b5)
-#define autoShot				(bits[0].b6)
+#define arToolate				(bits[0].b6) // did the autoresponse timer time out?
 #define a2dWatchingEye			(bits[0].b7) // is the a2d mux-ed to the eye channel and compare level set appropriately?
-
 #define samplingVoltage			(bits[1].b0) // is the a2d being used to sample voltage? if so do not toggle LED!
 #define blinkOn					(bits[1].b1) // while blinking, is the light on?
 #define ledOn					(bits[1].b2) // should the LED be on right now? this is filtered through dimmer and voltage check
 #define useEye					(bits[1].b3) // is the eye being used
 #define eyeFault				(bits[1].b4) // has the eye been detected as faulty
+#define selectingRegister		(bits[1].b5) // program mode
 
-volatile uint lastTriggerStateTransition; // how long in the past a trigger state changed
-volatile uint countsToReactiveTriggerDisable;
-volatile uchar AFARateBox;
-uchar shotStringCount;
-volatile uint countBox;
-uchar accessoryRunTime;
+volatile uint msToAutoresponseTriggerDisable;
+volatile uint shotsInString;
+volatile uint millisecondCountBox;
+volatile uint millisecondCountBox2;
+volatile uint millisecondCountBox3;
+
+volatile uchar accessoryRunTime;
+uint scheduleShotRate;
+volatile uint scheduleShotBox;
+volatile uint antiBoltstickTimeout;
 
 uchar timesToBlinkLight;
-uchar blinkBox;
-uchar dimmerBox;
-uchar debounceBox;
-uchar burstCount;
+volatile uint blinkBox;
+volatile uchar dimmerBox;
+volatile uchar debounceBox;
+volatile uchar burstCount;
 
 uchar usbCommand = ceCommandIdle;
 uchar eepromLoadPointer;
 volatile struct EEPROMConstants consts;
 
-#define FAST_TIMER_COUNTS_PER_SECOND 5859
-#define FAST_TIMER_ISR_PRESCALE 23
+// program mode
+volatile uint msUntilEntryValid;
+volatile uchar currentEntry;
 
-// these are approximations
-#define msToFastTimerCounts( ms ) ((ms) * 6) 
-#define msToSlowTimerCounts( ms ) (((ms) * 255) / 1000)
+uchar rampModeReplaced;
+volatile uint rampTimeoutBox;
+uchar rampLevel;
+uchar triggerTimer;
+uchar currentFireMode;
 
 //------------------------------------------------------------------------------
 // source up the profile
@@ -131,6 +108,9 @@ void loadEEPROMConstants()
 	{
 		((uchar*)&consts)[i] = eeprom_read_byte( (uchar*)i );
 	}
+
+	refireTime = TIMER_COUNTS_PER_SECOND_X10 / consts.ballsPerSecondX10;
+	currentFireMode = consts.fireMode;
 }
 
 //------------------------------------------------------------------------------
@@ -145,21 +125,82 @@ void saveEEPROMConstants()
 }
 
 //------------------------------------------------------------------------------
+unsigned char dnaUsbInputSetup( unsigned char *data, unsigned char len )
+{
+	if ( usbCommand != ceCommandIdle )
+	{
+		return 0; // must be part of a multi-command, pass through
+	}
+
+	usbCommand = data[0];
+	switch( usbCommand )
+	{
+		case ceCommandSetEEPROMConstants:
+		{
+			eepromLoadPointer = 0;
+			break;
+		}
+
+		case ceCommandGetEEPROMConstants:
+		{
+			dnaUsbQueueData( (unsigned char *)&consts, sizeof(consts) );
+			usbCommand = ceCommandIdle;
+			break;
+		}
+
+		default:
+			usbCommand = ceCommandIdle; // yeek
+			break;
+	}
+
+	return 1;
+}
+
+//------------------------------------------------------------------------------
+void dnaUsbInputStream( unsigned char *data, unsigned char len )
+{
+	switch( usbCommand )
+	{
+		case ceCommandSetEEPROMConstants:
+		{
+			unsigned char i;
+			for( i=0; i<len; i++ )
+			{
+				((unsigned char *)&consts)[eepromLoadPointer++] = data[i];
+			}
+
+			if ( eepromLoadPointer >= sizeof(consts) )
+			{
+				usbCommand = ceCommandIdle;
+				saveEEPROMConstants();
+			}
+			break;
+		}
+
+		default:
+		{
+			usbCommand = ceCommandIdle;
+			break;
+		}
+	}
+}
+
+//------------------------------------------------------------------------------
 void cycleSingleSolenoid()
 {
+	refireBox = refireTime;
 	if ( useEye )
 	{
 		if ( !eyeBlocked )
 		{
-			countBox = msToFastTimerCounts( 400 );
-			while( countBox )
+			millisecondCountBox = 400;
+			while( millisecondCountBox )
 			{
-				// break the count if the trigger is released on an empty
-				// chamber, but at the same time allow enhanced trigger
-				// modes to function within a ~400ms window (AR and
-				// Turbo)
+				// break the count if the trigger is released on an
+				// empty chamber, or the ball fell within 100ms of a
+				// scheduled shot, or we are in semi-auto
 				if ( !triggerState
-					 && ((countBox < msToFastTimerCounts(350)) || consts.fireMode == ceENSemi) )
+					 && ((millisecondCountBox < 300) || currentFireMode == ceSemi) )
 				{
 					startFireCycle = false;
 					return;
@@ -170,12 +211,15 @@ void cycleSingleSolenoid()
 					break;
 				}
 			}
+
+			if ( millisecondCountBox < 375 ) // took more than 25 milliseconds, dont' want to short-cycle the gun
+			{
+				refireBox = refireTime;
+			}
 		}
-		// else the eye was blocked indicating nothing special needed
-		// to happen
-			
-		countBox = consts.eyeHoldoff; // wait for ball to 'seat'
-		while( countBox );
+
+		millisecondCountBox = consts.eyeHoldoff; // wait for ball to 'seat'
+		while( millisecondCountBox );
 	}
 
 	ledOn = true;
@@ -188,306 +232,162 @@ void cycleSingleSolenoid()
 		fet2On();
 	}
 
-//	uiCountBox = ubDwell1;
+	millisecondCountBox = consts.dwell1;
 
-#ifdef MORLOCK
-	if ( !uiABSTimeBox && ubABSTime != 1 )
-		uiCountBox += ubABSAddition;
-
-	if ( ubABSTime > 1 )
+	if ( !antiBoltstickTimeout && consts.ABSTime )
 	{
-		uiABSTimeBox = 1250;
+		antiBoltstickTimeout = consts.ABSTime;
+		millisecondCountBox += consts.ABSAddition;
 	}
-#endif
 
-//	while( uiCountBox );
+	while( millisecondCountBox );
 
 	fet1Off();
 
-/*
-	if ( bUseEye )
+	if ( useEye )
 	{
 		// okay the bolt is on its way forward or already forward,
 		// give it some time to unblock, if it takes longer than
 		// that then something is wrong.
-		uiCountBox = 100;
-		while ( bEyeBlocked && uiCountBox );
+		millisecondCountBox = 100;
+		while ( eyeBlocked && millisecondCountBox );
 
 		// wait the holdoff to make sure the bolt is on its way back,
 		// and we're not seeing the space between the ball and
 		// the bolt.
-		uiCountBox = ubFireHoldoff; 
-		while( uiCountBox );
+		millisecondCountBox = consts.fireHoldoff;
+		while( millisecondCountBox );
 
 		// if there is an error, then wait for the ROF timer,
 		// otherwise ignore it and only wait the eye holdoff
 	}
 
-	while( ubRefireBox );
-*/
-	
+	while( refireBox );
 }
 
 //------------------------------------------------------------------------------
 void cycleDoubleSolenoid()
 {
-/*
-	uiCountBox = ubDwell1; 
-	output_high( FET_1 );
-	while( uiCountBox );
-	output_low( FET_1 );
+	millisecondCountBox = consts.dwell1;
+	millisecondCountBox2 = consts.dwell1ToDwell2Holdoff;
+	millisecondCountBox3 = 0;
 
-	if ( bSniperMode && !bTriggerReleaseTooLate ) // drop out of sniper if two shots are fired quickly
+	fet1On();
+
+	while( millisecondCountBox )
 	{
-		while ( !bTriggerState ); // trigger released?
-	}
-
-	uiRefireBox = uiRefireCounter - ubDwell1; // when can we fire again
-
-	uiCountBox = ubFireHoldoff; 
-	while( uiCountBox );
-
-	if ( bUseEye )
-	{
-		bEyeError = false; // default to working on closed-bolt
-
-		if ( !bEyeBlocked ) // bolt missing or eye faulty
-			bEyeError = true;
-	}
-
-	output_high( FET_2 );	// open bolt
-
-	if ( bUseEye && !bEyeError )
-	{
-		uiCountBox = BOLT_HELD_FOR;
-		while( uiCountBox && bEyeBlocked ); // wait for bolt to open
-
-		if ( !uiCountBox )
+		if ( !millisecondCountBox2 && (currentFireMode != ceSniper) )
 		{
-			bEyeError = true;
-		}
-		else // now wait for paint to drop
-		{
-			while( uiCountBox && !bEyeBlocked ); // wait for bolt to open
-
-			if ( !uiCountBox )
-			{
-				bEyeError = true;
-			}
+			fet2On();
+			millisecondCountBox3 = consts.dwell2;
 		}
 	}
-	else
-	{
-		uiCountBox = ubDwell2;
-		while( uiCountBox );	// wait for pulse, then check eye
-	}
 
-	if ( bCockerMode ) // cool mode if you hate your battery
-	{
-		uiRefireHold = uiRefireBox;  // stop time
+	fet1Off();
 
-		do
-		{
-			uiCountBox = BOLT_HELD_FOR;
-			while ( !bTriggerState && uiCountBox ); // wait for trigger to release
-
-		} while ( !bCockerDontWaitForever && !bTriggerState );
-
-		uiRefireBox = uiRefireHold;  // start time
-	}
-
-
-	output_low( FET_2 ); // close bolt
-*/
-}
-
-unsigned char d[8];
-
-//------------------------------------------------------------------------------
-unsigned char dnaUsbInputSetup( unsigned char *data, unsigned char len )
-{
-	/*
-	if ( usbCommand != ceCommandIdle )
-	{
-		return 0; // must be part of a multi-command, pass through
-	}
+	while( !arToolate // don't engage sniper mode if you are firing quickly
+		   && currentFireMode == ceSniper 
+		   && triggerState );
 	
-	usbCommand = data[0];
-	switch( usbCommand )
+	while( millisecondCountBox2 ); // wait for holdoff
+
+	if ( useEye )
 	{
-		case ceCommandSetEEPROMConstants:
-		{
-			eepromLoadPointer = 0;
-			break;
-		}
+		millisecondCountBox = consts.maxDwell2;
 		
-		case ceCommandGetEEPROMConstants:
+		while( millisecondCountBox && eyeBlocked ); // wait for eye to unblock indicating the bolt has opened
+
+		if ( !millisecondCountBox )
 		{
-			dnaUsbQueueData( (unsigned char *)&consts, sizeof(consts) );
-			usbCommand = ceCommandIdle;
-			break;
+			// took too long, eye must be busted
+			eyeFault = true;
 		}
-		
-		default:
-			usbCommand = ceCommandIdle; // yeek
-			break;
-	}
-	*/
-	/*
-		case 10:
+		else
 		{
-			d[0] = 0xA1;
-			d[1] = 0xB2;
-			d[2] = 0xC1;
-			d[3] = 0xD1;
-			write24c512( 0xA0, 100, d, 4 );
-			write24c512( 0xA0, 101, d+1, 1 );
-			write24c512( 0xA0, 102, d+2, 1 );
-			write24c512( 0xA0, 103, d+3, 1 );
-			break;
-		}
-
-		case 20:
-		{
-			d[0] = 1;
-			d[1] = 2;
-			d[2] = 3;
-			d[3] = 4;
-//			read24c512( 0xA0, 100, d, 4 );
-//			read24c512( 0xA0, 101, d+1, 1 );
-//			read24c512( 0xA0, 102, d+2, 1 );
-//			read24c512( 0xA0, 103, d+3, 1 );
-			dnaUsbQueueData( d, 4 );
-
-			break;
-		}
-*/
-	
-
-	return 0;
-}
-
-//------------------------------------------------------------------------------
-void dnaUsbInputStream( unsigned char *data, unsigned char len )
-{
-	/*
-	switch( usbCommand )
-	{
-		case ceCommandSetEEPROMConstants:
-		{
-			unsigned char i;
-			for( i=0; i<len; i++ )
-			{
-				((unsigned char *)&consts)[eepromLoadPointer++] = data[i];
-			}
+			eyeFault = false;
 			
-			if ( eepromLoadPointer >= sizeof(consts) )
+			while( millisecondCountBox && !eyeFault ); // now wait for paint to drop
+
+			if ( !millisecondCountBox )
 			{
-				usbCommand = ceCommandIdle;
-				saveEEPROMConstants();
+				// took too long, eye must be damaged
+				eyeFault = true;
 			}
-			break;
-		}
-		
-		default:
-		{
-			usbCommand = ceCommandIdle;
-			break;
+			else
+			{
+				millisecondCountBox = consts.eyeHoldoff; // wait for ball to 'seat'
+				while( millisecondCountBox );
+
+				eyeFault = false;
+			}
 		}
 	}
-	*/
-}
+	else 
+	{
+		if ( !millisecondCountBox3 )
+		{
+			fet2On();
+			millisecondCountBox3 = consts.dwell2;
+		}
 
+		while( millisecondCountBox3 ); // wait for pulse, then check eye
+	}
+
+	if ( currentFireMode == ceCocker ) // cool mode if you hate your battery
+	{
+		while( triggerState && millisecondCountBox );
+	}
+
+	fet2Off();
+
+	refireBox = refireTime - (consts.dwell1ToDwell2Holdoff + consts.dwell2); // load box as if everything happened instantly
+}
 
 //------------------------------------------------------------------------------
 int __attribute__((noreturn)) main(void)
 {
+	// set up I/O
+	DDRA = 0b10000000;
+	PORTA = 0b10000000; // all off
+
+//	DDRB = 0b00000000;
+//	PORTB = 0b00000000;
+
 	dnaUsbInit();
-	i2cInit(10);
 	loadEEPROMConstants();
-	
-//	DDRA = 0b10000000;
-//	PORTA = 0b00000001;
-	
-//	TCCR0B = 1<<CS01; // set 8-bit timer prescaler to /8 for 5859.375 intterupts per second @12mHz
-//	TIMSK0 = 1<<TOIE0; // fire off an interrupt every time it overflows, this is our tick (~170 microseconds per)
 
-	sei();
-
-	for(;;)
-	{
-		usbPoll();
-	}
-	/*
-		while ( i2cStartWrite(0xA0) );
-		i2cWrite( 0 );
-		i2cWrite( 100 );
-
-		i2cStartRead( 0xA0 );
-
-		i2cReadByte();
-		i2cReadByte();
-		i2cReadByte();
-		
-//		if ( !i2cWrite( 0x55 ) )
-//		{
-//			PORTA &= 0b01111111;
-//		}
-//		else
-//		{
-//			PORTA |= 0b10000000;
-//		}
-
-
-//		i2cWrite( 0x23 );
-
-		i2cStop();
-
-		
-
-//		read24c512( 0xA0, 100, d, 4 );
-
-		_delay_ms(5);
-
-				
-
-//		usbPoll();
-		
-	}
-
-*/
-
-
-
-
-
-
-
-
-
-
-
-	
-	loadEEPROMConstants();
+	// set up timer 0 to tick exactly 6000 per second:
+	// 12000000 / (8 * 250) = 6000
+	// accomplished by using timer0 in waveform generation mode 2
+	TCCR0B = 1<<CS01; // set 8-bit timer prescaler to div/8
+	OCR0A = 250;
+	TCCR0A = 1<<WGM01; // mode 2, reset counter when it reaches OCROA
+	TIMSK0 = 1<<OCIE0A; // fire off an interrupt every time it matches 250, thus dividing by exactly 2000 (overflow would work too)
 	
 	a2dSetChannel( 6 );
 	a2dSetPrescaler( A2D_PRESCALE_16 ); 
 	a2dEnableInterrupt(); // latch in the value as an interrupt rather than polling
 
-
 	sei();
 
-	_delay_ms(10); // let the state set up
+	shotsInString = 0;
+	currentEntry = 0;
+	rampTimeoutBox = 1; // let this timeout immediately so the defaults will be instaled
+
+	_delay_ms(10); // let the state settle
 
 	if( triggerState && !consts.locked )
 	{
-		consts.fireMode = 1;
+		currentFireMode = 1;
+		saveEEPROMConstants(); // prorgam mode defaults the gun to semi
+		
 		timesToBlinkLight = 2;
 		inProgramMode = true;
 	}
 
 	for(;;)
 	{
+		// spin until a fire condition is triggered from the ISR
 		while( !startFireCycle )
 		{
 			if ( !inProgramMode	)
@@ -496,46 +396,9 @@ int __attribute__((noreturn)) main(void)
 			}
 		}
 
-//		countsToReactiveTriggerDisable = msToSlowTimerCounts( 500 );
-
-		autoShot = false;
-
-		if ( consts.fireMode != ceFAFast
-			 && consts.fireMode != ceENFA
-			 && consts.fireMode != ceBONXL )
+		if ( currentFireMode != ceFullAuto )
 		{
 			startFireCycle = false;
-		}
-
-		// some enhanced fire modes
-		if ( shotStringCount > consts.AFACount )
-		{
-			if ( AFARateBox )
-			{
-				if ( consts.fireMode == ceENSmooth )
-				{
-					debounceBox = 1;
-				}
-
-				if ( consts.fireMode == ceENFast || consts.fireMode == ceENPSP )
-				{
-					autoShot = true;
-				}
-			}
-
-			if ( consts.fireMode == ceENNXL )
-			{
-				if ( !readTrigger() )
-				{
-					startFireCycle = true;
-				}
-			}
-
-			if ( lastTriggerStateTransition
-				 && (consts.fireMode == ceENPSP2 || consts.fireMode == ceENUNSAFE) )
-			{
-				startFireCycle = true;
-			}
 		}
 
 		// bursting? if so count it down
@@ -544,11 +407,7 @@ int __attribute__((noreturn)) main(void)
 			startFireCycle = true;
 		}
 
-		refireBox = consts.eyeOffRefireCounter;
-		AFARateBox = consts.AFARate;
-
-		// setup should be complete now, we know we are firing, so now
-		// its time to cycle the marker
+		// setup complete, cycle the marker
 		if ( consts.singleSolenoid )
 		{
 			cycleSingleSolenoid();
@@ -559,12 +418,20 @@ int __attribute__((noreturn)) main(void)
 		}
 
 		while( refireBox ); // wait until the counter clears us
+
+		// if ramping has hit this top rate its basically full-auto as
+		// long as the trigger keeps being cycled at some [slow] rate
+		if ( currentFireMode == ceRamp
+			 && scheduleShotRate < refireTime )
+		{
+			startFireCycle = true;
+		}
 	}
 }
 
 //------------------------------------------------------------------------------
 // sample the eye asychonously
-ISR( ADC_vect, ISR_NOBLOCK )
+ISR( ADC_vect )
 {
 	if ( !a2dWatchingEye )
 	{
@@ -585,27 +452,30 @@ ISR( ADC_vect, ISR_NOBLOCK )
 }
 
 //------------------------------------------------------------------------------
-// this is entered 5859.375 times per second, to make sure any
-// rate-of-fire calculations are performed properly I am truncating
-// that for compuatational purposes.
-
-// If the gun is cycling, then the programming stuff will never be
-// entered, in programming mode some of the extra logic might push this
-// ISR into the next tick, thats ok, it doesn't matter if a tick (or
-// three!) is lost. 
-ISR( TIM0_OVF_vect, ISR_NOBLOCK )
+// Entered 6000 times per second
+// if the marker is in programming mode, or USB is being used, some of
+// the extra logic might push this ISR into the next tick, that's ok,
+// it doesn't matter if a tick (or three!) is lost now and again, since
+// when the gun is cycling none of that logic will be engaged.
+ISR( TIM0_COMPA_vect )
 {
+	usbPoll();
+
 	// timers at the top have a very high resolution
 	if ( refireBox )
 	{
 		refireBox--;
 	}
 
-	if ( countBox )
+	if ( scheduleShotBox )
 	{
-		countBox--;
+		if ( !--scheduleShotBox && rampTimeoutBox && (currentFireMode == ceRamp) )
+		{
+			startFireCycle = true;
+			scheduleShotBox = scheduleShotRate;
+		}
 	}
-	
+
 	if ( debounceBox ) // programmable debounce, sample ever X milliseconds
 	{
 		debounceBox--;
@@ -615,28 +485,69 @@ ISR( TIM0_OVF_vect, ISR_NOBLOCK )
 		// debounce check part 2, make sure the state change lasts long enough
 		if ( !triggerStateChangeValid )
 		{
-			triggerState = !readTrigger();
-			
 			debounceBox = consts.antiMechanicalDebounce;
 			triggerStateChangeValid = true; // next time around it counts
-
-//			lastTriggerStateTransition = msToSlowTimerCounts( 750 );
-
-			
-
 		}
 		else
 		{
-			
+			triggerState = !readTrigger();
+			debounceBox = consts.debounce;
+
+			if ( triggerState ) // been pressed
+			{
+				if ( inProgramMode )
+				{
+					msUntilEntryValid = MS_UNTIL_ENTRY_VALID;
+					currentEntry++;
+				}
+				else
+				{
+					startFireCycle = true;
+					shotsInString++;
+
+					if ( currentFireMode == ceRamp
+						 && shotsInString >= consts.rampEnableCount )
+					{
+						scheduleShotRate = ((consts.msToAutoresponseTriggerDisable - msToAutoresponseTriggerDisable) /
+										   rampLevel) * 6;
+						scheduleShotBox = scheduleShotRate;
+						rampLevel += consts.rampRate;
+						
+						if ( scheduleShotRate <= refireTime )
+						{
+							currentFireMode = consts.rampTopMode; // we're there, go crazy
+						}
+					}
+					
+					rampTimeoutBox = consts.rampTimeout; // trigger has been depressed, reset the "do what you're doing" timeout
+					
+					// after this many milliseconds autoresponse will not fire
+					msToAutoresponseTriggerDisable = consts.msToAutoresponseTriggerDisable;
+					arToolate = false;
+
+					if ( currentFireMode == ceBurst )
+					{
+						burstCount = consts.burstCount;
+					}
+				}
+			}
+			else if ( !inProgramMode ) // been released 
+			{
+				if ( (currentFireMode == ceAutoresponse) && !arToolate )
+				{
+					startFireCycle = true;
+				}
+				else
+				{
+					startFireCycle = false;
+				}
+			}
 		}
-		
 	}
 	else
 	{
 		triggerStateChangeValid = false;
-
 	}
-
 
 	// duty cycle for LED, effecting a dimmer
 	if ( !samplingVoltage )
@@ -663,35 +574,55 @@ ISR( TIM0_OVF_vect, ISR_NOBLOCK )
 		}
 	}
 
-	// use a prescaler to get a more 'human' amount of time, which can
-	// be measured with an 8-bit byte: 5859/23 = ~255 counts per second
-	static uchar s_tim0Prescaler;
-	if ( --s_tim0Prescaler )
+	static uchar millisecondPrescaler = 1;
+	if ( --millisecondPrescaler )
 	{
 		return;
 	}
-	
+	millisecondPrescaler = 6;
+
+	// ------------------------------------------------------------------------------------------
+	// exactly 1 ms per tick
+	// ------------------------------------------------------------------------------------------
+		
 	if ( a2dWatchingEye )
 	{
 		eyeEnable(); // turn on emitter, wait until the end of this routine to kick off the sampling
 	}
 	
-	s_tim0Prescaler = FAST_TIMER_ISR_PRESCALE;
-
-	// check+dec all the subcounters that slave from the primary
-	if ( lastTriggerStateTransition )
+	if ( msToAutoresponseTriggerDisable )
 	{
-		lastTriggerStateTransition--;
-	}
-	
-	if ( countsToReactiveTriggerDisable )
-	{
-		countsToReactiveTriggerDisable--;
+		msToAutoresponseTriggerDisable--;
+		arToolate = true;
 	}
 
-	if ( AFARateBox )
+	if ( antiBoltstickTimeout )
 	{
-		AFARateBox--;
+		antiBoltstickTimeout--;
+	}
+
+	if ( millisecondCountBox )
+	{
+		millisecondCountBox--;
+	}
+	if ( millisecondCountBox2 )
+	{
+		millisecondCountBox2--;
+	}
+	if ( millisecondCountBox3 )
+	{
+		millisecondCountBox3--;
+	}
+
+	if ( rampTimeoutBox )
+	{
+		if ( !--rampTimeoutBox )
+		{
+			shotsInString = 0;
+			rampLevel = 2;
+			currentFireMode = consts.fireMode;
+			scheduleShotRate = 0xFFFF;
+		}
 	}
 
 	// fet2 being used to run a hopper? turn it off now
@@ -703,6 +634,58 @@ ISR( TIM0_OVF_vect, ISR_NOBLOCK )
 		}
 	}
 
+	// handle program mode activity
+	if ( !triggerState && inProgramMode )	// trigger up in program mode?
+	{
+		if ( msUntilEntryValid )	// waiting for idle trigger? (signifying an entry has been made)
+		{
+			if ( !--msUntilEntryValid ) // this the one?
+			{
+				if ( selectingRegister )
+				{
+					selectingRegister = false;
+//					ubAddress = ubCurrentEntry;
+
+//					if ( currentEntry < ceLastEEPROMLocation )
+					{
+//						ReadEEPROM(); // read current value
+//						ubAddress--; // undo auto-increment
+//						timesToBlinkLight = ubData; // flash it
+					}
+//					else // error
+					{
+						timesToBlinkLight = 4;
+						selectingRegister = true;
+					}
+				}
+				else // not selecting a register, use the value
+				{
+					selectingRegister = true;
+
+					timesToBlinkLight = 2;
+
+/*
+					if ( ubAddress == ceFireMode )
+					{
+						bInProgramMode = false;
+					}
+
+					ubData = ubCurrentEntry;
+					WriteEEPROM(); // commit the value
+
+					GetConstantsByEEPROM(); // read them all back
+
+					ubData = 0;
+*/
+				}
+
+				currentEntry = 0;
+			}
+		}
+	}
+
+
+	
 	// if the LED is being told to blink, handle that here
 	if ( timesToBlinkLight )
 	{

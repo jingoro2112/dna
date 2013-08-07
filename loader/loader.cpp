@@ -116,23 +116,26 @@ int main( int argc, char *argv[] )
 			Log( "code too large [0x%08X], must be below bootloader @ 0x%08X", chunk->size, (BOOTLOADER_ENTRY*2) );
 			return -1;
 		}
-		
-		// decompile the rjmp instruction to find out where it is pointed to
-		unsigned int offset = 2 * ( 1 + (chunk->data[0] + (((int)chunk->data[1] & 0x3F) << 8)));
 
-		if ( (offset + sizeof(bootJumper)) >= chunk->size )
+		if ( !args.isSet("-dnv") ) // double-secret 'do not valide' flag, please donot publicize. 
 		{
-			Log( "Invalid rjmp offset found for reset vector in image [%s]", image );
-		}
+			// decompile the rjmp instruction to find out where it is pointed to
+			unsigned int offset = 2 * ( 1 + (chunk->data[0] + (((int)chunk->data[1] & 0x3F) << 8)));
 
-//		Log( "rjmp offset points to [0x%04X][0x%04X]", offset, offset / 2 );
-
-		for( int i=0; i<sizeof(bootJumper); i++ )
-		{
-			if ( chunk->data[offset + i] != bootJumper[i] )
+			if ( (offset + sizeof(bootJumper)) >= chunk->size )
 			{
-				Log( "Bootjumper signature not found [0x%02X] != [0x%02X] @ byte[%d]\n", chunk->data[offset + i], bootJumper[i], i );
-				return -1;
+				Log( "Invalid rjmp offset found for reset vector in image [%s]", image );
+			}
+
+//			Log( "rjmp offset points to [0x%04X][0x%04X]", offset, offset / 2 );
+
+			for( int i=0; i<sizeof(bootJumper); i++ )
+			{
+				if ( chunk->data[offset + i] != bootJumper[i] )
+				{
+					Log( "Bootjumper signature not found [0x%02X] != [0x%02X] @ instruction #%d\n", chunk->data[offset + i], bootJumper[i], i/2 );
+					return -1;
+				}
 			}
 		}
 	}

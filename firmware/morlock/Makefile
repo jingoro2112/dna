@@ -11,8 +11,6 @@ OBJS = \
 	objs/usb.o \
 	objs/main.o \
 	objs/a2d.o \
-	objs/i2c.o \
-	objs/24c512.o \
 
 MCU = attiny84
 CPU_FREQUENCY = 12000000

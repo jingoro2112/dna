@@ -21,6 +21,10 @@ protected:
 
 	void buildFireCycleGraphic();
 	void populateDialogFromConstants();
+
+	void rigForMorlock();
+	void rigForUnknown();
+	void rigForDisconnected();
 	
 	static void morlockCommThread( void* arg );
 

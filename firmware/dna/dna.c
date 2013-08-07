@@ -1,18 +1,18 @@
-#include "dna.h"
-#include <avr/io.h>
-#include <util/delay.h>
-#include <avr/wdt.h>
 /* Copyright: (c) 2013 by Curt Hartung
  * This work is released under the Creating Commons 3.0 license
  * found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
  * and in the LICENCE.txt file included with this distribution
  */
 
+#include "dna.h"
+#include <avr/io.h>
+#include <util/delay.h>
+
 //------------------------------------------------------------------------------
 // this code is executed IMMEDIATELY out of reset, before any other C
-// code has a chance to even set up the environment. This is important
-// to inspect bootloader entry before anything else possibly screws up
-// the MCU
+// code has a chance to even set up the environment. It is important
+// to inspect bootloader entry before anything else sends the MCU off
+// into the weeds
 //
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // ALTER/OMIT THIS AT YOUR OWN PERIL. THE DNA BOARD CANNOT BE SERIAL
