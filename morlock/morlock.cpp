@@ -13,11 +13,7 @@ END_MESSAGE_MAP()
 //------------------------------------------------------------------------------
 CMorlockApp::CMorlockApp()
 {
-	// support Restart Manager
-	m_dwRestartManagerSupportFlags = AFX_RESTART_MANAGER_SUPPORT_RESTART;
-
-	// TODO: add construction code here,
-	// Place all significant initialization in InitInstance
+	m_dwRestartManagerSupportFlags = AFX_RESTART_MANAGER_SUPPORT_RESTART; // support Restart Manager
 }
 
 
@@ -77,4 +73,3 @@ BOOL CMorlockApp::InitInstance()
 	//  application, rather than start the application's message pump.
 	return FALSE;
 }
-

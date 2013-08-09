@@ -228,7 +228,8 @@ USB_PUBLIC usbMsgLen_t usbFunctionSetup(uchar data[8]);
  * data. See the documentation of usbFunctionSetup() above for more info.
  */
 #if USB_CFG_HAVE_INTRIN_ENDPOINT
-USB_PUBLIC void usbSetInterrupt(uchar *data, uchar len);
+//USB_PUBLIC  // commented out to remove warning when including usbdrv.c --Curt
+void usbSetInterrupt(uchar *data, uchar len);
 /* This function sets the message which will be sent during the next interrupt
  * IN transfer. The message is copied to an internal buffer and must not exceed
  * a length of 8 bytes. The message may be 0 bytes long just to indicate the
@@ -241,7 +242,8 @@ USB_PUBLIC void usbSetInterrupt(uchar *data, uchar len);
  * message already buffered will be lost.
  */
 #if USB_CFG_HAVE_INTRIN_ENDPOINT3
-USB_PUBLIC void usbSetInterrupt3(uchar *data, uchar len);
+//USB_PUBLIC  // commented out to remove warning when including usbdrv.c --Curt
+void usbSetInterrupt3(uchar *data, uchar len);
 #define usbInterruptIsReady3()   (usbTxLen3 & 0x10)
 /* Same as above for endpoint 3 */
 #endif

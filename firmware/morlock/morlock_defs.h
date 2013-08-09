@@ -10,6 +10,7 @@
 #ifdef _WIN32
 #define uchar unsigned char
 #define uint unsigned short
+#pragma pack(push, 1)
 #endif
 
 #define TIMER_COUNTS_PER_SECOND 6000
@@ -20,13 +21,13 @@
 //------------------------------------------------------------------------------
 enum FireModes
 {
-	ceSemi =0,
+	ceSemi =1,
+	ceAutoresponse,
+	ceBurst,
+	ceFullAuto,
+	ceRamp,
 	ceCocker,
 	ceSniper,
-	ceAutoresponse,
-	ceFullAuto,
-	ceBurst,
-	ceRamp,
 };
 
 //------------------------------------------------------------------------------
@@ -38,26 +39,26 @@ enum USBCommands
 };
 
 #define DEFAULT_SINGLE_SOLENOID 1
-#define DEFAULT_FIRE_MODE  ceRamp
+#define DEFAULT_FIRE_MODE  ceSemi
 #define DEFAULT_BALLS_PER_SECOND_X_10 125
 #define DEFAULT_BURST_COUNT 3
-#define DEFAULT_MS_TO_AUTORESPONSE_TRIGGER_DISABLE 400
-#define DEFAULT_FIRE_HOLDOFF 5
+#define DEFAULT_MS_TO_ENHANCED_TRIGGER_DISABLE 400
+#define DEFAULT_BOLT_HOLDOFF 5
 #define DEFAULT_ACCESSORY_RUN_TIME 100
 #define DEFAULT_DIMMER 255
-#define DEFAULT_ANTI_BOLT_STICK_TIME 0
+#define DEFAULT_ANTI_BOLT_STICK_TIMEOUT 0
 #define DEFAULT_ANTI_BOLT_STICK_ADDITION 5
-#define DEFAULT_ANTI_MECHANICAL_DEBOUNCE 30
 #define DEFAULT_DEBOUNCE 150
+#define DEFAULT_REBOUNCE 30
 #define DEFAULT_DWELL1 10
 #define DEFAULT_DWELL_1_TO_2_HOLDOFF 10
 #define DEFAULT_DWELL2 50
 #define DEFAULT_MAX_DWELL2 100
 #define DEFAULT_EYE_HOLDOFF 1
-#define DEFAULT_EYE_TRANSITION_LEVEL 0
+#define DEFAULT_EYE_HIGH_BLOCKED 1
 #define DEFAULT_LOCKED 0
 #define DEFAULT_RAMP_ENABLE_COUNT 3
-#define DEFAULT_RAMP_RATE 1
+#define DEFAULT_RAMP_CLIMB_RATE 1
 #define DEFAULT_RAMP_TOP_MODE ceSemi
 #define DEFAULT_RAMP_TIMEOUT 750
 
@@ -70,18 +71,19 @@ struct EEPROMConstants
 	uchar fireMode; // what fire mode we're in
 	uint ballsPerSecondX10; // fixed-point x10 rate of fire
 	uchar burstCount; // how many shots are in a burst
-	uchar msToAutoresponseTriggerDisable;
+	uint enhancedTriggerTimeout;
 
-	uchar fireHoldoff; // (milliseconds)
-	uchar accessoryRunTime;
+	uchar boltHoldoff; // (milliseconds)
+	
+	uchar accessoryRunTime; // milliseconds to run FET2 in single-solenoid mode
 
 	uchar dimmer; // 0-255 how dim to run the LED
 
-	uint ABSTime;  // how long before engaging Anti Boltstick (milliseconds)
+	uint ABSTimeout;  // how long before engaging Anti Boltstick (milliseconds)
 	uchar ABSAddition; // (milliseconds)
 
-	uchar antiMechanicalDebounce; //  how long a trigger state must remain stable before it is believed (fast count)
-	uchar debounce; // (fast counts)
+	uchar rebounce; // how long a trigger state must remain stable before it is believed (fast count)
+	uchar debounce; // min time between samples after a state change has occured (fast counts)
 
 	uchar dwell1; // (milliseconds)
 	uchar dwell1ToDwell2Holdoff; // (milliseconds) time after solenoid1 fire to fire solenoid2, may be negative
@@ -89,43 +91,47 @@ struct EEPROMConstants
 	uchar maxDwell2; // (milliseconds)
 
 	uchar eyeHoldoff; // (milliseconds)
-	uint eyeTransitionLevel; // the point at which the eye is considered to have gone from high to low
+	uchar eyeHighBlocked;
 
 	uchar locked;
 
 	uchar rampEnableCount; // shots before ramping starts
-	uchar rampRate; // how many additional shots are added while ramping
+	uchar rampClimb; // how many additional shots are added while ramping
 	uchar rampTopMode; // when ramping is fully engaged, what mode of fire should be used
 	uint rampTimeout; // how long the trigger must be idle for ramping to expire
 
 #ifdef _WIN32
-	void EEPROMConstants()
+	void installDefaults()
 	{
 		singleSolenoid = DEFAULT_SINGLE_SOLENOID;
 		fireMode = DEFAULT_FIRE_MODE;
 		ballsPerSecondX10 = DEFAULT_BALLS_PER_SECOND_X_10;
 		burstCount = DEFAULT_BURST_COUNT;
-		msToAutoresponseTriggerDisable = DEFAULT_MS_TO_AUTORESPONSE_TRIGGER_DISABLE;
-		fireHoldoff = DEFAULT_FIRE_HOLDOFF;
+		enhancedTriggerTimeout = DEFAULT_MS_TO_ENHANCED_TRIGGER_DISABLE;
+		boltHoldoff = DEFAULT_BOLT_HOLDOFF;
 		accessoryRunTime = DEFAULT_ACCESSORY_RUN_TIME;
 		dimmer = DEFAULT_DIMMER;
-		ABSTime = DEFAULT_ANTI_BOLT_STICK_TIME;
+		ABSTimeout = DEFAULT_ANTI_BOLT_STICK_TIMEOUT;
 		ABSAddition = DEFAULT_ANTI_BOLT_STICK_ADDITION;
-		antiMechanicalDebounce = DEFAULT_ANTI_MECHANICAL_DEBOUNCE;
+		rebounce = DEFAULT_REBOUNCE;
 		debounce = DEFAULT_DEBOUNCE;
 		dwell1 = DEFAULT_DWELL1;
 		dwell1ToDwell2Holdoff = DEFAULT_DWELL_1_TO_2_HOLDOFF;
 		dwell2 = DEFAULT_DWELL2;
 		maxDwell2 = DEFAULT_MAX_DWELL2;
 		eyeHoldoff = DEFAULT_EYE_HOLDOFF;
-		eyeTransitionLevel = DEFAULT_EYE_TRANSITION_LEVEL;
+		eyeHighBlocked = DEFAULT_EYE_HIGH_BLOCKED;
 		locked = DEFAULT_LOCKED;
 		rampEnableCount = DEFAULT_RAMP_ENABLE_COUNT;
-		rampRate = DEFAULT_RAMP_RATE;
+		rampClimb = DEFAULT_RAMP_CLIMB_RATE;
 		rampTopMode = DEFAULT_RAMP_TOP_MODE;
 		rampTimeout = DEFAULT_RAMP_TIMEOUT;
 	}
 #endif
 };
+
+#ifdef _WIN32
+#pragma pack(pop)
+#endif
 
 #endif

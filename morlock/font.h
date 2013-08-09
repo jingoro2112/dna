@@ -8,7 +8,7 @@
  */
 
 //------------------------------------------------------------------------------
-struct Font
+struct MFont
 {
 	int x;
 	int y;
@@ -16,6 +16,6 @@ struct Font
 	int h;
 	int pre;
 	int post;
-}
+};
 
 #endif

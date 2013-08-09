@@ -17,7 +17,6 @@
 #else
 #include <unistd.h>
 #include <sys/time.h>
-static timespec s_ts;
 #endif
 
 //------------------------------------------------------------------------------
@@ -69,10 +68,15 @@ private:
 		char temp[8192];
 
 #ifdef _WIN32
-     		int tick = GetTickCount();
-#else   
-        	clock_gettime( CLOCK_REALTIME, &s_ts );
-        	int tick = ( s_ts.tv_sec * 1000 ) + ( s_ts.tv_nsec / 1000000 );
+   		int tick = GetTickCount();
+#else
+		struct timeval tv;
+		gettimeofday( &tv, 0 );
+		int tick = tv.tv_usec / 1000;
+
+//		timespec ts
+//		clock_gettime( CLOCK_REALTIME, &ts );
+//		int tick = ( ts.tv_sec * 1000 ) + ( ts.tv_nsec / 1000000 );
 #endif
 
 		sprintf( temp, "%02d %02d:%02d:%02d.%03d> ",

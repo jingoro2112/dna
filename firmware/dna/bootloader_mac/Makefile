@@ -6,7 +6,7 @@
 TARGET = bootloader
 MCU = attiny84
 CPU_FREQUENCY = 12000000
-BOOTLOADER_ADDRESS = 18E0
+BOOTLOADER_ADDRESS = 18C0
 
 OBJS = \
 	objs/usbdrvasm.o \

@@ -129,7 +129,7 @@ int main( int argc, char *argv[] )
 
 //			Log( "rjmp offset points to [0x%04X][0x%04X]", offset, offset / 2 );
 
-			for( int i=0; i<sizeof(bootJumper); i++ )
+			for( unsigned int i=0; i<sizeof(bootJumper); i++ )
 			{
 				if ( chunk->data[offset + i] != bootJumper[i] )
 				{

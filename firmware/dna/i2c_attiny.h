@@ -8,6 +8,7 @@
  */
 
 #include <avr/io.h>
+#include <util/delay.h>
 
 unsigned char i2cStartRead( unsigned char address );
 unsigned char i2cStartWrite( unsigned char address );
@@ -25,12 +26,16 @@ void i2cStop();
 //#define i2cSetSDALow() (DDRA |=  0b01000000); asm volatile("nop"); asm volatile("nop"); asm volatile("nop")//_delay_us(1)
 //#define i2cSetSDAHigh() (DDRA &= 0b10111111); asm volatile("nop"); asm volatile("nop"); asm volatile("nop")//_delay_us(1)
 
-#define i2cSetSCLLow() (DDRA |=  0b00010000); _delay_us(5)
-#define i2cSetSCLHigh() (DDRA &= 0b11101111); _delay_us(5)
-#define i2cSetSDALow() (DDRA |=  0b01000000); _delay_us(5)
-#define i2cSetSDAHigh() (DDRA &= 0b10111111); _delay_us(5)
+#define i2cSCL 0b00010000
+#define i2cSDA 0b01000000
+
+//extern unsigned char g_i2cDelay;
+#define i2cSetSDALow() (DDRA |= i2cSDA); _delay_us(3)//g_i2cDelay)
+#define i2cSetSDAHigh() (DDRA &= ~i2cSDA); _delay_us(3)//g_i2cDelay)
+#define i2cSetSCLLow() (PORTA &= ~i2cSCL); _delay_us(3)//g_i2cDelay)
+#define i2cSetSCLHigh() (PORTA |= i2cSCL); _delay_us(3)//g_i2cDelay)
 
 
-#define i2cGetSDA() (PINA & 0b01000000)
+#define i2cGetSDA() (PINA & i2cSDA)
 
 #endif

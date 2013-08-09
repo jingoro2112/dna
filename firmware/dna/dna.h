@@ -17,6 +17,8 @@
 #define uint unsigned int
 #endif
 
+#define ledOn() (DDRA |= 0b10000000; PORTA &= 0b01111111)
+#define ledOff() (DDRA &= 0b01111111)
 
 #include "dna_defs.h" // is included in c++ projects as well so need sto remain generic
    

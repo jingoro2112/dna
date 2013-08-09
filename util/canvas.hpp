@@ -28,10 +28,12 @@ public:
 			   const unsigned int originY  );
 	
 	void blit( void* hdc );
-
+	void getBounds( unsigned int *width, unsigned int *height ) { *width = m_sizeX; *height = m_sizeY; }
 	void clear();
 	
 	int set( unsigned int x, unsigned int y, unsigned int rgba );
+
+	void drawLine( int p1x, int p1y, int p2x, int p2y, int color );
 
 	const int* getBuffer() const { return m_buffer; }
 

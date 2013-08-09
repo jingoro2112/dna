@@ -19,11 +19,11 @@ hid_device* DNAUSB::openDevice( int vid, int pid, const char* vendor, char* prod
 		return 0;
 	}
 
-	char buf[64];
+	char buf[512];
 	Cstr temp;
-	if ( hid_get_manufacturer_string( device, buf, 64) )
+	if ( hid_get_manufacturer_string( device, buf, 512) )
 	{
-		Log( "could not fetch manufacturer string" );
+		Log( "could not fetch manufacturer string");
 		hid_close( device );
 		return 0;
 	}

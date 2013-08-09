@@ -4,6 +4,9 @@
  * and in the LICENCE.txt file included with this distribution
  */
 
+// so I wrote this for a tank-fighting game and have used it quite a
+// few more times after that
+
 #include <stdafx.h>
 #include "canvas.hpp"
 
@@ -112,6 +115,247 @@ int Canvas::set( unsigned int x, unsigned int y, unsigned int rgba )
 	}
 
 	return true;
+}
+
+//------------------------------------------------------------------------------
+void Canvas::drawLine( int p1x, int p1y, int p2x, int p2y, int color )
+{
+	// horizontal line
+	if (p1x == p2x)
+	{
+		if (p1y > p2y)
+		{
+			for( ; p1y >= p2y ; p1y-- )
+			{
+				if ( !set(p1x, p1y, color) )
+				{
+					return;
+				}
+			}
+		}
+		else
+		{
+			for( ; p1y <= p2y ; p1y++ )
+			{
+				if ( !set(p1x, p1y, color) )
+				{
+					return;
+				}
+			}
+		}
+
+		return;
+	}
+
+	// vertical line
+	else if (p1y == p2y)
+	{
+		if (p1x > p2x)
+		{
+			for( ; p1x >= p2x ; p1x-- )
+			{
+				if ( !set(p1x, p1y, color) )
+				{
+					return;
+				}
+			}
+		}
+		else
+		{
+			for( ; p1x <= p2x ; p1x++ )
+			{
+				if ( !set(p1x, p1y, color) )
+				{
+					return;
+				}
+			}
+		}
+
+		return;
+	}
+
+	int dy = p2y - p1y;
+	int dx = p2x - p1x;
+
+	if ( dx == dy || dx == -dy ) // diagonal line?
+	{
+		if ( p1x > p2x )
+		{
+			if ( p1y > p2y )
+			{
+				for( ; p1y >= p2y ; p1y--, p1x-- )
+				{
+					if ( !set(p1x, p1y, color) )
+					{
+						return;
+					}
+				}
+			}
+			else
+			{
+				for( ; p1y <= p2y ; p1y++, p1x-- )
+				{
+					if ( !set(p1x, p1y, color) )
+					{
+						return;
+					}
+				}
+			}
+		}
+		else
+		{
+			if ( p1y > p2y )
+			{
+				for( ; p1y >= p2y ; p1y--, p1x++ )
+				{
+					if ( !set(p1x, p1y, color) )
+					{
+						return;
+					}
+				}
+			}
+			else
+			{
+				for( ; p1y <= p2y ; p1y++, p1x++ )
+				{
+					if ( !set(p1x, p1y, color) )
+					{
+						return;
+					}
+				}
+			}
+		}
+	}
+
+	if ( dx < 0 )
+	{
+		dx = -dx;
+	}
+
+	if ( dy < 0 )
+	{
+		dy = -dy;
+	}
+
+	int err = dx - dy;
+	if ( p1x < p2x )
+	{
+		if ( p1y < p2y )
+		{
+			for(;;)
+			{
+				if ( !set(p1x, p1y, color) )
+				{
+					return;
+				}	
+
+				if ( p1x == p2x && p1y == p2y )
+				{
+					break;
+				}
+
+				int e2 = 2 * err;
+				if ( e2 > -dy )
+				{
+					err -= dy;
+					p1x++;
+				}
+
+				if ( e2 < dx )
+				{
+					err += dx;
+					p1y++;
+				}
+			}
+		}
+		else
+		{
+			for(;;)
+			{
+				if ( !set(p1x, p1y, color) )
+				{
+					return;
+				}	
+
+				if ( p1x == p2x && p1y == p2y )
+				{
+					break;
+				}
+
+				int e2 = 2 * err;
+				if ( e2 > -dy )
+				{
+					err -= dy;
+					p1x++;
+				}
+
+				if ( e2 < dx )
+				{
+					err += dx;
+					p1y--;
+				}
+			}
+		}
+	}
+	else
+	{
+		if ( p1y < p2y )
+		{
+			for(;;)
+			{
+				if ( !set(p1x, p1y, color) )
+				{
+					return;
+				}	
+
+				if ( p1x == p2x && p1y == p2y )
+				{
+					break;
+				}
+
+				int e2 = 2 * err;
+				if ( e2 > -dy )
+				{
+					err -= dy;
+					p1x--;
+				}
+
+				if ( e2 < dx )
+				{
+					err += dx;
+					p1y++;
+				}
+			}
+		}
+		else
+		{
+			for(;;)
+			{
+				if ( !set(p1x, p1y, color) )
+				{
+					return;
+				}	
+
+				if ( p1x == p2x && p1y == p2y )
+				{
+					break;
+				}
+
+				int e2 = 2 * err;
+				if ( e2 > -dy )
+				{
+					err -= dy;
+					p1x--;
+				}
+
+				if ( e2 < dx )
+				{
+					err += dx;
+					p1y--;
+				}
+			}
+		}
+	}
 }
 
 //------------------------------------------------------------------------------

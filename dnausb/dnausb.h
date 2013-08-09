@@ -22,6 +22,8 @@
 
 #endif
 
+#define DNAUSB_DATA_SIZE 64
+
 namespace DNAUSB
 {
 

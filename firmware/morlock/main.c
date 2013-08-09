@@ -1,3 +1,9 @@
+/* Copyright: (c) 2013 by Curt Hartung
+ * This work is released under the Creating Commons 3.0 license
+ * found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
+ * and in the LICENCE.txt file included with this distribution
+ */
+
 #include <dna.h>
 #include <usb.h>
 #include <a2d.h>
@@ -20,6 +26,7 @@
 #define eyeEnable()  (PORTA |= 0b00000000)
 #define eyeDisable() (PORTA &= 0b11111111)
 #define readTrigger() (PORTA & 0b00000000)
+#define readEye() (PORTA & 0b00000000)
 #define setLedOn()  (PORTA &= 0b01111111)
 #define setLedOff() (PORTA |= 0b10000000)
 #define fet1On()
@@ -54,13 +61,13 @@ volatile uint refireBox;
 // hands-off, if I think of some sort of enum/typedef/macro-geddon I'll
 // add it
 #define eyeBlocked				(bits[0].b0) // is the eye blocked
-#define eyeHighBlocked			(bits[0].b1) // is blocked high, or low?
+//#define
 #define triggerState			(bits[0].b2) // high is depressed
 #define triggerStateChangeValid	(bits[0].b3) // did the state change last long enough to 'count'?
 #define startFireCycle			(bits[0].b4) // signal to the main loop to begine a single shot cycle
 #define inProgramMode			(bits[0].b5)
-#define arToolate				(bits[0].b6) // did the autoresponse timer time out?
-#define a2dWatchingEye			(bits[0].b7) // is the a2d mux-ed to the eye channel and compare level set appropriately?
+#define enToolate				(bits[0].b6) // did the Enhanced timer time out?
+//#define
 #define samplingVoltage			(bits[1].b0) // is the a2d being used to sample voltage? if so do not toggle LED!
 #define blinkOn					(bits[1].b1) // while blinking, is the light on?
 #define ledOn					(bits[1].b2) // should the LED be on right now? this is filtered through dimmer and voltage check
@@ -68,7 +75,7 @@ volatile uint refireBox;
 #define eyeFault				(bits[1].b4) // has the eye been detected as faulty
 #define selectingRegister		(bits[1].b5) // program mode
 
-volatile uint msToAutoresponseTriggerDisable;
+volatile uint enhancedTriggerTimeout;
 volatile uint shotsInString;
 volatile uint millisecondCountBox;
 volatile uint millisecondCountBox2;
@@ -234,9 +241,9 @@ void cycleSingleSolenoid()
 
 	millisecondCountBox = consts.dwell1;
 
-	if ( !antiBoltstickTimeout && consts.ABSTime )
+	if ( !antiBoltstickTimeout && consts.ABSTimeout )
 	{
-		antiBoltstickTimeout = consts.ABSTime;
+		antiBoltstickTimeout = consts.ABSTimeout;
 		millisecondCountBox += consts.ABSAddition;
 	}
 
@@ -255,7 +262,7 @@ void cycleSingleSolenoid()
 		// wait the holdoff to make sure the bolt is on its way back,
 		// and we're not seeing the space between the ball and
 		// the bolt.
-		millisecondCountBox = consts.fireHoldoff;
+		millisecondCountBox = consts.boltHoldoff;
 		while( millisecondCountBox );
 
 		// if there is an error, then wait for the ROF timer,
@@ -285,7 +292,7 @@ void cycleDoubleSolenoid()
 
 	fet1Off();
 
-	while( !arToolate // don't engage sniper mode if you are firing quickly
+	while( !enToolate // don't engage sniper mode if you are firing quickly
 		   && currentFireMode == ceSniper 
 		   && triggerState );
 	
@@ -364,9 +371,9 @@ int __attribute__((noreturn)) main(void)
 	TCCR0A = 1<<WGM01; // mode 2, reset counter when it reaches OCROA
 	TIMSK0 = 1<<OCIE0A; // fire off an interrupt every time it matches 250, thus dividing by exactly 2000 (overflow would work too)
 	
-	a2dSetChannel( 6 );
-	a2dSetPrescaler( A2D_PRESCALE_16 ); 
-	a2dEnableInterrupt(); // latch in the value as an interrupt rather than polling
+//	a2dSetChannel( 6 );
+//	a2dSetPrescaler( A2D_PRESCALE_16 ); 
+//	a2dEnableInterrupt(); // latch in the value as an interrupt rather than polling
 
 	sei();
 
@@ -431,6 +438,7 @@ int __attribute__((noreturn)) main(void)
 
 //------------------------------------------------------------------------------
 // sample the eye asychonously
+/*
 ISR( ADC_vect )
 {
 	if ( !a2dWatchingEye )
@@ -450,6 +458,7 @@ ISR( ADC_vect )
 		eyeBlocked = !eyeHighBlocked;
 	}	
 }
+*/
 
 //------------------------------------------------------------------------------
 // Entered 6000 times per second
@@ -482,16 +491,16 @@ ISR( TIM0_COMPA_vect )
 	}
 	else if ( triggerState != readTrigger() )
 	{
-		// debounce check part 2, make sure the state change lasts long enough
+		// rebounce check part 2, make sure the state change lasts long enough
 		if ( !triggerStateChangeValid )
 		{
-			debounceBox = consts.antiMechanicalDebounce;
+			debounceBox = consts.rebounce;
 			triggerStateChangeValid = true; // next time around it counts
 		}
 		else
 		{
-			triggerState = !readTrigger();
 			debounceBox = consts.debounce;
+			triggerState = !readTrigger();
 
 			if ( triggerState ) // been pressed
 			{
@@ -508,10 +517,10 @@ ISR( TIM0_COMPA_vect )
 					if ( currentFireMode == ceRamp
 						 && shotsInString >= consts.rampEnableCount )
 					{
-						scheduleShotRate = ((consts.msToAutoresponseTriggerDisable - msToAutoresponseTriggerDisable) /
+						scheduleShotRate = ((consts.enhancedTriggerTimeout - enhancedTriggerTimeout) /
 										   rampLevel) * 6;
 						scheduleShotBox = scheduleShotRate;
-						rampLevel += consts.rampRate;
+						rampLevel += consts.rampClimb;
 						
 						if ( scheduleShotRate <= refireTime )
 						{
@@ -521,9 +530,9 @@ ISR( TIM0_COMPA_vect )
 					
 					rampTimeoutBox = consts.rampTimeout; // trigger has been depressed, reset the "do what you're doing" timeout
 					
-					// after this many milliseconds autoresponse will not fire
-					msToAutoresponseTriggerDisable = consts.msToAutoresponseTriggerDisable;
-					arToolate = false;
+					// after this many milliseconds Enhanced will not fire
+					enhancedTriggerTimeout = consts.enhancedTriggerTimeout;
+					enToolate = false;
 
 					if ( currentFireMode == ceBurst )
 					{
@@ -533,7 +542,7 @@ ISR( TIM0_COMPA_vect )
 			}
 			else if ( !inProgramMode ) // been released 
 			{
-				if ( (currentFireMode == ceAutoresponse) && !arToolate )
+				if ( (currentFireMode == ceEnhanced) && !enToolate )
 				{
 					startFireCycle = true;
 				}
@@ -584,16 +593,16 @@ ISR( TIM0_COMPA_vect )
 	// ------------------------------------------------------------------------------------------
 	// exactly 1 ms per tick
 	// ------------------------------------------------------------------------------------------
-		
-	if ( a2dWatchingEye )
+
+	if ( useEye )
 	{
-		eyeEnable(); // turn on emitter, wait until the end of this routine to kick off the sampling
+		eyeEnable(); // turn on emitter, wait until the end of this routine to sample
 	}
 	
-	if ( msToAutoresponseTriggerDisable )
+	if ( enhancedTriggerTimeout )
 	{
-		msToAutoresponseTriggerDisable--;
-		arToolate = true;
+		enhancedTriggerTimeout--;
+		enToolate = true;
 	}
 
 	if ( antiBoltstickTimeout )
@@ -712,8 +721,15 @@ ISR( TIM0_COMPA_vect )
 	}
 
 	// should have been plenty of CPU cycles to let the emitter rise, start conversion!
-	if ( a2dWatchingEye )
+	if ( useEye )
 	{
-		a2dStartConversion(); 
+		if ( readEye() )
+		{
+			eyeBlocked = eyeHighBlocked;
+		}
+		else
+		{
+			eyeBlocked = !eyeHighBlocked;	
+		}
 	}
 }

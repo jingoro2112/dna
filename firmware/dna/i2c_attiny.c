@@ -1,13 +1,12 @@
-#include "i2c_attiny.h"
-#include <util/delay.h>
-
-
 /* Copyright: (c) 2013 by Curt Hartung
  * This work is released under the Creating Commons 3.0 license
  * found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
  * and in the LICENCE.txt file included with this distribution
  */
 
+#include "i2c_attiny.h"
+
+//unsigned char g_i2cDelay;
 
 //------------------------------------------------------------------------------
 unsigned char i2cWrite( unsigned char data )
@@ -254,10 +253,11 @@ unsigned char i2cReadByte()
 //------------------------------------------------------------------------------
 void i2cInit( unsigned char c )
 {
-	DDRA  |= 0b01010000; // set as output
-	PORTA &= 0b10101111; // assert low
-	DDRA  &= 0b10101111; // set as input (makes them high)
-	PORTA &= 0b10101111; // disable pullups
+//	g_i2cDelay = c;
+	DDRA  |= i2cSCL | i2cSDA; // set as output
+	PORTA &= ~(i2cSCL | i2cSDA); // assert low
+	DDRA  &= ~(i2cSCL | i2cSDA); // set as input
+	PORTA |= (i2cSCL | i2cSDA); // enable pullups
 }
 
 //------------------------------------------------------------------------------
@@ -271,5 +271,5 @@ void i2cStart()
 void i2cStop()
 {
 	i2cSetSCLHigh();
-	i2cSetSDAHigh(); // transition SDA high while SCL is high
+	i2cSetSDAHigh(); // SDA high while SCL is high
 }
