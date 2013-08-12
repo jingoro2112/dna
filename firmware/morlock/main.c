@@ -223,10 +223,11 @@ void cycleSingleSolenoid()
 			{
 				refireBox = refireTime;
 			}
-		}
 
-		millisecondCountBox = consts.eyeHoldoff; // wait for ball to 'seat'
-		while( millisecondCountBox );
+			millisecondCountBox = consts.eyeHoldoff; // wait for ball to 'seat'
+			while( millisecondCountBox );
+		}
+		// assume enough time has passed, no need to wait for the eyeHoldoff
 	}
 
 	ledOn = true;
@@ -253,20 +254,12 @@ void cycleSingleSolenoid()
 
 	if ( consts.eyeEnabled )
 	{
-		// okay the bolt is on its way forward or already forward,
-		// give it some time to unblock, if it takes longer than
-		// that then something is wrong.
-		millisecondCountBox = 100;
-		while ( eyeBlocked && millisecondCountBox );
-
 		// wait the holdoff to make sure the bolt is on its way back,
 		// and we're not seeing the space between the ball and
-		// the bolt.
+		// the bolt, which would short-cycle the gun thinking the bolt
+		// was another ball
 		millisecondCountBox = consts.boltHoldoff;
 		while( millisecondCountBox );
-
-		// if there is an error, then wait for the ROF timer,
-		// otherwise ignore it and only wait the eye holdoff
 	}
 
 	while( refireBox );

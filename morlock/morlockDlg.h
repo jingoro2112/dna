@@ -58,7 +58,6 @@ public:
 	afx_msg void OnBnClickedCancel();
 	afx_msg void OnBnClickedButton1();
 	afx_msg void OnDeltaposSpin1(NMHDR *pNMHDR, LRESULT *pResult);
-	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 	afx_msg void OnDeltaposDwell2HoldoffSpin(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnDeltaposDwell2Spin(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnDeltaposMaxDwell2Spin(NMHDR *pNMHDR, LRESULT *pResult);

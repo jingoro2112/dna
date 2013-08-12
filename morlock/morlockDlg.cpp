@@ -36,6 +36,11 @@ const ToolTipTable c_tips[]=
 {
 	{ IDC_SPIN1, "number of milliseconds the fire-control solenoid will remain open" },
 	{ IDC_DWELL1, "number of milliseconds the fire-control solenoid will remain open" },
+	{ IDC_SINGLE_SOLENOID, "Select single-solenoid cycle, enabling second power channel to run an accessory" },
+	{ IDC_DUAL_SOLENOID, "Select dual-solenoid cycle" },
+	{ IDC_DWELL2_SPIN, "number of millisecond time the second solenoid will hold the bolt open" },
+	{ IDC_MAX_DWELL2_SPIN, "When the eye is used, this is the longest time the bolt will be held open before giving up and closing it" },
+	
 	{ 0, 0 },
 };
 
@@ -60,7 +65,6 @@ BEGIN_MESSAGE_MAP(CMorlockDlg, CDialogEx)
 	ON_BN_CLICKED(IDCANCEL, &CMorlockDlg::OnBnClickedCancel)
 	ON_BN_CLICKED(IDC_BUTTON1, &CMorlockDlg::OnBnClickedButton1)
 	ON_NOTIFY(UDN_DELTAPOS, IDC_SPIN1, &CMorlockDlg::OnDeltaposSpin1)
-	ON_WM_MOUSEMOVE()
 	ON_NOTIFY(UDN_DELTAPOS, IDC_DWELL2_HOLDOFF_SPIN, &CMorlockDlg::OnDeltaposDwell2HoldoffSpin)
 	ON_NOTIFY(UDN_DELTAPOS, IDC_DWELL2_SPIN, &CMorlockDlg::OnDeltaposDwell2Spin)
 	ON_NOTIFY(UDN_DELTAPOS, IDC_MAX_DWELL2_SPIN, &CMorlockDlg::OnDeltaposMaxDwell2Spin)
@@ -394,7 +398,7 @@ void CMorlockDlg::renderGraphics()
 			drawBar( m_fireCycle, origin, height/2, length, 0, 180, 255, 0 );
 
 			m_fireCycle.drawLine( length / 2, height/2 - halfBar, length / 2 + (lineLength*2), (height/2 - halfBar) - (lineLength*2), CANVAS_RGB(0,180,255) );
-			buf.format( "Holdoff %d", g_morlockConstants.eyeHoldoff );
+			buf.format( "%d", g_morlockConstants.eyeHoldoff );
 
 			textAt( buf, m_fireCycle, digital_16, digital_16_bitmap, (length / 2), 24, 0, 180, 255, 255);
 			
@@ -890,17 +894,6 @@ BOOL CMorlockDlg::PreTranslateMessage(MSG* pMsg)
 {
 	m_tips.RelayEvent(pMsg);  
 	return CDialog::PreTranslateMessage(pMsg);
-}
-
-//------------------------------------------------------------------------------
-void CMorlockDlg::OnMouseMove(UINT nFlags, CPoint point)
-{
-	TOOLINFO t;
-	if ( GetDlgItem(IDC_PRODUCT)->OnToolHitTest( point, &t ) != -1 )
-	{
-		printf("yo");
-	}
-	CDialogEx::OnMouseMove(nFlags, point);
 }
 
 //------------------------------------------------------------------------------
