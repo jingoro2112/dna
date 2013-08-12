@@ -71,7 +71,7 @@ volatile uint refireBox;
 #define samplingVoltage			(bits[1].b0) // is the a2d being used to sample voltage? if so do not toggle LED!
 #define blinkOn					(bits[1].b1) // while blinking, is the light on?
 #define ledOn					(bits[1].b2) // should the LED be on right now? this is filtered through dimmer and voltage check
-#define useEye					(bits[1].b3) // is the eye being used
+//#define						(bits[1].b3)
 #define eyeFault				(bits[1].b4) // has the eye been detected as faulty
 #define selectingRegister		(bits[1].b5) // program mode
 
@@ -196,7 +196,7 @@ void dnaUsbInputStream( unsigned char *data, unsigned char len )
 void cycleSingleSolenoid()
 {
 	refireBox = refireTime;
-	if ( useEye )
+	if ( consts.eyeEnabled )
 	{
 		if ( !eyeBlocked )
 		{
@@ -251,7 +251,7 @@ void cycleSingleSolenoid()
 
 	fet1Off();
 
-	if ( useEye )
+	if ( consts.eyeEnabled )
 	{
 		// okay the bolt is on its way forward or already forward,
 		// give it some time to unblock, if it takes longer than
@@ -276,7 +276,7 @@ void cycleSingleSolenoid()
 void cycleDoubleSolenoid()
 {
 	millisecondCountBox = consts.dwell1;
-	millisecondCountBox2 = consts.dwell1ToDwell2Holdoff;
+	millisecondCountBox2 = consts.dwell2Holdoff;
 	millisecondCountBox3 = 0;
 
 	fet1On();
@@ -298,7 +298,7 @@ void cycleDoubleSolenoid()
 	
 	while( millisecondCountBox2 ); // wait for holdoff
 
-	if ( useEye )
+	if ( consts.eyeEnabled )
 	{
 		millisecondCountBox = consts.maxDwell2;
 		
@@ -347,7 +347,7 @@ void cycleDoubleSolenoid()
 
 	fet2Off();
 
-	refireBox = refireTime - (consts.dwell1ToDwell2Holdoff + consts.dwell2); // load box as if everything happened instantly
+	refireBox = refireTime - (consts.dwell2Holdoff + consts.dwell2); // load box as if everything happened instantly
 }
 
 //------------------------------------------------------------------------------
@@ -594,7 +594,7 @@ ISR( TIM0_COMPA_vect )
 	// exactly 1 ms per tick
 	// ------------------------------------------------------------------------------------------
 
-	if ( useEye )
+	if ( consts.eyeEnabled )
 	{
 		eyeEnable(); // turn on emitter, wait until the end of this routine to sample
 	}
@@ -721,7 +721,7 @@ ISR( TIM0_COMPA_vect )
 	}
 
 	// should have been plenty of CPU cycles to let the emitter rise, start conversion!
-	if ( useEye )
+	if ( consts.eyeEnabled )
 	{
 		if ( readEye() )
 		{

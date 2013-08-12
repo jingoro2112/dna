@@ -7,10 +7,17 @@
  * and in the LICENCE.txt file included with this distribution
  */
 
+// must define this for whatever OS it's running on
 #ifdef _WIN32
+#include <Winsock2.h>
 #define uchar unsigned char
 #define uint unsigned short
 #pragma pack(push, 1)
+
+#else
+//#include <arpa/inet.h>
+//#define uchar unsigned char
+//#define uint unsigned short
 #endif
 
 #define TIMER_COUNTS_PER_SECOND 6000
@@ -51,11 +58,12 @@ enum USBCommands
 #define DEFAULT_DEBOUNCE 150
 #define DEFAULT_REBOUNCE 30
 #define DEFAULT_DWELL1 10
-#define DEFAULT_DWELL_1_TO_2_HOLDOFF 10
+#define DEFAULT_DWELL2_HOLDOFF 10
 #define DEFAULT_DWELL2 50
 #define DEFAULT_MAX_DWELL2 100
 #define DEFAULT_EYE_HOLDOFF 1
 #define DEFAULT_EYE_HIGH_BLOCKED 1
+#define DEFAULT_EYE_ENABLED 0
 #define DEFAULT_LOCKED 0
 #define DEFAULT_RAMP_ENABLE_COUNT 3
 #define DEFAULT_RAMP_CLIMB_RATE 1
@@ -86,10 +94,11 @@ struct EEPROMConstants
 	uchar debounce; // min time between samples after a state change has occured (fast counts)
 
 	uchar dwell1; // (milliseconds)
-	uchar dwell1ToDwell2Holdoff; // (milliseconds) time after solenoid1 fire to fire solenoid2, may be negative
+	uchar dwell2Holdoff; // (milliseconds) time after solenoid1 fire to fire solenoid2
 	uchar dwell2; // (milliseconds)
 	uchar maxDwell2; // (milliseconds)
 
+	uchar eyeEnabled;
 	uchar eyeHoldoff; // (milliseconds)
 	uchar eyeHighBlocked;
 
@@ -100,7 +109,7 @@ struct EEPROMConstants
 	uchar rampTopMode; // when ramping is fully engaged, what mode of fire should be used
 	uint rampTimeout; // how long the trigger must be idle for ramping to expire
 
-#ifdef _WIN32
+#ifndef __AVR_ARCH__
 	void installDefaults()
 	{
 		singleSolenoid = DEFAULT_SINGLE_SOLENOID;
@@ -116,17 +125,39 @@ struct EEPROMConstants
 		rebounce = DEFAULT_REBOUNCE;
 		debounce = DEFAULT_DEBOUNCE;
 		dwell1 = DEFAULT_DWELL1;
-		dwell1ToDwell2Holdoff = DEFAULT_DWELL_1_TO_2_HOLDOFF;
+		dwell2Holdoff = DEFAULT_DWELL2_HOLDOFF;
 		dwell2 = DEFAULT_DWELL2;
 		maxDwell2 = DEFAULT_MAX_DWELL2;
 		eyeHoldoff = DEFAULT_EYE_HOLDOFF;
 		eyeHighBlocked = DEFAULT_EYE_HIGH_BLOCKED;
+		eyeEnabled = DEFAULT_EYE_ENABLED;
 		locked = DEFAULT_LOCKED;
 		rampEnableCount = DEFAULT_RAMP_ENABLE_COUNT;
 		rampClimb = DEFAULT_RAMP_CLIMB_RATE;
 		rampTopMode = DEFAULT_RAMP_TOP_MODE;
 		rampTimeout = DEFAULT_RAMP_TIMEOUT;
 	}
+
+	// set the byte-order properly for values that are in host OS
+	// format but need to go to the AVR 
+	void valuesToHardware()
+	{
+		ballsPerSecondX10 = htons( ballsPerSecondX10 );
+		enhancedTriggerTimeout = htons( enhancedTriggerTimeout );
+		ABSTimeout = htons( ABSTimeout );
+		rampTimeout = htons( rampTimeout );
+	}
+
+	// set the byte-order properly for values that came from the AVR
+	// and need to be worked with on the hosthardware
+	void valuesFromHardware()
+	{
+		ballsPerSecondX10 = ntohs( ballsPerSecondX10 );
+		enhancedTriggerTimeout = ntohs( enhancedTriggerTimeout );
+		ABSTimeout = ntohs( ABSTimeout );
+		rampTimeout = ntohs( rampTimeout );
+	}
+
 #endif
 };
 

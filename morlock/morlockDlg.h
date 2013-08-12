@@ -21,14 +21,16 @@ public:
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
 
+	void drawBar( Canvas& canvas, unsigned int originX, unsigned int originY, unsigned int length, unsigned int r, unsigned int g, unsigned int b, const char* label );
+	void drawInvertedBar( Canvas& canvas, unsigned int originX, unsigned int originY, unsigned int length, unsigned int r, unsigned int g, unsigned int b, const char* label );
 	void renderGraphics();
 	void populateDialogFromConstants();
 	void save();
+	void load( Cstr& buf );
 	
 	static void morlockCommThread( void* arg );
 
 	Canvas m_fireCycle;
-	Canvas m_eyeCycle;
 	CToolTipCtrl m_tips;
 
 	bool m_connected;
@@ -42,6 +44,7 @@ protected:
 	unsigned int getTextWidth( const char* string, const MFont* font );
 	void textAt( const char* text, Canvas& canvas, const MFont* font, const unsigned char* bitmap,
 				 int x, int y, float r, float g, float b, float a );
+	unsigned int textLength( const char* text, const MFont* font );
 
 	// Generated message map functions
 	BOOL PreTranslateMessage( MSG* pMsg );
@@ -83,4 +86,6 @@ public:
 	afx_msg void OnDeltaposDebounceSpin(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnDeltaposBoltHoldoffSpin(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnBnClickedSaveAs();
+	afx_msg void OnBnClickedEyeEnabled();
+	afx_msg void OnBnClickedCheck3();
 };

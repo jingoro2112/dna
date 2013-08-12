@@ -15,6 +15,7 @@
 #include "../firmware/dna/dna_defs.h"
 #include "../firmware/morlock/morlock_defs.h"
 #include "../util/hash.hpp"
+#include "../util/json_parser.hpp"
 
 EEPROMConstants g_morlockConstants;
 bool CMorlockDlg::m_active = true;
@@ -87,6 +88,8 @@ BEGIN_MESSAGE_MAP(CMorlockDlg, CDialogEx)
 	ON_NOTIFY(UDN_DELTAPOS, IDC_DEBOUNCE_SPIN, &CMorlockDlg::OnDeltaposDebounceSpin)
 	ON_NOTIFY(UDN_DELTAPOS, IDC_BOLT_HOLDOFF_SPIN, &CMorlockDlg::OnDeltaposBoltHoldoffSpin)
 	ON_BN_CLICKED(IDC_SAVE_AS, &CMorlockDlg::OnBnClickedSaveAs)
+	ON_BN_CLICKED(IDC_EYE_ENABLED, &CMorlockDlg::OnBnClickedEyeEnabled)
+	ON_BN_CLICKED(IDC_CHECK3, &CMorlockDlg::OnBnClickedCheck3)
 END_MESSAGE_MAP()
 
 //------------------------------------------------------------------------------
@@ -102,7 +105,6 @@ BOOL CMorlockDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// Set small icon
 
 	m_fireCycle.init( 500, 120, 20, 20 );
-	m_eyeCycle.init( 300, 100, 20, 210  );
 
 	m_connected = false;
 	m_morlockConstantsDirty = false;
@@ -166,7 +168,6 @@ void CMorlockDlg::OnPaint()
 	else
 	{
 		CDialogEx::OnPaint();
-		m_eyeCycle.blit( ::GetDC(GetSafeHwnd()) );
 		m_fireCycle.blit( ::GetDC(GetSafeHwnd()) );
 	}
 }
@@ -205,18 +206,138 @@ void CMorlockDlg::OnBnClickedButton1()
 	CDialogEx::OnCancel();
 }
 
+const int lineLength = 6;
+const int halfBar = 6;
+
+//------------------------------------------------------------------------------
+void CMorlockDlg::drawInvertedBar( Canvas& canvas, unsigned int originX, unsigned int originY, unsigned int length, unsigned int r, unsigned int g, unsigned int b, const char* label )
+{
+	unsigned int width;
+	unsigned int height;
+	unsigned int i,j;
+	canvas.getBounds( &width, &height );
+
+	for( i=originX; i<(length + originX); i++ )
+	{
+		m_fireCycle.set( i, originY + (halfBar+1), CANVAS_RGBA(r, g, b, 255) );
+	}
+	for( j=originY - halfBar; j < originY + halfBar; j++ )
+	{
+		m_fireCycle.set( originX, j, CANVAS_RGBA(r, g, b, 255) );
+	}
+
+	for( i=originX; i<(length + originX); i++ )
+	{
+		for( j=originY - halfBar; j < originY + halfBar; j++ )
+		{
+			m_fireCycle.set( i, j, CANVAS_RGBA(r, g, b, 150) );
+		}
+	}
+
+	if ( label )
+	{
+		unsigned int textLen = textLength( label, digital_16 );
+		textAt( label, m_fireCycle, digital_16, digital_16_bitmap, (originX + (length / 2)) - (textLen / 2), originY + 10, (float)r, (float)g, (float)b, 255 );
+
+		m_fireCycle.drawLine( originX,
+							  originY + halfBar,
+							  originX + lineLength,
+							  originY + halfBar + lineLength,
+							  CANVAS_RGBA(r,g,b,200) );
+
+		m_fireCycle.drawLine( originX + length,
+							  originY + halfBar,
+							  (originX + length) - lineLength,
+							  originY + halfBar + lineLength,
+							  CANVAS_RGBA(r,g,b,200) );
+
+		m_fireCycle.drawLine( originX + lineLength,
+							  originY + halfBar + lineLength,
+							  originX + (length / 2) - ((textLen / 2) + 3),
+							  originY + halfBar + lineLength,
+							  CANVAS_RGBA(r,g,b,100) );
+
+		m_fireCycle.drawLine( originX + (length / 2) + ((textLen / 2) + 3),
+							  originY + halfBar + lineLength,
+							  (originX + length) - lineLength,
+							  originY + halfBar + lineLength,
+							  CANVAS_RGBA(r,g,b,100) );
+	}
+}
+
+//------------------------------------------------------------------------------
+void CMorlockDlg::drawBar( Canvas& canvas,
+						   unsigned int originX, unsigned int originY,
+						   unsigned int length, unsigned int r, unsigned int g, unsigned int b, const char* label )
+{
+	unsigned int width;
+	unsigned int height;
+	unsigned int i,j;
+	canvas.getBounds( &width, &height );
+
+	for( i=originX; i<(length + originX); i++ )
+	{
+		m_fireCycle.set( i, originY - (halfBar+1), CANVAS_RGBA(r, g, b, 255) );
+	}
+	for( j=originY - halfBar; j < originY + halfBar; j++ )
+	{
+		m_fireCycle.set( originX, j, CANVAS_RGBA(r, g, b, 255) );
+	}
+
+	for( i=originX; i<(length + originX); i++ )
+	{
+		for( j=originY - halfBar; j < originY + halfBar; j++ )
+		{
+			m_fireCycle.set( i, j, CANVAS_RGBA(r, g, b, 150) );
+		}
+	}
+
+	if ( label )
+	{
+		unsigned int textLen = textLength( label, digital_16 );
+		textAt( label, m_fireCycle, digital_16, digital_16_bitmap, (originX + (length / 2)) - (textLen / 2), originY - 22, (float)r, (float)g, (float)b, 255 );
+
+		m_fireCycle.drawLine( originX,
+							  originY - halfBar,
+							  originX + lineLength,
+							  (originY - halfBar) - lineLength,
+							  CANVAS_RGBA(r,g,b,200) );
+
+		m_fireCycle.drawLine( originX + length,
+							  originY - halfBar,
+							  (originX + length) - lineLength,
+							  (originY - halfBar) - lineLength,
+							  CANVAS_RGBA(r,g,b,200) );
+
+		m_fireCycle.drawLine( originX + lineLength,
+							  (originY - halfBar) - lineLength,
+							  originX + (length / 2) - ((textLen / 2) + 3),
+							  (originY - halfBar) - lineLength,
+							  CANVAS_RGBA(r,g,b,100) );
+
+		m_fireCycle.drawLine( originX + (length / 2) + ((textLen / 2) + 3),
+							  (originY - halfBar) - lineLength,
+							  (originX + length) - lineLength,
+							  (originY - halfBar) - lineLength,
+							  CANVAS_RGBA(r,g,b,100) );
+	}
+}
+
 //------------------------------------------------------------------------------
 void CMorlockDlg::renderGraphics()
 {
-	m_eyeCycle.clear();
 	m_fireCycle.clear();
 
 	unsigned int width;
 	unsigned int height;
+	unsigned int widthCoord;
+	unsigned int heightCoord;
 	unsigned int i,j;
 
 	m_fireCycle.getBounds( &width, &height );
-	// first a cool grid, everythin is cooler with green lines
+	widthCoord = width - 1;
+	heightCoord = height - 1;
+	// first a cool grid, everything is cooler with green lines
 	for( i=0; i<width; i+= 20 )
 	{
 		for( j=0; j<height; j++ )
@@ -231,61 +352,99 @@ void CMorlockDlg::renderGraphics()
 			m_fireCycle.set( i, j, CANVAS_RGB(0,40,0) );
 		}
 	}
-
-	float scale = (float)width / ((10.f / (float)g_morlockConstants.ballsPerSecondX10) * 1000);
-	
 
 	const int halfBar = 6;
-
-	// now draw the dwell1 bar
-	unsigned int barLength = (int)(scale * (float)g_morlockConstants.dwell1);
-	for( i=0; i<barLength; i++ )
-	{
-		m_fireCycle.set( i, height/2 - (halfBar+1), CANVAS_RGBA(255,0,0,255) );
-	}
-	for( j=height/2 - halfBar; j < height/2 + halfBar; j++ )
-	{
-		m_fireCycle.set( 0, j, CANVAS_RGBA(255,0,0,255) );
-	}
-
-	for( i=0; i<barLength; i++ )
-	{
-		for( j=height/2 - halfBar; j < height/2 + halfBar; j++ )
-		{
-			m_fireCycle.set( i, j, CANVAS_RGBA(255,0,0,150) );
-		}
-	}
-
-	// and label it
 	const int lineLength = 6;
-	m_fireCycle.drawLine( 2, height/2 - (halfBar + 2), 2 + lineLength, height/2 - (halfBar + 2) - lineLength, CANVAS_RGBA(255,0,0,255) );
-	m_fireCycle.drawLine( barLength - 2, height/2 - (halfBar + 2), (barLength - 2) - lineLength, height/2 - (halfBar + 2) - lineLength, CANVAS_RGBA(255,0,0,255) );
+	unsigned int origin = 0;
+	unsigned int length;
+	float scale = (float)width / ((10.f / (float)g_morlockConstants.ballsPerSecondX10) * 1000);
+	Cstr buf;
 
-	unsigned int textCenter = getTextWidth( "dwell 1", digital_16 ) / 2;
 
+	buf.format( "Total Fire Cycle %.1f", (10.f / (float)g_morlockConstants.ballsPerSecondX10) * 1000);
+	unsigned int textLen = textLength( buf, digital_16 );
+	textAt( buf, m_fireCycle, digital_16, digital_16_bitmap, (width / 2) - (textLen / 2), 0, 0, 255, 0, 255 );
+
+	m_fireCycle.drawLine( 0, 0, lineLength, lineLength, CANVAS_RGBA(0,255,0,200) );
 	
-	textAt( "dwell 1", m_fireCycle, digital_16, digital_16_bitmap, 10, 10, 0, 2	 55, 255, 255 );
+	m_fireCycle.drawLine( widthCoord,
+						  0,
+						  widthCoord - lineLength,
+						  lineLength,
+						  CANVAS_RGBA(0,255,70,200) );
+	
+	m_fireCycle.drawLine( lineLength,
+						  lineLength,
+						  (width / 2) - ((textLen / 2) + 3),
+						  lineLength,
+						  CANVAS_RGBA(0,255,70,100) );
+	
+	m_fireCycle.drawLine( widthCoord - lineLength,
+						  lineLength,
+						  (width / 2) + ((textLen / 2) + 3),
+						  lineLength,
+						  CANVAS_RGBA(0,255,70,100) );
 
-
-	m_eyeCycle.getBounds( &width, &height );
-	// first a cool grid, everythin is cooler with green lines
-	for( i=0; i<width; i+= 20 )
+	if ( g_morlockConstants.singleSolenoid )
 	{
-		for( j=0; j<height; j++ )
+		// using the eye? draw the eye cycle
+		if ( g_morlockConstants.eyeEnabled )
 		{
-			m_eyeCycle.set( i, j, CANVAS_RGB(0,40,0) );
+			length = (unsigned int)(scale * (float)g_morlockConstants.eyeHoldoff);
+			drawBar( m_fireCycle, origin, height/2, length, 0, 180, 255, 0 );
+
+			m_fireCycle.drawLine( length / 2, height/2 - halfBar, length / 2 + (lineLength*2), (height/2 - halfBar) - (lineLength*2), CANVAS_RGB(0,180,255) );
+			buf.format( "Holdoff %d", g_morlockConstants.eyeHoldoff );
+
+			textAt( buf, m_fireCycle, digital_16, digital_16_bitmap, (length / 2), 24, 0, 180, 255, 255);
+			
+			origin += length;
+		}
+
+		length = (unsigned int)(scale * (float)g_morlockConstants.dwell1);
+		drawBar( m_fireCycle, origin, height/2, length, 255, 0, 0, buf.format( "%d", g_morlockConstants.dwell1 ) );
+
+		origin += length;
+
+		// using the eye? draw the eye cycle
+		if ( g_morlockConstants.eyeEnabled )
+		{
+			length = (unsigned int)(scale * (float)g_morlockConstants.boltHoldoff);
+
+			drawBar( m_fireCycle, origin, height/2, length, 200, 200, 0, buf.format("%d", g_morlockConstants.boltHoldoff) );
 		}
 	}
-	for( i=0; i<width; i++ )
+	else
 	{
-		for( j=0; j<height; j+=20 )
-		{
-			m_eyeCycle.set( i, j, CANVAS_RGB(0,40,0) );
-		}
-	}
+		length = (unsigned int)(scale * (float)g_morlockConstants.dwell1);
+		drawBar( m_fireCycle, origin, height/2 - halfBar, length, 255, 0, 0, buf.format( "%d", g_morlockConstants.dwell1 ) );
+		length = (unsigned int)(scale * (float)g_morlockConstants.dwell2Holdoff);
+		drawInvertedBar( m_fireCycle, origin, height/2 + halfBar, length, 0, 200, 250, buf.format( "%d", g_morlockConstants.dwell2Holdoff ) );
 
+		origin += length;
+
+
+		// using the eye? draw the eye cycle
+		if ( g_morlockConstants.eyeEnabled )
+		{
+			length = (unsigned int)(scale * (float)g_morlockConstants.eyeHoldoff);
+			drawBar( m_fireCycle, origin, height/2, length, 0, 180, 255, 0 );
+
+			m_fireCycle.drawLine( origin + length/2,
+								  height/2 - halfBar,
+								  origin + (length/2) + (lineLength*2),
+								  (height/2 - halfBar) - (lineLength*2),
+								  CANVAS_RGB(0,180,255) );
+
+			textAt( buf.format("Holdoff %d", g_morlockConstants.eyeHoldoff), m_fireCycle, digital_16, digital_16_bitmap, origin + (length / 2), 24, 0, 180, 255, 255);
+
+			origin += length;
+		}
+
+		length = (unsigned int)(scale * (float)g_morlockConstants.dwell2);
+		drawBar( m_fireCycle, origin, height/2, length, 160, 32, 240, buf.format( "%d", g_morlockConstants.dwell2 ) );
+	}
 	
-	m_eyeCycle.blit( ::GetDC(GetSafeHwnd()) );
 	m_fireCycle.blit( ::GetDC(GetSafeHwnd()) );
 }
 
@@ -299,7 +458,7 @@ void CMorlockDlg::populateDialogFromConstants()
 
 	SetDlgItemText( IDC_DWELL2, buf.format("%d", g_morlockConstants.dwell2) );
 	SetDlgItemText( IDC_MAX_DWELL2, buf.format("%d", g_morlockConstants.maxDwell2) );
-	SetDlgItemText( IDC_DWELL2_HOLDOFF, buf.format("%d", g_morlockConstants.dwell1ToDwell2Holdoff) );
+	SetDlgItemText( IDC_DWELL2_HOLDOFF, buf.format("%d", g_morlockConstants.dwell2Holdoff) );
 	SetDlgItemText( IDC_DWELL1, buf.format("%d", g_morlockConstants.dwell1) );
 
 
@@ -328,6 +487,8 @@ void CMorlockDlg::populateDialogFromConstants()
 
 	SetDlgItemText( IDC_EYE_HOLDOFF, buf.format("%d", g_morlockConstants.eyeHoldoff) );
 	SetDlgItemText( IDC_BOLT_HOLDOFF, buf.format("%d", g_morlockConstants.boltHoldoff) );
+	((CButton *)GetDlgItem( IDC_EYE_ENABLED ))->SetCheck( g_morlockConstants.eyeEnabled );
+	((CButton *)GetDlgItem( IDC_CHECK3 ))->SetCheck( g_morlockConstants.locked );
 
 	renderGraphics();
 }
@@ -335,11 +496,220 @@ void CMorlockDlg::populateDialogFromConstants()
 //------------------------------------------------------------------------------
 void CMorlockDlg::save()
 {
+	JsonValue val;
+
+	val.add( "SingleSolenoid", (long long)g_morlockConstants.singleSolenoid );
+	val.add( "FireMode", (long long)g_morlockConstants.fireMode );
+	val.add( "BallsPerSecond", (float)g_morlockConstants.ballsPerSecondX10 / 10.f );
+	val.add( "BurstCount", (long long)g_morlockConstants.burstCount );
+	val.add( "EnhancedTriggerTimeout", (long long)g_morlockConstants.enhancedTriggerTimeout );
+	val.add( "BoltHoldoff", (long long)g_morlockConstants.boltHoldoff );
+	val.add( "AccessortRunTime", (long long)g_morlockConstants.accessoryRunTime );
+	val.add( "Dimmer", (long long)g_morlockConstants.dimmer );
+	val.add( "ABSTimeout", (long long)g_morlockConstants.ABSTimeout );
+	val.add( "ABSAddition", (long long)g_morlockConstants.ABSAddition );
+	val.add( "Rebounce", (long long)g_morlockConstants.rebounce );
+	val.add( "Debounce", (long long)g_morlockConstants.debounce );
+	val.add( "Dwell1", (long long)g_morlockConstants.dwell1 );
+	val.add( "Dwell2Holdoff", (long long)g_morlockConstants.dwell2Holdoff );
+	val.add( "Dwell2", (long long)g_morlockConstants.dwell2 );
+	val.add( "maxDwell2", (long long)g_morlockConstants.maxDwell2 );
+	val.add( "eyeHoldoff", (long long)g_morlockConstants.eyeHoldoff );
+	val.add( "eyeHighBlocked", (long long)g_morlockConstants.eyeHighBlocked );
+	val.add( "Locked", (long long)g_morlockConstants.locked );
+	val.add( "RampEnableCount", (long long)g_morlockConstants.rampEnableCount );
+	val.add( "RampClimb", (long long)g_morlockConstants.rampClimb );
+	val.add( "RampTopMode", (long long)g_morlockConstants.rampTopMode );
+	val.add( "RampTimeout", (long long)g_morlockConstants.rampTimeout );
+	val.add( "EyeEnabled", (long long)g_morlockConstants.eyeEnabled );
+
 	Cstr buffer;
-	buffer.append( &g_morlockConstants, 4 ); // write 4 dummy bytes
-	buffer.append( &g_morlockConstants, sizeof(EEPROMConstants) );
-	*(unsigned int*)buffer.c_str() = Hash::hash( buffer.c_str() + 4, sizeof(EEPROMConstants)); // store a CRC
+	val.writePretty( buffer );
 	buffer.bufferToFile( m_currentPath );
+}
+
+//------------------------------------------------------------------------------
+void CMorlockDlg::load( Cstr& buf )
+{
+	JsonValue val( buf );
+
+	if ( !val.valid() )
+	{
+		MessageBox( "Morlock profile is corrupt", "error", MB_OK | MB_ICONSTOP);
+		m_currentPath = "";
+	}
+
+	JsonValue *ret;
+
+	if ( !(ret = val.get( "SingleSolenoid")) )
+	{
+		MessageBox( "Morlock profile is corrupt, [SingleSolenoid] key not found", "error", MB_OK | MB_ICONSTOP);
+		m_currentPath = "";
+	}
+	g_morlockConstants.singleSolenoid = (uchar)ret->asInt();
+	
+	if ( !(ret = val.get( "FireMode")) )
+	{
+		MessageBox( "Morlock profile is corrupt, [FireMode] key not found", "error", MB_OK | MB_ICONSTOP);
+		m_currentPath = "";
+	}
+	g_morlockConstants.fireMode = (uchar)ret->asInt();
+	
+	if ( !(ret = val.get( "BallsPerSecond")) )
+	{
+		MessageBox( "Morlock profile is corrupt, [BallsPerSecond] key not found", "error", MB_OK | MB_ICONSTOP);
+		m_currentPath = "";
+	}
+	g_morlockConstants.ballsPerSecondX10 = (uint)(ret->asFloat() * 10.f);
+	
+	if ( !(ret = val.get( "BurstCount")) )
+	{
+		MessageBox( "Morlock profile is corrupt, [BurstCount] key not found", "error", MB_OK | MB_ICONSTOP);
+		m_currentPath = "";
+	}
+	g_morlockConstants.burstCount = (uchar)ret->asInt();
+	
+	if ( !(ret = val.get( "EnhancedTriggerTimeout")) )
+	{
+		MessageBox( "Morlock profile is corrupt, [EnhancedTriggerTimeout] key not found", "error", MB_OK | MB_ICONSTOP);
+		m_currentPath = "";
+	}
+	g_morlockConstants.enhancedTriggerTimeout = (uint)ret->asInt();
+	
+	if ( !(ret = val.get( "BoltHoldoff")) )
+	{
+		MessageBox( "Morlock profile is corrupt, [BoltHoldoff] key not found", "error", MB_OK | MB_ICONSTOP);
+		m_currentPath = "";
+	}
+	g_morlockConstants.boltHoldoff = (uchar)ret->asInt();
+	
+	if ( !(ret = val.get( "AccessortRunTime")) )
+	{
+		MessageBox( "Morlock profile is corrupt, [AccessortRunTime] key not found", "error", MB_OK | MB_ICONSTOP);
+		m_currentPath = "";
+	}
+	g_morlockConstants.accessoryRunTime = (uchar)ret->asInt();
+	
+	if ( !(ret = val.get( "Dimmer")) )
+	{
+		MessageBox( "Morlock profile is corrupt, [Dimmer] key not found", "error", MB_OK | MB_ICONSTOP);
+		m_currentPath = "";
+	}
+	g_morlockConstants.dimmer = (uchar)ret->asInt();
+	
+	if ( !(ret = val.get( "ABSTimeout")) )
+	{
+		MessageBox( "Morlock profile is corrupt, [ABSTimeout] key not found", "error", MB_OK | MB_ICONSTOP);
+		m_currentPath = "";
+	}
+	g_morlockConstants.ABSTimeout = (uint)ret->asInt();
+	
+	if ( !(ret = val.get( "ABSAddition")) )
+	{
+		MessageBox( "Morlock profile is corrupt, [ABSAddition] key not found", "error", MB_OK | MB_ICONSTOP);
+		m_currentPath = "";
+	}
+	g_morlockConstants.ABSAddition = (uchar)ret->asInt();
+	
+	if ( !(ret = val.get( "Rebounce")) )
+	{
+		MessageBox( "Morlock profile is corrupt, [Rebounce] key not found", "error", MB_OK | MB_ICONSTOP);
+		m_currentPath = "";
+	}
+	g_morlockConstants.rebounce = (uchar)ret->asInt();
+	
+	if ( !(ret = val.get( "Debounce")) )
+	{
+		MessageBox( "Morlock profile is corrupt, [Debounce] key not found", "error", MB_OK | MB_ICONSTOP);
+		m_currentPath = "";
+	}
+	g_morlockConstants.debounce = (uchar)ret->asInt();
+	
+	if ( !(ret = val.get( "Dwell1")) )
+	{
+		MessageBox( "Morlock profile is corrupt, [Dwell1] key not found", "error", MB_OK | MB_ICONSTOP);
+		m_currentPath = "";
+	}
+	g_morlockConstants.dwell1 = (uchar)ret->asInt();
+	
+	if ( !(ret = val.get( "Dwell2Holdoff")) )
+	{
+		MessageBox( "Morlock profile is corrupt, [Dwell2Holdoff] key not found", "error", MB_OK | MB_ICONSTOP);
+		m_currentPath = "";
+	}
+	g_morlockConstants.dwell2Holdoff = (uchar)ret->asInt();
+	
+	if ( !(ret = val.get( "Dwell2")) )
+	{
+		MessageBox( "Morlock profile is corrupt, [Dwell2] key not found", "error", MB_OK | MB_ICONSTOP);
+		m_currentPath = "";
+	}
+	g_morlockConstants.dwell2 = (uchar)ret->asInt();
+	
+	if ( !(ret = val.get( "maxDwell2")) )
+	{
+		MessageBox( "Morlock profile is corrupt, [maxDwell2] key not found", "error", MB_OK | MB_ICONSTOP);
+		m_currentPath = "";
+	}
+	g_morlockConstants.maxDwell2 = (uchar)ret->asInt();
+	
+	if ( !(ret = val.get( "eyeHoldoff")) )
+	{
+		MessageBox( "Morlock profile is corrupt, [eyeHoldoff] key not found", "error", MB_OK | MB_ICONSTOP);
+		m_currentPath = "";
+	}
+	g_morlockConstants.eyeHoldoff = (uchar)ret->asInt();
+	
+	if ( !(ret = val.get( "eyeHighBlocked")) )
+	{
+		MessageBox( "Morlock profile is corrupt, [eyeHighBlocked] key not found", "error", MB_OK | MB_ICONSTOP);
+		m_currentPath = "";
+	}
+	g_morlockConstants.eyeHighBlocked = (uchar)ret->asInt();
+	
+	if ( !(ret = val.get( "Locked")) )
+	{
+		MessageBox( "Morlock profile is corrupt, [Locked] key not found", "error", MB_OK | MB_ICONSTOP);
+		m_currentPath = "";
+	}
+	g_morlockConstants.locked = (uchar)ret->asInt();
+	
+	if ( !(ret = val.get( "RampEnableCount")) )
+	{
+		MessageBox( "Morlock profile is corrupt, [RampEnableCount] key not found", "error", MB_OK | MB_ICONSTOP);
+		m_currentPath = "";
+	}
+	g_morlockConstants.rampEnableCount = (uchar)ret->asInt();
+	
+	if ( !(ret = val.get( "RampClimb")) )
+	{
+		MessageBox( "Morlock profile is corrupt, [RampClimb] key not found", "error", MB_OK | MB_ICONSTOP);
+		m_currentPath = "";
+	}
+	g_morlockConstants.rampClimb = (uchar)ret->asInt();
+	
+	if ( !(ret = val.get( "RampTopMode")) )
+	{
+		MessageBox( "Morlock profile is corrupt, [RampTopMode] key not found", "error", MB_OK | MB_ICONSTOP);
+		m_currentPath = "";
+	}
+	g_morlockConstants.rampTopMode = (uchar)ret->asInt();
+	
+	if ( !(ret = val.get( "RampTimeout")) )
+	{
+		MessageBox( "Morlock profile is corrupt, [RampTimeout] key not found", "error", MB_OK | MB_ICONSTOP);
+		m_currentPath = "";
+	}
+	g_morlockConstants.rampTimeout = (uint)ret->asInt();
+
+	if ( !(ret = val.get( "EyeEnabled")) )
+	{
+		MessageBox( "Morlock profile is corrupt, [EyeEnabled] key not found", "error", MB_OK | MB_ICONSTOP);
+		m_currentPath = "";
+	}
+	g_morlockConstants.eyeEnabled = (uchar)ret->asInt();
+
+	populateDialogFromConstants();
 }
 
 //------------------------------------------------------------------------------
@@ -400,7 +770,9 @@ void CMorlockDlg::morlockCommThread( void* arg )
 				goto disconnected;
 			}
 
+
 			memcpy( &g_morlockConstants, buffer, sizeof(g_morlockConstants) );
+			g_morlockConstants.valuesToHardware();
 			md->populateDialogFromConstants();
 			
 			md->SetDlgItemText( IDC_STATUS, "connected" );
@@ -418,7 +790,10 @@ void CMorlockDlg::morlockCommThread( void* arg )
 				goto disconnected;
 			}
 
+			g_morlockConstants.valuesToHardware();
 			memcpy( buffer, &g_morlockConstants, sizeof(g_morlockConstants) );
+			g_morlockConstants.valuesFromHardware();
+			
 			if ( !DNAUSB::sendData(device, buffer) )
 			{
 				goto disconnected;
@@ -498,6 +873,19 @@ void CMorlockDlg::textAt( const char* text, Canvas& canvas, const MFont* font, c
 }
 
 //------------------------------------------------------------------------------
+unsigned int CMorlockDlg::textLength( const char* text, const MFont* font )
+{
+	unsigned int length = 0;
+	for( int i=0; text[i]; i++ )
+	{
+		char c = text[i] - 32;
+		length += font[c].pre + font[c].post + font[c].w;
+	}
+
+	return length;
+}
+
+//------------------------------------------------------------------------------
 BOOL CMorlockDlg::PreTranslateMessage(MSG* pMsg)
 {
 	m_tips.RelayEvent(pMsg);  
@@ -533,7 +921,7 @@ void CMorlockDlg::OnDeltaposDwell2HoldoffSpin(NMHDR *pNMHDR, LRESULT *pResult)
 	*pResult = 0;
 
 	m_morlockConstantsDirty = true;
-	g_morlockConstants.dwell1ToDwell2Holdoff -= pNMUpDown->iDelta;
+	g_morlockConstants.dwell2Holdoff -= pNMUpDown->iDelta;
 	populateDialogFromConstants();
 }
 
@@ -582,7 +970,7 @@ void CMorlockDlg::OnDeltaposRofSpin(NMHDR *pNMHDR, LRESULT *pResult)
 	*pResult = 0;
 
 	m_morlockConstantsDirty = true;
-	g_morlockConstants.ballsPerSecondX10 -= (pNMUpDown->iDelta * 5);
+	g_morlockConstants.ballsPerSecondX10 -= pNMUpDown->iDelta;
 	populateDialogFromConstants();
 }
 
@@ -700,10 +1088,10 @@ void CMorlockDlg::OnDeltaposRebounceSpin(NMHDR *pNMHDR, LRESULT *pResult)
 void CMorlockDlg::OnBnClickedLoad()
 {
 	CFileDialog dlgFile( TRUE,
-						 _T(".mlk"),
+						 _T(".json"),
 						 NULL,
 						 OFN_HIDEREADONLY | OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_READONLY,
-						 _T("Morlock Profiles (*.mlk)|*.mlk||"));
+						 _T("Morlock JSON (*.json)|*.json||"));
 
 	if ( dlgFile.DoModal() == IDOK)
 	{
@@ -715,24 +1103,7 @@ void CMorlockDlg::OnBnClickedLoad()
 			Cstr buffer;
 			if ( buffer.fileToBuffer(m_currentPath) )
 			{
-				if ( buffer.size() != (sizeof(EEPROMConstants) + 4) )
-				{
-					MessageBox( "Not a Morlock profile", "error", MB_OK | MB_ICONSTOP);
-					m_currentPath = "";
-				}
-				else 
-				{
-					if ( Hash::hash( buffer.c_str() + 4, sizeof(EEPROMConstants)) != *(unsigned int*)buffer.c_str() )
-					{
-						MessageBox( "Morlock profile is corrupt", "error", MB_OK | MB_ICONSTOP);
-						m_currentPath = "";
-					}
-					else
-					{
-						memcpy( &g_morlockConstants, buffer.c_str() + 4, sizeof(EEPROMConstants) );
-						populateDialogFromConstants();
-					}
-				}
+				load( buffer );
 			}
 			else
 			{
@@ -749,10 +1120,10 @@ void CMorlockDlg::OnBnClickedSave()
 	{
 		char buf[ MAX_PATH + 2 ] = "";
 		CFileDialog dlgFile( FALSE,
-							 _T(".mlk"),
+							 _T(".json"),
 							 buf,
 							 OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
-							 _T("Morlock Profiles (*.mlk)|*.mlk||"));
+							 _T("Morlock JSON (*.json)|*.json||"));
 
 		if ( dlgFile.DoModal() != IDOK )
 		{
@@ -762,6 +1133,7 @@ void CMorlockDlg::OnBnClickedSave()
 		m_currentPath = dlgFile.GetPathName();
 	}
 
+	m_currentPath = "c:\\curt\\test.json";
 	if ( m_currentPath.size() )
 	{
 		save();
@@ -870,4 +1242,34 @@ void CMorlockDlg::OnBnClickedSaveAs()
 	{
 		save();
 	}
+}
+
+//------------------------------------------------------------------------------
+void CMorlockDlg::OnBnClickedEyeEnabled()
+{
+	m_morlockConstantsDirty = true;
+	if ( ((CButton *)GetDlgItem(IDC_EYE_ENABLED))->GetState() & 0x3 )
+	{
+		g_morlockConstants.eyeEnabled = 1;
+	}
+	else
+	{
+		g_morlockConstants.eyeEnabled = 0;
+	}
+	populateDialogFromConstants();
+}
+
+//------------------------------------------------------------------------------
+void CMorlockDlg::OnBnClickedCheck3()
+{
+	m_morlockConstantsDirty = true;
+	if ( ((CButton *)GetDlgItem(IDC_CHECK3))->GetState() & 0x3 )
+	{
+		g_morlockConstants.locked = 1;
+	}
+	else
+	{
+		g_morlockConstants.locked = 0;
+	}
+	populateDialogFromConstants();
 }
