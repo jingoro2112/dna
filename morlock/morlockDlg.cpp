@@ -40,7 +40,26 @@ const ToolTipTable c_tips[]=
 	{ IDC_DUAL_SOLENOID, "Select dual-solenoid cycle" },
 	{ IDC_DWELL2_SPIN, "number of millisecond time the second solenoid will hold the bolt open" },
 	{ IDC_MAX_DWELL2_SPIN, "When the eye is used, this is the longest time the bolt will be held open before giving up and closing it" },
-	
+	{ IDC_DWELL2_HOLDOFF_SPIN, "In dual-solenoid mode, this is how long the bolt solenoid waits to begin its cycle" },
+	{ IDC_ROF_SPIN, "Cap on the rate of fire" },
+	{ IDC_SHOTS_IN_BURST_SPIN, "How many shots to fire in burst mode" },
+	{ IDC_ENHANCED_TRIGGER_TIMEOUT_SPIN, "How long after the trigger is pulled will its release no longer trigger an enhanced shot, such as autoresponse" },
+	{ IDC_RAMP_TOP_MODE, "When ramping fully engages, what mode of fire will be used" },
+	{ IDC_FIRE_MODE, "What mode of fire will be used" },
+	{ IDC_RAMP_ENABLE_COUNT_SPIN, "How many shots must be fire in semi before ramping kicks in" },
+	{ IDC_RAMP_CLIMB_SPIN, "Number of shots added per trigger pull in ramping mode, cumulative, this adjusts ramping speed" },
+	{ IDC_RAMP_TIMEOUT_SPIN, "Time before ramping reverts to normal semi and must be re-engaged" },
+	{ IDC_ABS_TIMEOUT_SPIN, "How long the marker is idle before the Anti Bolt-Stick is added to dwell 1 on the next shot" },
+	{ IDC_ABS_ADDITION_SPIN, "How many milliseconds are added to dwell 1 to mitigate first-shot dropoff" },
+	{ IDC_DEBOUNCE_SPIN, "Debounce constant to filter switch noise, lowering this can cause sporatic shots" },
+	{ IDC_REBOUNCE_SPIN, "Constant for filtering transistion in the switch, lowering this could cause erratic switch behavior in enhanced trigger modes" },
+	{ IDC_ACCESORY_RUNTIME_SPIN, "In single-solenoid mode, how long the second channel will be turned on to run an accessory" },
+	{ IDC_DIMMER_SPIN, "dimmer for the on-board LED" },
+	{ IDC_EYE_HOLDOFF_SPIN, "If the eye is being used, and paint is not in the breech, when it is detected, wait this amount of time to be sure it has seated" },
+	{ IDC_BOLT_HOLDOFF_SPIN, "when using the eye, this is how long to way after the bolt cycles to begin looking at it again to detect the next paintball, this prevents accidentally detecting the bolt as a paintball" },
+	{ IDC_EYE_ENABLED, "Enable the eye" },
+	{ IDC_CHECK3, "When checked, the morlock cannot be trigger programmed, only by tethering" },
+		
 	{ 0, 0 },
 };
 
@@ -199,7 +218,7 @@ void CMorlockDlg::OnBnClickedCancel()
 //------------------------------------------------------------------------------
 void CMorlockDlg::OnBnClickedButton1()
 {
-	if ( m_morlockConstantsDirty && m_connected )
+	if ( m_morlockConstantsDirty || m_morlockConstantsNeedCommit )
 	{
 		if ( MessageBox("Current changes are unsaved, are you sure you want to exit?", "warning", MB_OKCANCEL) != IDOK )
 		{
@@ -465,7 +484,6 @@ void CMorlockDlg::populateDialogFromConstants()
 	SetDlgItemText( IDC_DWELL2_HOLDOFF, buf.format("%d", g_morlockConstants.dwell2Holdoff) );
 	SetDlgItemText( IDC_DWELL1, buf.format("%d", g_morlockConstants.dwell1) );
 
-
 	SetDlgItemText( IDC_ROF, buf.format("%.1f", (float)g_morlockConstants.ballsPerSecondX10 / 10) );
 	SetDlgItemText( IDC_SHOTS_IN_BURST, buf.format("%d", g_morlockConstants.burstCount) );
 	SetDlgItemText( IDC_ENHANCED_TRIGGER_TIMEOUT, buf.format("%d", g_morlockConstants.enhancedTriggerTimeout) );
@@ -530,6 +548,8 @@ void CMorlockDlg::save()
 	Cstr buffer;
 	val.writePretty( buffer );
 	buffer.bufferToFile( m_currentPath );
+
+	m_morlockConstantsDirty = false;
 }
 
 //------------------------------------------------------------------------------
@@ -760,25 +780,30 @@ void CMorlockDlg::morlockCommThread( void* arg )
 			{
 				md->SetDlgItemText( IDC_PRODUCT, "DNA Hardware v1.0" );
 			}
+			else
+			{
+				ms->MessageBox( temp.format("Unrecognized device 0x%02X", productId), "error", MB_OK | MB_ICONSTOP);
+				goto disconnected;
+			}
 			
 			md->SetDlgItemText( IDC_STATUS, "connected" );
 
-			buffer[0] = ceCommandGetEEPROMConstants;
-			if ( !DNAUSB::sendData(device, buffer) )
+			if ( !md->m_morlockConstantsDirty
+				 || (md->m_morlockConstantsDirty
+					 && ms->MessageBox( temp.format("Morlock device detected, but unsaved changes have been made from defaults."
+													"Would you like to load the values from the board, overriding changes you have made to the dialog?"
+													"query", MB_OKCANCEL) == IDOK)) )
 			{
-				goto disconnected;
+				if ( !DNAUSB::getData(device, buffer) )
+				{
+					goto disconnected;
+				}
+
+				memcpy( &g_morlockConstants, buffer, sizeof(g_morlockConstants) );
+				g_morlockConstants.valuesToHardware();
 			}
-
-			if ( !DNAUSB::getData(device, buffer) )
-			{
-				goto disconnected;
-			}
-
-
-			memcpy( &g_morlockConstants, buffer, sizeof(g_morlockConstants) );
-			g_morlockConstants.valuesToHardware();
-			md->populateDialogFromConstants();
 			
+			md->populateDialogFromConstants();
 			md->SetDlgItemText( IDC_STATUS, "connected" );
 		}
 
@@ -936,8 +961,11 @@ void CMorlockDlg::OnDeltaposMaxDwell2Spin(NMHDR *pNMHDR, LRESULT *pResult)
 	*pResult = 0;
 
 	m_morlockConstantsDirty = true;
-	g_morlockConstants.maxDwell2 -= pNMUpDown->iDelta;
-	populateDialogFromConstants();
+	if ( (g_morlockConstants.maxDwell2 - pNMUpDown->iDelta) >= g_morlockConstants.dwell2  )
+	{
+		g_morlockConstants.maxDwell2 -= pNMUpDown->iDelta;
+		populateDialogFromConstants();
+	}
 }
 
 //------------------------------------------------------------------------------
@@ -1136,7 +1164,14 @@ void CMorlockDlg::OnBnClickedSave()
 //------------------------------------------------------------------------------
 void CMorlockDlg::OnBnClickedApply()
 {
+	if ( !m_connected )
+	{
+		MessageBox( "Cannot commit changes, no device detected", "Error", MB_OK | MB_ICONSTOP );
+		return;
+	}
+	
 	m_morlockConstantsNeedCommit = true;
+	m_morlockConstantsDirty = false;
 }
 
 //------------------------------------------------------------------------------
@@ -1146,7 +1181,10 @@ void CMorlockDlg::OnDeltaposEyeHoldoffSpin(NMHDR *pNMHDR, LRESULT *pResult)
 	*pResult = 0;
 
 	m_morlockConstantsDirty = true;
-	g_morlockConstants.eyeHoldoff -= pNMUpDown->iDelta;
+	if ( (int)g_morlockConstants.eyeHoldoff - pNMUpDown->iDelta >= 0 )
+	{
+		g_morlockConstants.eyeHoldoff -= pNMUpDown->iDelta;
+	}
 	populateDialogFromConstants();
 }
 

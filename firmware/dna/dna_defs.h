@@ -12,7 +12,7 @@
 #define DNA_AT84_v1_00				0x03
 #define BOOTLOADER_DNA_AT84_v1_00	0x04
 
-#define BOOTLOADER_ENTRY			0x0C70
+#define BOOTLOADER_ENTRY			0x0C60
 
 #define DNA_PRODUCT_MASK			0x7F
 #define DNA_RTS						0x80

@@ -174,7 +174,7 @@ const PROGMEM int isrJump[] =
 	0x08C0, // c0 08  rjmp +8    -- rjmp to trampoline
 	0x93EF, // ef 93  push r30   -- INT0, push r30/31
 	0x93FF, // ff 93  push r31
-	0xEEE7, // e7 ee  ldi r30, 0xE7 -- load them with the ISR vector for..
+	0xEDEE, // ee ed  ldi  r30, 0xDE -- load them with the ISR vector for..
 	0xE0FC, // fc e0  ldi r31, 0x0C
 	0x9509, // 09 95  icall         -- an icall, so it can be reached WAAAY at the top of Flash
 	0x91FF, // ff 91  pop r31
