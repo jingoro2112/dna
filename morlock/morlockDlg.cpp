@@ -64,6 +64,15 @@ const ToolTipTable c_tips[]=
 };
 
 //------------------------------------------------------------------------------
+enum RampPresets
+{
+	ceRampTurbo,
+	ceRampDoubleTap,
+	ceRampOMG,
+	ceRampMillenium,
+};
+
+//------------------------------------------------------------------------------
 CMorlockDlg::CMorlockDlg(CWnd* pParent /*=NULL*/)
 	: CDialogEx(CMorlockDlg::IDD, pParent)
 {
@@ -113,6 +122,7 @@ BEGIN_MESSAGE_MAP(CMorlockDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_SAVE_AS, &CMorlockDlg::OnBnClickedSaveAs)
 	ON_BN_CLICKED(IDC_EYE_ENABLED, &CMorlockDlg::OnBnClickedEyeEnabled)
 	ON_BN_CLICKED(IDC_CHECK3, &CMorlockDlg::OnBnClickedCheck3)
+	ON_CBN_SELCHANGE(IDC_RAMP_PRESETS, &CMorlockDlg::OnCbnSelchangeRampPresets)
 END_MESSAGE_MAP()
 
 //------------------------------------------------------------------------------
@@ -154,7 +164,16 @@ BOOL CMorlockDlg::OnInitDialog()
 	combo->SetItemData( combo->AddString( "3 Burst" ), ceBurst );
 	combo->SetItemData( combo->AddString( "4 Full Auto" ), ceFullAuto );
 	combo->SetCurSel( 0 );
-	
+
+	combo = (CComboBox *)GetDlgItem( IDC_RAMP_PRESETS );
+	combo->ResetContent();
+	combo->SetItemData( combo->AddString( "None" ), -1 );
+	combo->SetItemData( combo->AddString( "Turbo" ), ceRampTurbo );
+	combo->SetItemData( combo->AddString( "Double Tap" ), ceRampDoubleTap );
+	combo->SetItemData( combo->AddString( "OMG" ), ceRampOMG );
+	combo->SetItemData( combo->AddString( "Millenium" ), ceRampMillenium );
+	combo->SetCurSel( 0 );
+
 	m_tips.Create( this, TTS_ALWAYSTIP );
 	for( int i=0; c_tips[i].windowId ; i++ )
 	{
@@ -782,7 +801,7 @@ void CMorlockDlg::morlockCommThread( void* arg )
 			}
 			else
 			{
-				ms->MessageBox( temp.format("Unrecognized device 0x%02X", productId), "error", MB_OK | MB_ICONSTOP);
+				md->MessageBox( temp.format("Unrecognized device 0x%02X", productId), "error", MB_OK | MB_ICONSTOP);
 				goto disconnected;
 			}
 			
@@ -790,9 +809,9 @@ void CMorlockDlg::morlockCommThread( void* arg )
 
 			if ( !md->m_morlockConstantsDirty
 				 || (md->m_morlockConstantsDirty
-					 && ms->MessageBox( temp.format("Morlock device detected, but unsaved changes have been made from defaults."
-													"Would you like to load the values from the board, overriding changes you have made to the dialog?"
-													"query", MB_OKCANCEL) == IDOK)) )
+					 && md->MessageBox(temp.format("Morlock device detected, but unsaved changes have been made from defaults."
+												   "Would you like to load the values from the board, overriding changes you have made to the dialog?"
+												   "query", MB_OKCANCEL)) == IDOK) )
 			{
 				if ( !DNAUSB::getData(device, buffer) )
 				{
@@ -1303,4 +1322,69 @@ void CMorlockDlg::OnBnClickedCheck3()
 		g_morlockConstants.locked = 0;
 	}
 	populateDialogFromConstants();
+}
+
+//------------------------------------------------------------------------------
+void CMorlockDlg::OnCbnSelchangeRampPresets()
+{
+	CComboBox *combo = (CComboBox *)GetDlgItem( IDC_RAMP_PRESETS );
+	int preset = combo->GetItemData( combo->GetCurSel() );
+
+	switch( preset )
+	{
+		case ceRampTurbo:
+		{
+			m_morlockConstantsDirty = true;
+			g_morlockConstants.rampTopMode = ceSemi;
+			g_morlockConstants.ballsPerSecondX10 = 15;
+			g_morlockConstants.enhancedTriggerTimeout = 120;
+			g_morlockConstants.rampEnableCount = 1;
+			g_morlockConstants.rampTimeout = 120;
+			g_morlockConstants.rampClimb = 1;
+			break;	
+		}
+		
+		case ceRampDoubleTap:
+		{
+			m_morlockConstantsDirty = true;
+			g_morlockConstants.rampTopMode = ceAutoresponse;
+			g_morlockConstants.ballsPerSecondX10 = 15;
+			g_morlockConstants.enhancedTriggerTimeout = 1000;
+			g_morlockConstants.rampEnableCount = 3;
+			g_morlockConstants.rampTimeout = 1000;
+			g_morlockConstants.rampClimb = 1;
+			break;	
+		}			
+   
+		case ceRampOMG:
+		{
+			m_morlockConstantsDirty = true;
+			g_morlockConstants.rampTopMode = ceFullAuto;
+			g_morlockConstants.ballsPerSecondX10 = 15;
+			g_morlockConstants.enhancedTriggerTimeout = 1000;
+			g_morlockConstants.rampEnableCount = 3;
+			g_morlockConstants.rampTimeout = 1000;
+			g_morlockConstants.rampClimb = 2;
+			break;	
+		}
+
+		case ceRampMillenium:
+		{
+			m_morlockConstantsDirty = true;
+			g_morlockConstants.rampTopMode = ceSemi;
+			g_morlockConstants.ballsPerSecondX10 = 105;
+			g_morlockConstants.enhancedTriggerTimeout = 200;
+			g_morlockConstants.rampEnableCount = 3;
+			g_morlockConstants.rampTimeout = 200;
+			g_morlockConstants.rampClimb = 1;
+			break;	
+		}
+
+		default:
+		{
+			break;
+		}
+	}
+	populateDialogFromConstants();
+
 }

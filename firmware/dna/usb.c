@@ -4,10 +4,10 @@
  * and in the LICENCE.txt file included with this distribution
  */
 
+#include "dna.h"
 #include "usb.h"
 #include "../../usbdrv/usbdrv.c"
 
-#include "dna.h"
 
 #include <util/delay.h>
 #include <avr/interrupt.h>
@@ -35,8 +35,8 @@ const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
 static unsigned char s_status;
 
 volatile unsigned char g_sendQueueLen;
-static unsigned char s_sendQueuePosition;
-static unsigned char *s_sendQueueBuffer;
+volatile static unsigned char s_sendQueuePosition;
+volatile static unsigned char *s_sendQueueBuffer;
 
 static unsigned char s_dataTransferRemaining;
 

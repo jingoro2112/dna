@@ -87,4 +87,5 @@ public:
 	afx_msg void OnBnClickedSaveAs();
 	afx_msg void OnBnClickedEyeEnabled();
 	afx_msg void OnBnClickedCheck3();
+	afx_msg void OnCbnSelchangeRampPresets();
 };

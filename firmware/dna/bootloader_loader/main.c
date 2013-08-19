@@ -5,6 +5,7 @@
  */
 
 #include "../dna_defs.h"
+
 #include <avr/io.h>
 #include <avr/boot.h>
 #include <avr/pgmspace.h>
@@ -41,6 +42,6 @@ int main()
 		
 	} while( pos < g_size );
 
-	asm	volatile ("ijmp" ::"z" (BOOTLOADER_ENTRY)); // jump to bootloader!
+	asm	volatile ("ijmp" ::"z" (BOOTLOADER_ENTRY)); // jump to bootloader we just loaded
 	return 0;
 }

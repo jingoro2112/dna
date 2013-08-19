@@ -27,8 +27,6 @@
 #define eyeDisable() (PORTA &= 0b11111111)
 #define readTrigger() (PORTA & 0b00000000)
 #define readEye() (PORTA & 0b00000000)
-#define setLedOn()  (PORTA &= 0b01111111)
-#define setLedOff() (PORTA |= 0b10000000)
 #define fet1On()
 #define fet1Off()
 #define fet2On()
@@ -70,7 +68,7 @@ volatile uint refireBox;
 //#define
 #define samplingVoltage			(bits[1].b0) // is the a2d being used to sample voltage? if so do not toggle LED!
 #define blinkOn					(bits[1].b1) // while blinking, is the light on?
-#define ledOn					(bits[1].b2) // should the LED be on right now? this is filtered through dimmer and voltage check
+#define isLedOn					(bits[1].b2) // should the LED be on right now? this is filtered through dimmer and voltage check
 //#define						(bits[1].b3)
 #define eyeFault				(bits[1].b4) // has the eye been detected as faulty
 #define selectingRegister		(bits[1].b5) // program mode
@@ -230,7 +228,7 @@ void cycleSingleSolenoid()
 		// assume enough time has passed, no need to wait for the eyeHoldoff
 	}
 
-	ledOn = true;
+	isLedOn = true;
 
 	fet1On();
 
@@ -392,7 +390,7 @@ int __attribute__((noreturn)) main(void)
 		{
 			if ( !inProgramMode	)
 			{
-				ledOn = eyeBlocked;
+				isLedOn = eyeBlocked;
 			}
 		}
 
@@ -535,7 +533,7 @@ ISR( TIM0_COMPA_vect )
 			}
 			else if ( !inProgramMode ) // been released 
 			{
-				if ( (currentFireMode == ceEnhanced) && !enToolate )
+				if ( (currentFireMode == ceAutoresponse) && !enToolate )
 				{
 					startFireCycle = true;
 				}
@@ -554,7 +552,7 @@ ISR( TIM0_COMPA_vect )
 	// duty cycle for LED, effecting a dimmer
 	if ( !samplingVoltage )
 	{
-		if ( ledOn )
+		if ( isLedOn )
 		{
 			if ( dimmerBox++ > 8 )
 			{
@@ -696,19 +694,19 @@ ISR( TIM0_COMPA_vect )
 			if ( !--blinkBox )
 			{
 				blinkOn = false;
-				ledOn = true;
+				isLedOn = true;
 				blinkBox = LIGHT_OFF_FOR;
 			}
 		}
 		else if ( !--blinkBox )
 		{
 			blinkOn = true;
-			ledOn = false;
+			isLedOn = false;
 			blinkBox = LIGHT_ON_FOR;
 			
 			if ( !--timesToBlinkLight )
 			{
-				ledOn = inProgramMode;
+				isLedOn = inProgramMode;
 			}
 		}
 	}
@@ -718,11 +716,11 @@ ISR( TIM0_COMPA_vect )
 	{
 		if ( readEye() )
 		{
-			eyeBlocked = eyeHighBlocked;
+			eyeBlocked = consts.eyeHighBlocked;
 		}
 		else
 		{
-			eyeBlocked = !eyeHighBlocked;	
+			eyeBlocked = !consts.eyeHighBlocked;	
 		}
 	}
 }

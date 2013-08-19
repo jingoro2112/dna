@@ -66,7 +66,7 @@ const unsigned char bootJumper[]=
 	0xb3, 0x9b, // sbis    0x16, 3 ; 22
 	0x01, 0xc0, // rjmp    .+2             ; 0x378 <__init+0x26>
 	0x8b, 0xce, // rjmp    .-746           ; 0x8e <__ctors_end>
-	0xe0, 0xe7, // ldi     r30, 0x70       ; 112
+	0xe0, 0xe6, // ldi     r30, 0x60       ; 112
 	0xfc, 0xe0, // ldi     r31, 0x0C       ; 12
 	0x09, 0x94, // ijmp
 };
@@ -182,13 +182,6 @@ int main( int argc, char *argv[] )
 		{
 			unsigned char data[64];
 			data[0] = 1;
-			DNAUSB::sendData( handle, data );
-#ifdef _WIN32
-			Sleep( 10 );
-#else
-			usleep( 10000 );
-#endif
-			data[0] = 2;
 			DNAUSB::sendData( handle, data );
 
 			memset( data, 0xFF, 64 );

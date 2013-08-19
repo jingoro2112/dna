@@ -17,6 +17,7 @@
 	TWBR = (c);  \
 	TWCR = (1<<TWEN); \
 
+void i2cWaitLoop();
 #define i2cWait() if ( !(TWCR & (1<<TWINT)) ) { i2cWaitLoop(); }
 
 unsigned char i2cStartRead( unsigned char address );
