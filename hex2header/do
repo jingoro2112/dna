@@ -1,0 +1,1 @@
+g++ -O3 -Wall -o hex2header hex2header.cpp

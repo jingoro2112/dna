@@ -39,7 +39,7 @@ int main( int argn, char *argv[] )
 		{
 			buffer.append( "\n\t" );
 		}
-		buffer.appendFormat( "0x%02X%02X, ", chunk->data[i], chunk->data[i+1] );
+		buffer.appendFormat( "0x%02X%02X, ", chunk->data[i+1], chunk->data[i] );
 	}
 			
 	buffer.append( "\n};\n" );

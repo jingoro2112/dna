@@ -19,19 +19,22 @@ int main()
 	unsigned int pos = 0;
 	unsigned int address = g_origin;
 	unsigned char i;
-
+	const int* data = g_data;
+	
 	do
 	{
-		for( i=0; i<32; i++ )
+		for( i=0; i<64; i+=2 )
 		{
 			if ( pos < g_size )
 			{
-				boot_page_fill( i, pgm_read_word(g_data[pos++]) );
+				boot_page_fill( i, pgm_read_word(data++) );
 			}
 			else
 			{
 				boot_page_fill( i, 0 );
 			}
+
+			pos++;
 		}
 
 		boot_page_erase( address );

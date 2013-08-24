@@ -23,13 +23,14 @@ int usage()
 {
 	printf( "loader.exe\n"
 			"\n"
-			"-i     <image name, default 'application.hex'>\n"
+			"-i     <image name'>\n"
 			"-r     report only\n"
 			"-oled  enumerate oled standalone board instead of dna\n"
 			"-a     read a2d\n"
 			"-e     eeprom read\n"
 			"-v     verbose\n"
 		  );
+	
 	return 0;
 }
 
