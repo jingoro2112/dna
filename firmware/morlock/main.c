@@ -7,6 +7,7 @@
 #include <dna.h>
 #include <usb.h>
 #include <a2d.h>
+#include <rna.h>
 
 #include <avr/interrupt.h>
 #include <avr/eeprom.h>
@@ -342,12 +343,25 @@ void cycleDoubleSolenoid()
 }
 
 //------------------------------------------------------------------------------
+unsigned char rnaInputSetup( unsigned char *data, unsigned char from, unsigned char len )
+{
+	return 0;
+}
+
+//------------------------------------------------------------------------------
+void rnaInputStream( unsigned char *data, unsigned char bytes )
+{
+
+}
+
+//------------------------------------------------------------------------------
 int __attribute__((noreturn)) main(void)
 {
 	// set up I/O
-	DDRA = 0b10000000;
+	DDRA = 0b10000001;
 	PORTA = 0b10000000; // all off
 
+	
 //	DDRB = 0b00000000;
 //	PORTB = 0b00000000;
 
@@ -366,8 +380,35 @@ int __attribute__((noreturn)) main(void)
 //	a2dSetPrescaler( A2D_PRESCALE_16 ); 
 //	a2dEnableInterrupt(); // latch in the value as an interrupt rather than polling
 
+
+
+//	rnaInit( 0x1 );
+//	rnaSend( 0x2, (unsigned char *)&accessoryRunTime, 1 );
+
+
+
+
+
+	
+	
 	sei();
 
+
+
+
+	for(;;)
+	{
+		_delay_ms(500);
+//		setLedOn();
+		PORTA |= 0b00000001;
+		_delay_ms(40);
+//		setLedOff();
+		PORTA &= 0b11111110;
+	}
+
+
+
+	
 	shotsInString = 0;
 	currentEntry = 0;
 	rampTimeoutBox = 1; // let this timeout immediately so the defaults will be instaled
@@ -392,6 +433,8 @@ int __attribute__((noreturn)) main(void)
 			{
 				isLedOn = eyeBlocked;
 			}
+//			rnaPoll();
+			usbPoll();
 		}
 
 		if ( currentFireMode != ceFullAuto )
@@ -460,7 +503,13 @@ ISR( ADC_vect )
 ISR( TIM0_COMPA_vect )
 {
 	usbPoll();
+	return;
 
+
+
+
+
+	
 	// timers at the top have a very high resolution
 	if ( refireBox )
 	{

@@ -4,48 +4,25 @@
  * and in the LICENCE.txt file included with this distribution
  */
 
+#include "loader.hpp"
+
 #ifdef _WIN32
 #include <windows.h>
 #else
 #include <unistd.h>
 #endif
 
-#include "../dnausb/dnausb.h"
-#include "../firmware/dna/dna_defs.h"
-
 #include <stdio.h>
-#include <ctype.h>
-#include <stdlib.h>
-
-
+#include "../firmware/dna/dna_defs.h"
 #include "../util/str.hpp"
-#include "../util/asciidump.hpp"
-#include "../util/simple_log.hpp"
-#include "../util/mainargs.hpp"
-#include "../util/read_hex.hpp"
 
-
-SimpleLog Log;
-
-//------------------------------------------------------------------------------
-int usage()
+namespace Loader
 {
-	printf( "loader.exe\n"
-			"\n"
-			"-i     <image name, default 'application.hex'>\n"
-			"-r     report only\n"
-			"-oled  enumerate oled standalone board instead of dna\n"
-			"-a     read a2d\n"
-			"-e     eeprom read\n"
-			"-v     verbose\n"
-		  );
-	return 0;
-}
-
+	
 //------------------------------------------------------------------------------
 // any potential code updates must have a reset vector that points to a
 // function that EXACTLY MATCHES this one.
-const unsigned char bootJumper[]=
+const unsigned char c_bootJumper[]=
 {
 	0x17, 0xba, // out     0x17, r1        ; 23
 	0x88, 0xe0, // ldi     r24, 0x08       ; 8
@@ -72,187 +49,77 @@ const unsigned char bootJumper[]=
 };
 
 //------------------------------------------------------------------------------
-int main( int argc, char *argv[] )
+bool checkDNAImage( const unsigned char* image, const unsigned int len, char* err /*=0*/ )
 {
-	MainArgs args( argc, argv );
-
-	if ( !args.isSet("-v") )
+	if ( len >= (BOOTLOADER_ENTRY*2) )
 	{
-		DNAUSB::setLoggingCallback( 0 );
+		if ( err )
+		{
+			sprintf( err, "code too large [0x%08X], must be below bootloader @ 0x%08X", len, (BOOTLOADER_ENTRY*2) );
+		}
+		return false;
 	}
 
-	if ( args.isSet("-?") )
+	// decompile the rjmp instruction to find out where it is pointed to
+	unsigned int offset = 2 * ( 1 + (image[0] + (((int)image[1] & 0x3F) << 8)));
+	
+	if ( (offset + sizeof(c_bootJumper)) >= len )
 	{
-		return usage();
+		if ( err )
+		{
+			sprintf( err, "Invalid rjmp offset found for reset vector in image [%s]", image );
+			return false;
+		}
 	}
-
-	char image[256] = "application.hex";
-	CLinkList<ReadHex::Chunk> chunklist;
-	Cstr infile;
-	ReadHex::Chunk *chunk = 0;
-	if ( args.isStringSet("-i", image) )
+	
+//	Log( "rjmp offset points to [0x%04X][0x%04X]", offset, offset / 2 );
+	
+	for( unsigned int i=0; i<sizeof(c_bootJumper); i++ )
 	{
-		if ( !infile.fileToBuffer(image) )
+		if ( image[offset + i] != c_bootJumper[i] )
 		{
-			Log( "Could not read [%s]", image );
-			return -1;
-		}
-
-		if ( !ReadHex::parse( chunklist, infile.c_str(), infile.size() ) )
-		{
-			Log( "Could not parse [%s]", image );
-			return -1;
-		}
-
-		if ( chunklist.count() != 1 )
-		{
-			Log( "multiple chunks not supported" );
-			return -1;
-		}
-		chunk = chunklist.getFirst();
-
-		if ( chunk->size >= (BOOTLOADER_ENTRY*2) )
-		{
-			Log( "code too large [0x%08X], must be below bootloader @ 0x%08X", chunk->size, (BOOTLOADER_ENTRY*2) );
-			return -1;
-		}
-
-		if ( !args.isSet("-dnv") ) // double-secret 'do not valide' flag, please donot publicize. 
-		{
-			// decompile the rjmp instruction to find out where it is pointed to
-			unsigned int offset = 2 * ( 1 + (chunk->data[0] + (((int)chunk->data[1] & 0x3F) << 8)));
-
-			if ( (offset + sizeof(bootJumper)) >= chunk->size )
+			if ( err )
 			{
-				Log( "Invalid rjmp offset found for reset vector in image [%s]", image );
-			}
-
-//			Log( "rjmp offset points to [0x%04X][0x%04X]", offset, offset / 2 );
-
-			for( unsigned int i=0; i<sizeof(bootJumper); i++ )
-			{
-				if ( chunk->data[offset + i] != bootJumper[i] )
-				{
-					Log( "Bootjumper signature not found [0x%02X] != [0x%02X] @ instruction #%d\n", chunk->data[offset + i], bootJumper[i], i/2 );
-					return -1;
-				}
+				sprintf( err, "Bootjumper signature not found [0x%02X] != [0x%02X] @ instruction #%d\n", image[offset + i], c_bootJumper[i], i/2 );
+				return false;
 			}
 		}
 	}
 
-	Cstr vendor( "p@northarc.com" );
-	if ( args.isSet("-oled") )
-	{
-		vendor = "oled@northarc.com";
-	}
+	return true;
+}
 
-	bool trying = true;
+//------------------------------------------------------------------------------
+DNADEVICE Loader::openDevice( char* product )
+{
 	DNADEVICE handle = INVALID_DNADEVICE_VALUE;
+
 	int tries = 10;
-	for( int t = 0; trying && t < tries; t++ )
+	for( int t = 0; t < tries; t++ )
 	{
-		Log( "attempting connection [%d/%d]", t+1, tries );
-		
+//		Log( "attempting connection [%d/%d]", t+1, tries );
+
 		// okay find our device on th USB
-		char product[32];
+		char prod[256];
+		handle = DNAUSB::openDevice( 0x16C0, 0x05DF, "p@northarc.com", prod );
+		if ( product )
+		{
+			strcpy( product, prod );
+		}
+
 		if ( handle != INVALID_DNADEVICE_VALUE )
 		{
-			DNAUSB::closeDevice( handle );
+			break;
 		}
-		handle = DNAUSB::openDevice( 0x16C0, 0x05DF, vendor, product );
 
-		if ( handle == INVALID_DNADEVICE_VALUE )
-		{
 #ifdef _WIN32
-			Sleep(1000);
+		Sleep(2000);
 #else
-			sleep(1);
+		sleep(2);
 #endif
-			continue;
-		}
-
-		Log( "Found: %s[0x%02X]", product, (unsigned char)product[0] );
-		t = -1;
-		
-		unsigned char id;
-		DNAUSB::getProductId( handle, &id );
-		Log( "product ID[0x%02X]", id );
-
-		if ( args.isSet("-e") )
-		{
-			unsigned char data[64];
-			data[0] = 1;
-			DNAUSB::sendData( handle, data );
-
-			memset( data, 0xFF, 64 );
-			DNAUSB::getData( handle, data );
-
-			Log( "0x%02X 0x%02X 0x%02X 0x%02X", (unsigned int)data[0], (unsigned int)data[1], (unsigned int)data[2], (unsigned int)data[3] );
-			break;
-		}
-		else if ( args.isSet("-a") )
-		{
-			float avg = 0;
-			for(;;)
-			{
-				unsigned int data[64];
-				DNAUSB::sendData( handle, (unsigned char *)data );
-				DNAUSB::getData( handle, (unsigned char *)data );
-				data[0] &= 0x03FF;
-				avg = (avg * 30.f) + data[0];
-				avg /= 31.f;
-				Log( "%.2f\t%d", avg, (int)data[0] );
-			}
-			break;
-		}
-		else if (args.isSet("-r") ) // report only
-		{
-			break;
-		}
-
-		switch( id )
-		{
-			case OLED_AM88_v1_00:
-			case DNA_AT84_v1_00:
-			{
-				Log( "Commanding bootloader entry" );
-				if ( DNAUSB::sendEnterBootloader(handle) )
-				{
-					Log( "Sent reset command" );
-#ifdef _WIN32
-					Sleep(2000);
-#else
-					sleep(2);
-#endif
-				}
-				DNAUSB::closeDevice( handle );
-				break;
-			}
-
-			case BOOTLOADER_OLED_AM88_v1_00:
-			case BOOTLOADER_DNA_AT84_v1_00:
-			{
-				Log( "Loading executeable" );
-
-				if ( trying )
-				{
-					unsigned char checksum;
-					DNAUSB::sendCode( handle, (unsigned char *)(chunk->data), chunk->size, &checksum );
-					DNAUSB::sendEnterApp( handle, checksum );
-				}
-
-				trying = false;
-				break;
-			}
-
-			default:
-			{
-				Log( "Unrecognized device [0x%02X]", (unsigned int)id );
-				break;
-			}
-		}
 	}
 
-	DNAUSB::closeDevice( handle );
-	return 0;
+	return handle;
+}
+
 }

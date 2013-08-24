@@ -15,71 +15,52 @@
 #define RNA_PIN  RNA_D_PIN( RNA_PORT_LETTTER )
 #define RNA_DDR  RNA_D_DDR( RNA_PORT_LETTTER )
 
-#define RNA_ADDRESS_MASK 0x3F
-#define RNA_RW_BIT 0x80
-#define RNA_RW_BIT_MASK 0x7F
-#define RNA_COMMAND_BIT 0x40
-#define RNA_COMMAND_BIT_MASK 0xBF
-
-//#define rnaSetHigh() (RNA_PORT |= (1<<RNA_PIN))
-//#define rnaSetLow() (RNA_PORT &= ~(1<<RNA_PIN))
-
 #define rnaSetHigh() (RNA_DDR &= ~(1<<RNA_PIN_NUMBER))
 #define rnaSetLow() (RNA_DDR |= (1<<RNA_PIN_NUMBER))
 #define rnaIsHigh() (RNA_PIN & (1<<RNA_PIN_NUMBER))
 #define rnaIsLow()  (!(RNA_PIN & (1<<RNA_PIN_NUMBER)))
 
-
-#if defined _AVR_IOTNX4_H_
-#define rnaEnableINT0() (GIMSK |= (1 << INT0))
-#define rnaClearINT0() (GIFR |= (1<<INTF0))
-#define rnaDisableINT0() (GIMSK &= ~(1<<INT0))
-#define rnaINT0ToFallingEdge() (MCUCR |= (1<<ISC01)); (MCUCR &= ~(1<<ISC00))
+#ifndef RNA_POLL_DRIVEN
+#if defined (PROTO88)
+	#define rnaEnableINT()  (EIMSK |= (1 << INT1))
+	#define rnaClearINT()  (EIFR |= (1<<INTF1))
+	#define rnaDisableINT() (EIMSK &= ~(1 << INT1))
+	#define rnaINTArm() (EICRA |= (1 << ISC11)); (EICRA &= ~(1 << ISC10))
+#elif defined (DNA)
+	#define rnaEnableINT() (GIMSK |= (1<<PCIE1)
+	#define rnaClearINT() (GIFR |= (1<<PCIF1))
+	#define rnaDisableINT() (GIMSK &= ~(1<<PCIE1)
+	#define rnaINTarm()  (PCMSK1 |= (1<<PCINT11))
+#elif defined (DNAPROTO)
+	#define rnaEnableINT() (GIMSK |= (1<<PCIE0))
+	#define rnaClearINT() (GIFR |= (1<<PCIF0))
+	#define rnaDisableINT() (GIMSK &= ~(1<<PCIE0))
+	#define rnaINTArm() (PCMSK0 |= (1<<PCINT2))
+#elif defined (OLED)
+	#define rnaEnableINT() (GIMSK |= (1 << INT0))
+	#define rnaClearINT() (GIFR |= (1<<INTF0))
+	#define rnaDisableINT() (GIMSK &= ~(1<<INT0))
+	#define rnaINTArm() (MCUCR |= (1<<ISC01)); (MCUCR &= ~(1<<ISC00))
+#else
+	#error Unsupported hardware platform for RNA bus
+#endif
+#else
+	#define rnaEnableINT()
+	#define rnaClearINT()
+	#define rnaDisableINT()
+	#define rnaINTArm()
 #endif
 
-// INT11 (/reset)
-//#define rnaEnablePCINT() (GIFR |= (1<<PCIF1)); (GIMSK |= (1<<PCIE1)
-//#define rnaDisablePCINT() (GIMSK &= ~(1<<PCIE1)
-//#define rnaPCINTarm()  (PCMSK1 |= (1<<PCINT11))
-//#define rnaPCINTDisarm() (PCMSK1 &= ~(1<<PCINT11))
-
-// INT2 (A2)
-#define rnaEnablePCINT() (GIMSK |= (1<<PCIE0))
-#define rnaClearPCINT() (GIFR |= (1<<PCIF0))
-#define rnaDisablePCINT() (GIMSK &= ~(1<<PCIE0))
-#define rnaPCINTArm() (PCMSK0 |= (1<<PCINT2))
-#define rnaPCINTDisarm() (PCMSK0 &= ~(1<<PCINT2))
-
-#if defined _AVR_IOMX8_H_
-#define rnaEnableINT1()  (EIMSK |= (1 << INT1))
-#define rnaClearINT1()  (EIFR |= (1<<INTF1))
-#define rnaDisableINT1() (EIMSK &= ~(1 << INT1))
-#define rnaINT1ToFallingEdge() (EICRA |= (1 << ISC11)); (EICRA &= ~(1 << ISC10))
-#endif
-
-// rna time constant used in delay loops for baud sync
-#if F_CPU == 12000000
-#define RNA_T_CONST_HALF_SETUP  6
-#define RNA_T_CONST_SAMPLE 10
-#define RNA_T_CONST_SAMPLE_REMAINDER 3
-#define RNA_T_CONST_SETUP_EXTEND 0
-#define RNA_T_CONST_ACK_WAIT 2
-#define RNA_T_CONST_ACK_SETUP 6
-#elif F_CPU == 8000000
-#define RNA_T_CONST_HALF_SETUP 3
-#define RNA_T_CONST_SAMPLE 6
-#define RNA_T_CONST_SAMPLE_REMAINDER 2
-#define RNA_T_CONST_SETUP_EXTEND 1
-#define RNA_T_CONST_ACK_WAIT 1
-#define RNA_T_CONST_ACK_SETUP 3
-#endif
+extern unsigned int rnaHeapStart; // initialized after rnaInit to be __heap_start
 
 void rnaInit( unsigned char peerAddress );
-unsigned char rnaShiftOutByte( unsigned char data );
-unsigned char rnaShiftInByte();
+unsigned char rnaShiftOutByte( unsigned char data, unsigned char high );
+unsigned char rnaShiftInByte( unsigned char high );
 
 void rnaSend( unsigned char address, unsigned char *data, unsigned char len );
+void rnaSendSystem( unsigned char address, unsigned char *data, unsigned char len );
 unsigned char rnaProbe( unsigned char address );
+void rnaPoll();
 
 unsigned char rnaInputSetup( unsigned char *data, unsigned char from, unsigned char len );
 void rnaInputStream( unsigned char *data, unsigned char bytes );

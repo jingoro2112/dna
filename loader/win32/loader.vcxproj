@@ -12,6 +12,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\loader.cpp" />
+    <ClCompile Include="..\main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\loader.hpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{278E3E48-F89C-4EE3-8408-4C3CD8C7F556}</ProjectGuid>

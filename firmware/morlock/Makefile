@@ -11,11 +11,13 @@ OBJS = \
 	objs/usb.o \
 	objs/main.o \
 	objs/a2d.o \
+#	objs/rna.o \
 
 MCU = attiny84
 CPU_FREQUENCY = 12000000
+PLATFORM = DNAPROTO
 
-CC = avr-gcc -Wall -I../dna -MD -Os -fdata-sections -ffunction-sections -funsigned-char -funsigned-bitfields -fno-inline-small-functions -mmcu=$(MCU) -DF_CPU=$(CPU_FREQUENCY)
+CC = avr-gcc -Wall -I. -I../dna -MD -Os -fdata-sections -ffunction-sections -funsigned-char -funsigned-bitfields -fno-inline-small-functions -mmcu=$(MCU) -D$(PLATFORM)=1 -DF_CPU=$(CPU_FREQUENCY)
 
 all: $(TARGET).hex
 
@@ -54,4 +56,7 @@ objs/i2c.o: ../dna/i2c.c
 	$(CC) -c $< -o $@
 
 objs/24c512.o: ../dna/24c512.c
+	$(CC) -c $< -o $@
+
+objs/rna.o: ../dna/rna.c
 	$(CC) -c $< -o $@

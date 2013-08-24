@@ -1,381 +1,188 @@
 #include "rna.h"
 
-#if defined ( _AVR_IOMX8_H_ )
-#define On()  (PORTD |= 0b01000000)
-#define Off() (PORTD &= 0b10111111)
-#else
-#define On() (DDRA |= 0b10000000); (PORTA &= 0b01111111)
-#define Off() (DDRA &= 0b01111111)
-#endif
-
-static unsigned char s_address;
+static unsigned char s_myAddress;
 
 volatile static unsigned char s_busBusy;
-volatile static unsigned char s_sendSize;
-volatile static unsigned char s_sendHeader;
-volatile static unsigned char *s_sendBuf;
 
+//------------------------------------------------------------------------------
+struct SendUnit
+{
+	unsigned char size;
+	unsigned char toAddress;
+	unsigned char *buf;
+};
+static unsigned char s_sendQueueSize;
+extern unsigned int __heap_start;
+unsigned int rnaHeapStart;
+
+#if 1
 #if defined ( _AVR_IOMX8_H_ )
-#define On()  (PORTD |= 0b01000000)
-#define Off() (PORTD &= 0b10111111)
+	#define On()  (PORTD |= 0b01000000)
+	#define Off() (PORTD &= 0b10111111)
 #else
-#define On() (DDRA |= 0b10000000); (PORTA &= 0b01111111)
-#define Off() (DDRA &= 0b01111111)
+	#define On()  (PORTA |= 0b10000000)
+	#define Off() (PORTA &= 0b01111111)
+#endif
+#else
+#define On()
+#define Off()
 #endif
 
 //------------------------------------------------------------------------------
-unsigned char rnaShiftOutByte( unsigned char data )
+unsigned char rnaShiftOutByte( unsigned char data, unsigned char high )
 {
-	volatile unsigned char time;
-	rnaSetLow();  // start
-
-	On();
-	if ( data & 0b10000000 )
+	// coming into this the bus is expected to be held LOW, in
+	// preparation for the first clock pulse, which is always a rising
+	// edge
+	unsigned char collisionOccured = 0;
+	unsigned char i;
+	unsigned char bit = 0x80;
+	for( i=8; i; i-- )
 	{
-		rnaSetHigh();
+		// clock is just a flip from whatever state it was left in by
+		// the last data byte
+		On();
 
-		for( time = RNA_T_CONST_HALF_SETUP; time; time-- );
-
-		if ( rnaIsLow() ) // collision detection
+		if ( high )
 		{
-			goto collision;
+			rnaSetLow();
 		}
-	}
-	else
-	{
-		rnaSetLow();
-
-		for( time = RNA_T_CONST_HALF_SETUP; time; time-- );
-		asm volatile("nop"); // burn the same time as the collision detector
-		asm volatile("nop");
-	}
-	for( time = RNA_T_CONST_HALF_SETUP + RNA_T_CONST_SETUP_EXTEND; time; time-- );
-	Off();
-
-	On();
-	if ( data & 0b01000000 )
-	{
-		rnaSetHigh();
-
-		for( time = RNA_T_CONST_HALF_SETUP; time; time-- );
-
-		if ( rnaIsLow() ) // collision detection
+		else
 		{
-			goto collision;
+			rnaSetHigh();
 		}
 
-	}
-	else
-	{
-		rnaSetLow();
+#if F_CPU == 12000000
+		_delay_loop_1( 4 );
+#elif F_CPU == 8000000
+		_delay_loop_1( 2 );
+#endif		
 
-		for( time = RNA_T_CONST_HALF_SETUP; time; time-- );
-		asm volatile("nop"); // burn the same time as the collision detector
-		asm volatile("nop");
-	}
-	for( time = RNA_T_CONST_HALF_SETUP + RNA_T_CONST_SETUP_EXTEND; time; time-- );
-	Off();
-
-	On();
-	if ( data & 0b00100000 )
-	{
-		rnaSetHigh();
-
-		for( time = RNA_T_CONST_HALF_SETUP; time; time-- );
-
-		if ( rnaIsLow() ) // collision detection
+		if ( data & bit )
 		{
-			goto collision;
+			rnaSetHigh();
+			high = 1;
+			asm volatile("nop"); // make up the jump/branch opcode that causes the first case to execute two cycles faster
+			asm volatile("nop");
+		}
+		else
+		{
+			rnaSetLow();
+			high = 0;
 		}
 
-	}
-	else
-	{
-		rnaSetLow();
+		bit >>= 1;
+		
+#if F_CPU == 12000000
+		_delay_loop_1( 4 );
+#elif F_CPU == 8000000
+		_delay_loop_1( 2 );
+#endif		
 
-		for( time = RNA_T_CONST_HALF_SETUP; time; time-- );
-		asm volatile("nop"); // burn the same time as the collision detector
-		asm volatile("nop");
-	}
-	for( time = RNA_T_CONST_HALF_SETUP + RNA_T_CONST_SETUP_EXTEND; time; time-- );
-	Off();
-
-	On();
-	if ( data & 0b00010000 )
-	{
-		rnaSetHigh();
-
-		for( time = RNA_T_CONST_HALF_SETUP; time; time-- );
-
-		if ( rnaIsLow() ) // collision detection
+		// detect collision
+		if ( high && rnaIsLow() )
 		{
-			goto collision;
+			collisionOccured = -1;
 		}
 
+		Off();
+		
+#if F_CPU == 12000000
+		_delay_loop_1( 4 );
+#elif F_CPU == 8000000
+		_delay_loop_1( 2 );
+#endif
+		
 	}
-	else
+
+	rnaSetHigh(); // set bus idle (might be very temporary)
+
+	if ( !collisionOccured ) // if there was a collision we're done
 	{
-		rnaSetLow();
 
-		for( time = RNA_T_CONST_HALF_SETUP; time; time-- );
-		asm volatile("nop"); // burn the same time as the collision detector
-		asm volatile("nop");
-	}
-	for( time = RNA_T_CONST_HALF_SETUP + RNA_T_CONST_SETUP_EXTEND; time; time-- );
-	Off();
+#if F_CPU == 12000000
+		_delay_loop_1( 11 );
+#elif F_CPU == 8000000
+		_delay_loop_1( 2 ); // !!!!!!!!!!!!!!!!!!!! huh?
+#endif		
+		
+		On();
 
-	On();
-	if ( data & 0b00001000 )
-	{
-		rnaSetHigh();
-
-		for( time = RNA_T_CONST_HALF_SETUP; time; time-- );
-
-		if ( rnaIsLow() ) // collision detection
+		if ( rnaIsLow() )
 		{
-			goto collision;
-		}
-
-	}
-	else
-	{
-		rnaSetLow();
-
-		for( time = RNA_T_CONST_HALF_SETUP; time; time-- );
-		asm volatile("nop"); // burn the same time as the collision detector
-		asm volatile("nop");
-	}
-	for( time = RNA_T_CONST_HALF_SETUP + RNA_T_CONST_SETUP_EXTEND; time; time-- );
-	Off();
-
-	On();
-	if ( data & 0b00000100 )
-	{
-		rnaSetHigh();
-
-		for( time = RNA_T_CONST_HALF_SETUP; time; time-- );
-
-		if ( rnaIsLow() ) // collision detection
-		{
-			goto collision;
-		}
-
-	}
-	else
-	{
-		rnaSetLow();
-
-		for( time = RNA_T_CONST_HALF_SETUP; time; time-- );
-		asm volatile("nop"); // burn the same time as the collision detector
-		asm volatile("nop");
-	}
-	for( time = RNA_T_CONST_HALF_SETUP + RNA_T_CONST_SETUP_EXTEND; time; time-- );
-	Off();
-
-	On();
-	if ( data & 0b00000010 )
-	{
-		rnaSetHigh();
-		for( time = RNA_T_CONST_HALF_SETUP; time; time-- );
-
-		if ( rnaIsLow() ) // collision detection
-		{
-			goto collision;
+			while( rnaIsLow() ); // ack heard, and waiting
+			
+			collisionOccured++; // just saving space, this will always aoutput a '1' success from rnaShiftOutByte
 		}
 	}
-	else
-	{
-		rnaSetLow();
-		for( time = RNA_T_CONST_HALF_SETUP; time; time-- );
-		asm volatile("nop"); // burn the same time as the collision detector
-		asm volatile("nop");
-	}
-	for( time = RNA_T_CONST_HALF_SETUP + RNA_T_CONST_SETUP_EXTEND; time; time-- );
+
 	Off();
-
-	On();
-	if ( data & 0b00000001 )
-	{
-		rnaSetHigh();
-
-		for( time = RNA_T_CONST_HALF_SETUP; time; time-- );
-
-		if ( rnaIsLow() ) // collision detection
-		{
-			goto collision;
-		}
-	}
-	else
-	{
-		rnaSetLow();
-
-		for( time = RNA_T_CONST_HALF_SETUP; time; time-- );
-		asm volatile("nop"); // burn the same time as the collision detector
-		asm volatile("nop");
-	}
-	for( time = RNA_T_CONST_HALF_SETUP + RNA_T_CONST_SETUP_EXTEND; time; time-- );
-	Off();
-
-	rnaSetHigh();
-	for( time = RNA_T_CONST_ACK_WAIT; time; time-- );
-
-	On();
-	if ( rnaIsLow() )
-	{
-		while( rnaIsLow() ); // a low holds the bus forever
-		return 1;
-	}
-	else
-	{
-		return 0;
-	}
-	Off();
-
-collision:
-	return -1;
+	return collisionOccured;
 }
 
 //------------------------------------------------------------------------------
-unsigned char rnaShiftInByte()
+unsigned char rnaShiftInByte( unsigned char high )
 {
-	volatile unsigned char time;
+	unsigned char byte = 0;
+	unsigned char limit = 0;
+	unsigned char i;
+	unsigned char bit = 0x80;
+	
+	for( i=8; i; i-- )
+	{
+		if ( high )
+		{
+			while( rnaIsHigh() && --limit ); // wait for start (with breakout, high level might be idle bus)
+			
+#if F_CPU == 8000000
+			_delay_loop_1( 3 ); // slightly less since the 'limit' dec pushes us out a little
+#endif		
+		}
+		else
+		{
+			while( rnaIsLow() ); // wait for start
 
-	Off();
-	unsigned d = 0;
-	while( rnaIsLow() ); // wait for rise (if necessary)
-	while( rnaIsHigh() );
+#if F_CPU == 8000000
+			_delay_loop_1( 5 );
+#endif		
+		}
 
-	On();
-	for( time = RNA_T_CONST_SAMPLE; time; time-- );
-	if ( rnaIsHigh() )
-	{
-		d |= 0b10000000;
-	}
-	else
-	{
-		asm volatile("nop");
-		asm volatile("nop");
-	}
-	asm volatile("nop");
-	asm volatile("nop");
-	Off();
-	for( time = RNA_T_CONST_SAMPLE + RNA_T_CONST_SAMPLE_REMAINDER; time; time-- );
+		On();
 
-	On();
-	if ( rnaIsHigh() )
-	{
-		d |= 0b01000000;
-	}
-	else
-	{
-		asm volatile("nop");
-		asm volatile("nop");
-	}
-	asm volatile("nop");
-	asm volatile("nop");
-	Off();
-	for( time = RNA_T_CONST_SAMPLE + RNA_T_CONST_SAMPLE_REMAINDER; time; time-- );
+#if F_CPU == 12000000
+		_delay_loop_1( 10 );
+#endif		
 
-	On();
-	if ( rnaIsHigh() )
-	{
-		d |= 0b00100000;
-	}
-	else
-	{
-		asm volatile("nop");
-		asm volatile("nop");
-	}
-	asm volatile("nop");
-	asm volatile("nop");
-	Off();
-	for( time = RNA_T_CONST_SAMPLE + RNA_T_CONST_SAMPLE_REMAINDER; time; time-- );
+		if ( rnaIsHigh() ) // and read it
+		{
+			Off();
+			byte |= bit;
+			high = 1; // bus is high, next clock pulse will be a falling edge
+		}
+		else
+		{
+			Off();
+			high = 0; // bus is low, next clock pulse will be a rising edge
+		}
 
-	On();
-	if ( rnaIsHigh() )
-	{
-		d |= 0b00010000;
+		bit >>= 1;
 	}
-	else
-	{
-		asm volatile("nop");
-		asm volatile("nop");
-	}
-	asm volatile("nop");
-	asm volatile("nop");
-	Off();
-	for( time = RNA_T_CONST_SAMPLE + RNA_T_CONST_SAMPLE_REMAINDER; time; time-- );
 
-	On();
-	if ( rnaIsHigh() )
-	{
-		d |= 0b00001000;
-	}
-	else
-	{
-		asm volatile("nop");
-		asm volatile("nop");
-	}
-	asm volatile("nop");
-	asm volatile("nop");
-	Off();
-	for( time = RNA_T_CONST_SAMPLE + RNA_T_CONST_SAMPLE_REMAINDER; time; time-- );
-
-	On();
-	if ( rnaIsHigh() )
-	{
-		d |= 0b00000100;
-	}
-	else
-	{
-		asm volatile("nop");
-		asm volatile("nop");
-	}
-	asm volatile("nop");
-	asm volatile("nop");
-	Off();
-	for( time = RNA_T_CONST_SAMPLE + RNA_T_CONST_SAMPLE_REMAINDER; time; time-- );
-
-	On();
-	if ( rnaIsHigh() )
-	{
-		d |= 0b00000010;
-	}
-	else
-	{
-		asm volatile("nop");
-		asm volatile("nop");
-	}
-	asm volatile("nop");
-	asm volatile("nop");
-	Off();
-	for( time = RNA_T_CONST_SAMPLE + RNA_T_CONST_SAMPLE_REMAINDER; time; time-- );
-
-	On();
-	if ( rnaIsHigh() )
-	{
-		d |= 0b00000001;
-	}
-	else
-	{
-		asm volatile("nop");
-		asm volatile("nop");
-	}
-	Off();
-	return d;
+	return byte;
 }
+
 
 //------------------------------------------------------------------------------
 void rnaWaitForBusClear()
 {
-	// wait for bus to go idle, longest it can be high (non idle) is a string
-	// of 1's in data, which is around 1.2us
-	volatile unsigned char time;
-	for ( time = 30; time; time++ ) // more than enough, even on 12mHz
+	// manchester guarantees loads of transitions, high for more than 10
+	// loop cycles (even at 12mhz) is more than enough to detect idle-ness
+	unsigned char time;
+	for ( time = 20; time; time-- )
 	{
-		if ( rnaIsLow() ) // oops not idle, try again
+		if ( rnaIsLow() ) // oops not idle, keep waiting
 		{
-			time = 0;
+			time = 20;
 		}
 	}
 }
@@ -393,18 +200,28 @@ void rnaInit( unsigned char address )
 
 	rnaSetHigh(); // idle
 
-	s_address = address;
+	s_myAddress = address;
 
+	s_sendQueueSize = 0;
 	s_busBusy = 0;
-	s_sendSize = 0;
 
-#if defined ( _AVR_IOMX8_H_ )
-	rnaINT1ToFallingEdge();
-	rnaEnableINT1();
-#else
-	rnaPCINTArm();
-	rnaEnablePCINT();
-#endif
+	rnaHeapStart = __heap_start;
+
+	rnaINTArm();
+	rnaEnableINT();
+}
+
+//------------------------------------------------------------------------------
+static unsigned char attention( unsigned char address )
+{
+	rnaWaitForBusClear();
+
+	unsigned char header = address | (s_myAddress<<4); // from -> to
+
+	rnaSetLow();
+	_delay_us( 11 );
+	
+	return rnaShiftOutByte( header, 0 );
 }
 
 //------------------------------------------------------------------------------
@@ -415,26 +232,12 @@ unsigned char rnaProbe( unsigned char address )
 		return 0;
 	}
 
-	rnaWaitForBusClear();
-	
-	unsigned char header = address | (s_address<<4); // from -> to
 	for(;;)
 	{
-		cli();
-
-		// assert interrupt
-		rnaSetLow();
-		volatile unsigned char time;
-		for( time = RNA_T_CONST_HALF_SETUP*3; time; time-- );
-
-		// 
-		rnaSetHigh();
-		for( time = RNA_T_CONST_SAMPLE + RNA_T_CONST_SAMPLE_REMAINDER; time; time-- );
-
-		unsigned char ret = rnaShiftOutByte( header );
+		unsigned char ret = attention( address );
 		if ( ret == 1 )
 		{
-			rnaShiftOutByte(0); // length zero
+			rnaShiftOutByte( 0, 1 ); // send zero-length transmission
 			return 1;
 		}
 		else if ( ret == 0 ) // no one home
@@ -443,194 +246,264 @@ unsigned char rnaProbe( unsigned char address )
 		}
 
 		// otherwise there might have been a collision, try again
-		
-		// clear the interrupt conditions we just caused
-#if defined ( _AVR_IOMX8_H_ )
-		rnaClearINT1();
-#else
-		rnaClearPCINT();
-#endif
-
-		// else must have been a collision, back off and try again
-		sei();
-		for( time = (RNA_T_CONST_HALF_SETUP*s_address); time; time-- );
+		volatile unsigned char time = s_myAddress << 3;
+		for( ; time; time-- );
 	}
 
-#if defined ( _AVR_IOMX8_H_ )
-	rnaClearINT1();
-#else
-	rnaClearPCINT();
+	rnaSetHigh();
+
+#ifndef RNA_POLL_DRIVEN
+	rnaClearINT();
 #endif
 
 	sei();
+	Off();
+}
+
+//------------------------------------------------------------------------------
+// send a message to a device as if we are the virtual system device,
+// use with caution!
+void rnaSendSystem( unsigned char address, unsigned char *data, unsigned char len )
+{
+	cli();
+	unsigned char t = s_myAddress;
+	s_myAddress = 0;
+	rnaSend( address, data, len ); // this call will sei() before returning
+	s_myAddress = t;
 }
 
 //------------------------------------------------------------------------------
 void rnaSend( unsigned char address, unsigned char *data, unsigned char len )
 {
-	s_sendHeader = address | (s_address<<4); // from -> to
-
-	if ( s_busBusy )
+	if ( s_busBusy ) // being called from within the ISR: queue data for immediate transfer
 	{
-		s_sendHeader = len;
-		s_sendBuf = data;
+		struct SendUnit *send = ((struct SendUnit *)rnaHeapStart) + s_sendQueueSize;
+		send->toAddress = address;
+		send->size = len;
+		send->buf = data;
+		s_sendQueueSize++;
 		return;
 	}
-
-	rnaWaitForBusClear();
-
-	volatile unsigned char time;
-	unsigned char ret;
-
-	for(;;)
-	{
-		cli();
-
-		rnaSetLow();
-		for( time = RNA_T_CONST_HALF_SETUP*3; time; time-- );
-		
-		rnaSetHigh();
-		for( time = RNA_T_CONST_SAMPLE + RNA_T_CONST_SAMPLE_REMAINDER; time; time-- );
-
-		ret = rnaShiftOutByte( s_sendHeader );
-
-		if ( ret == 1 )
-		{
-			// success! shift out the payload
-			
-			if ( rnaShiftOutByte(len) != 1 ) // length..
-			{
-				return;
-			}
-
-			for( time = 0; time < len; time++ ) // data
-			{
-				if ( rnaShiftOutByte(data[time]) != 1 ) // keep going until there is a problem
-				{
-					return;
-				}
-			}
-
-			return;
-		}
-		else if ( ret == 0 ) // no one home
-		{
-			return;
-		}
-
-		// clear the interrupt conditions we just caused
-#if defined ( _AVR_IOMX8_H_ )
-		rnaClearINT1();
-#else
-		rnaClearPCINT();
-#endif
-
-		// else must have been a collision, back off and try again
-		sei();
-		for( time = (RNA_T_CONST_HALF_SETUP*s_address); time; time-- );
-	}
-
-	// clear the interrupt conditions we just caused
-#if defined ( _AVR_IOMX8_H_ )
-	rnaClearINT1();
-#else
-	rnaClearPCINT();
-#endif
-
-	sei();
-}
-
-//------------------------------------------------------------------------------
-#if defined ( _AVR_IOMX8_H_ )
-ISR( INT1_vect )
-#else
-//ISR( PCINT1_vect ) // /RESET
-ISR( PCINT0_vect ) // A2
-#endif
-{
-	if ( rnaIsHigh() ) // spurious
-	{
-		return;
-	}
-
-	Off();
-
-	volatile unsigned char time;
-	unsigned char data[8];
-	unsigned char len;
-	unsigned char pos = 0;
-	unsigned char from;
 
 	cli();
 
-	while( rnaIsLow() ); // wait for the attention signal to lapse
+	for(;;)
+	{
+		unsigned char ret = attention( address );
+		if ( ret == 1 )
+		{
+			// header was placed on the wire and acked
+			
+			if ( rnaShiftOutByte(len, 1) != 1 ) // length..
+			{
+				break; // not sure how to continue, chip died mid-transmission?
+			}
 
-	from = rnaShiftInByte();
+			// now just start shifting out data, if a problem is detected, scrap attempt
+			unsigned char byte;
+			for( byte = 0; byte < len; byte++ )
+			{
+				if ( rnaShiftOutByte(data[byte], 1) != 1 ) 
+				{
+					break;
+				}
+			}
+
+			break;
+		}
+		else if ( ret == 0 ) // no one home
+		{
+			break;
+		}
+
+		// -1, collision, back off and try again
+		volatile unsigned char time;
+		for( time = s_myAddress << 3; time; time-- );
+	}
+
+	rnaSetHigh();
+	Off();
+
+#ifndef RNA_POLL_DRIVEN
+	rnaClearINT(); // clear the interrupt condition caused by the pin toggling
+#endif
+
+	reti(); // guarantee a return, in case what we just sent is about to interrupt us with a reply
+}
+
+//------------------------------------------------------------------------------
+// commands that come from the "system" level device are handled
+// separatrely to insulate the user from needing to handle it in
+// user-level code
+unsigned char rnaSystemInputSetup( unsigned char *data, unsigned char len )
+{
+//	RNACommandCodePage
+	return 0;
+}
+
+//------------------------------------------------------------------------------
+void rnaSystemInputStream( unsigned char *data, unsigned char bytes )
+{
+	
+}
+	
+//------------------------------------------------------------------------------
+#ifndef RNA_POLL_DRIVEN
+#if defined(PROTO88)
+ISR( INT1_vect )
+#elif defined(DNAPROTO)
+ISR( PCINT0_vect )
+#elif defined(DNA)
+ISR( PCINT1_vect )
+#elif defined(OLED)
+ISR( INT0_vect )
+#endif
+#else
+void rnaPoll()
+#endif
+{
+	if ( rnaIsHigh() ) // spurious or idle, either way get out
+	{
+		return;
+	}
+
+#ifdef RNA_POLL_DRIVEN
+	cli();
+#endif
+	
 	On();
 
-	if ( (from & 0x0F) != s_address )
+	unsigned char header = rnaShiftInByte( 0 );
+
+	if ( (header & 0x0F) != s_myAddress )
 	{
+		// not meant for me, wait for an idle bus so we do not try and
+		// interpret garbage on the next interrupt
 		rnaWaitForBusClear();
 	}
 	else
 	{
-		rnaSetLow(); // hurry up and ACK! this was meant for me
-		for( time = RNA_T_CONST_ACK_SETUP; time; time-- );
-		rnaSetHigh();
+		rnaSetLow(); // was meant for me, ack it!
+
+		// all the time in the world for bookkeeping, bus is being held
+		s_busBusy = 1;
+
+		On();
+		
+		header >>= 4; // shift off our address and just leave source
+
+#if F_CPU == 12000000
+		_delay_loop_1( 9 );
+#elif F_CPU == 8000000
+		_delay_loop_1( 6 );
+#endif		
 
 		Off();
-		
-		len = rnaShiftInByte(); // get the expected length
+		rnaSetHigh();
+
+		unsigned char len = rnaShiftInByte( 1 ); // get the expected length
+
+		rnaSetLow(); // ack and HOLD for sample setup
+
+#if F_CPU == 12000000
+		_delay_loop_1( 16 );
+#elif F_CPU == 8000000
+		_delay_loop_1( 8 );
+#endif
 
 		if ( len )
 		{
-			rnaSetLow();
-			for( time = RNA_T_CONST_ACK_SETUP; time; time-- );
-
-			unsigned char index = 1;
+			unsigned char index = 0;
 			unsigned char setup = 0;
+			unsigned char pos = 0;
 			do
 			{
+				// break this up into bite-sized chunks, 8 bytes seems
+				// like a good compromise, don't want to consume to
+				// omuch memory for long messages ,let the callback do
+				// that if it so deems. This is not really a problem
+				// since the processing overhead is fairly small
+				unsigned char data[8];
+
 				for( index=0; index<8; index++ )
 				{
-					rnaSetHigh();
-					data[index] = rnaShiftInByte();
+					rnaSetHigh(); // release bus
 
-					rnaSetLow(); // ack and HOLD until the data has been delivered
+					data[index] = rnaShiftInByte( 1 ); // get some data (expect bus high intro)
 
-					for( time = RNA_T_CONST_ACK_SETUP - 1; time; time-- );
+					rnaSetLow(); // ack and hold/extend for (potential) processing
 
-					if ( ++pos >= len )
+#if F_CPU == 12000000
+					_delay_loop_1( 11 );
+#elif F_CPU == 8000000
+					_delay_loop_1( 4 );
+#endif
+
+					if ( ++pos >= len ) // reach the end of the stream?
 					{
 						break;
 					}
 				}
 
+				On();
+				
 				if ( setup )
 				{
-					rnaInputStream( data, index ); // setup has been called, this data better be expected
+					if ( header )
+					{
+						rnaInputStream( data, index ); // setup has been called, this data better be expected
+					}
+					else
+					{
+						rnaSystemInputStream( data, index ); // system-level commands (coming from virtual source 0x0)
+					}
 				}
 				else
 				{
-					unsigned char consumed = rnaInputSetup( data, from>>4, index );
-					if ( consumed < index )
+					unsigned char consumed;
+					if ( header )
 					{
-						rnaInputStream( data + consumed, index - consumed );	
+						consumed = rnaInputSetup( data, header, index );
+						if ( consumed < index )
+						{
+							rnaInputStream( data + consumed, index - consumed );	
+						}
 					}
+					else
+					{
+						consumed = rnaSystemInputSetup( data, index );
+						if ( consumed < index )
+						{
+							rnaSystemInputStream( data + consumed, index - consumed );	
+						}
+					}
+					
 					setup = 1;
 				}
 
-				rnaSetHigh();
-
+				Off();
+				
 			} while( pos < len );
 		}
+		
+		rnaSetHigh(); // bus idle
+
+		s_busBusy = 0;
+
+		unsigned char i;
+		for( i = 0; i<s_sendQueueSize; i++ )
+		{
+			struct SendUnit *send = ((struct SendUnit *)rnaHeapStart) + i;
+			rnaSend( send->toAddress, send->buf, send->size );
+		}
+		s_sendQueueSize = 0;
 	}
 
-#if defined ( _AVR_IOMX8_H_ )
-	rnaClearINT1();
+	Off();
+
+#ifdef RNA_POLL_DRIVEN
+	reti();
 #else
-	rnaClearPCINT();
+	rnaClearINT();
 #endif
-	
-	sei();
 }

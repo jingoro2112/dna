@@ -17,6 +17,15 @@
 #define DNA_PRODUCT_MASK			0x7F
 #define DNA_RTS						0x80
 
+
+//------------------------------------------------------------------------------
+// RNABusDevices
+#define RNADeviceDNA 0x1
+#define RNADeviceOLED 0x2
+#define RNADeviceBUTTON 0x3
+#define RNADeviceTELEMETRY 0x4
+
+
 // pins on the DNA
 // B0  the clock input, unavailable for use
 // B1  D- USB pin
@@ -48,10 +57,18 @@ enum DNAUSBCommands
 };
 
 //------------------------------------------------------------------------------
+enum DNARNACommands
+{
+	RNACommandCodePage = 1,
+	RNACommandEnterApp,
+	RNACommandEnterBootloader,
+};
+
+//------------------------------------------------------------------------------
 enum StatusBits
 {
 	Status_DataFromMCUSetup = 1<<0,
-	Status_CommandToMCUSetup = 1<<0,
+	Status_CommandToMCUSetup = 1<<1,
 };
 
 #endif

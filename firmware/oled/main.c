@@ -5,7 +5,7 @@
  */
 
 #include <dna.h>
-#include <usb.h>
+//#include <usb.h>
 #include <oled.h>
 #include <i2c.h>
 #include <24c512.h>
@@ -27,7 +27,7 @@ unsigned char message[10];
 //------------------------------------------------------------------------------
 unsigned char dnaUsbInputSetup( unsigned char *data, unsigned char len )
 {
-	dnaUsbQueueData( message, 4 );
+//	dnaUsbQueueData( message, 4 );
 	return 0;
 }
 
@@ -37,10 +37,17 @@ void dnaUsbInputStream( unsigned char *data, unsigned char len )
 	
 }
 
+static unsigned char check;
 //------------------------------------------------------------------------------
 unsigned char rnaInputSetup( unsigned char *data, unsigned char from, unsigned char len )
 {
-	return 0;
+//	if ( data[0] == check + 1 )
+	{
+//		check += 2;
+		message[0] = data[0];// + 1;
+//		rnaSend( from, message, 1 );
+	}
+	return 1;
 }
 
 //------------------------------------------------------------------------------
@@ -98,28 +105,21 @@ int __attribute__((noreturn)) main(void)
 
 	TCCR0B = 1<<CS01; // set 8-bit timer prescaler to /8 for 5859.375 intterupts per second @12mHz
 	TIMSK0 = 1<<TOIE0; // fire off an interrupt every time it overflows, this is our tick (~170 microseconds per)
-	sei();
 
 	rnaInit( 0x2 );
 
-	unsigned char d = 0;
+	sei();
+
+	check = 0;
+	unsigned char data[100];
+	data[0] = 0x55;
+	
 	for(;;)
 	{
-		for( d=0; d<=0xF; d++ )
-		{
-			if ( rnaProbe(d) )
-			{
-				rnaSend( d, &d, 5 );
-				ledOn();
-			}
-			else
-			{
-				ledOff();
-			}
-		}
+		data[check]++;
+		rnaSend( 0x1, data, 1 );
 
-//		rnaSend( 0x1, &d,  1 );
-		_delay_ms(10);
+		_delay_ms(2);
 	}
 }
 

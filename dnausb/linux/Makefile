@@ -2,8 +2,8 @@ OBJS = \
 	objs/dnausb.o \
 	objs/hid-libusb.o \
 
-CPP = g++ -Ihidapi -O3 -Wall -Werror -MD -c
-CC = cc -Ihidapi -O3 -MD -c
+CPP = g++ -fPIC -Ihidapi -O3 -Wall -Werror -MD -c
+CC = cc -fPIC -Ihidapi -O3 -MD -c
 
 all: libdnausb.a
 
@@ -14,7 +14,7 @@ clean:
 	@-mkdir objs
 	
 libdnausb.a: $(OBJS)
-	ar r libdnausb.a $(OBJS)
+	ar r libdnausb.a -lusb-1.0 $(OBJS)
 	ranlib libdnausb.a
 
 objs/dnausb.o: dnausb.cpp

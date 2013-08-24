@@ -45,7 +45,7 @@ void __init()
 	
 	// give the pin a chance to stabilize and clock in, can't be too careful
 	_delay_us(50);
-//	if ( PINB & 0b00001000 )
+	if ( PINB & 0b00001000 )
 	{
 		asm volatile ("rjmp __ctors_end" ); // return to our regularly scheduled C program
 	}
