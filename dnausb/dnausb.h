@@ -32,10 +32,10 @@ void closeDevice( DNADEVICE device );
 	
 bool getProductId( DNADEVICE device, unsigned char *id );
 
-bool sendEnterApp( DNADEVICE device, unsigned char checksum );
+bool sendEnterApp( DNADEVICE device );
 bool sendEnterBootloader( DNADEVICE device );
 
-bool sendCode( DNADEVICE device, const unsigned char* code, const unsigned int size, unsigned char *checksum );
+bool sendCode( DNADEVICE device, const unsigned char* code, const unsigned int size );
 
 bool sendData( DNADEVICE device, const unsigned char data[64] );
 bool getData( DNADEVICE device, unsigned char data[64] );

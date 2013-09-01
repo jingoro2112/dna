@@ -17,20 +17,18 @@
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // ALTER/OMIT THIS AT YOUR OWN PERIL. THE DNA BOARD CANNOT BE SERIAL
 // PROGRAMMED SINCE THE /RESET PIN HAS BEEN DISABLED! IF YOU BRICK THE
-// BOARD IT WILL NEED TO BE REWORKED WITH A NEW CHIP
+// BOARD IT WILL NEED TO BE REWORKED WITH A NEW CHIP, OR HIGH-VOLTAGE
+// PROGRAMMED
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 void __init()
 {
-	// start the pin rising as quickly as possible, if it's going to
+	asm volatile ( "clr __zero_reg__" );
 
-	DDRB = 0; // juuust in case it has been screwed with (this is primarily
-			  // to make sure this code still works in warm-reset situations
+	// start the pin rising as quickly as possible
+	DDRB = 0;
 	PORTB = 0b00001000; // turn on pullup
 
 	// some non-trivial code here, make sure c's assumptions are valid
-	
-//	asm volatile ( ".set __stack, %0" :: "i" (RAMEND) );  // not using the stack, but if we do, comment this back in!
-	asm volatile ( "clr __zero_reg__" );
 	
 	// if the source of the reset was a watchdog timeout, indicating a software
 	// request of bootloader entry, disable the watchdog and enter the
@@ -45,12 +43,12 @@ void __init()
 	
 	// give the pin a chance to stabilize and clock in, can't be too careful
 	_delay_us(50);
-	if ( PINB & 0b00001000 )
+	if ( !(PINB & 0b00001000) )
 	{
-		asm volatile ("rjmp __ctors_end" ); // return to our regularly scheduled C program
+bootloader_jump:
+		asm	volatile ("ijmp" ::"z" (BOOTLOADER_ENTRY)); // jump to bootloader!
 	}
 
-bootloader_jump:
-	asm	volatile ("ijmp" ::"z" (BOOTLOADER_ENTRY)); // jump to bootloader!
+	asm volatile ( "rjmp __ctors_end" ); // return to our regularly scheduled C program
 }
 

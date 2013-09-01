@@ -34,18 +34,15 @@ const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
 	0x75, 0x08,				// REPORT_SIZE (8)
 
 	0x85, Report_Command,	// REPORT_ID
-	0x95, 0x41,				// REPORT_COUNT (64 + 1)
+	0x95, 0x06,				// REPORT_COUNT (pos[1], word[2], word[2])
 	0x09, 0x00,				// USAGE (Undefined)
 	0xb2, 0x02, 0x01,		// FEATURE (Data,Var,Abs,Buf)
 
 	0xc0					// END_COLLECTION
 };
 
-int g_addressBase; // page base currently being loaded
-static int g_byteCountIn; // how much data is remaining to tranfer in the current code page
 static int g_pageZero[32]; // retain page zero (ISR) in RAM, commit only after load is complete and validated
-static int g_pageZeroIndex;
-unsigned char g_codeChecksum; // must match before user app is entered
+static unsigned char g_pageZeroIndex;
 static unsigned char s_replyBuffer[4];
 
 //------------------------------------------------------------------------------
@@ -62,98 +59,67 @@ unsigned char usbFunctionSetup( unsigned char data[8] )
 {
 	if( ((usbRequest_t *)data)->bRequest == USBRQ_HID_SET_REPORT )
 	{
-		g_byteCountIn = 0;
 		return USB_NO_MSG;
 	}
 
-//	USBRQ_HID_GET_REPORT is the only other supported method
+	// Report_Command inferred; only one command is legal, so don't
+	// bother parsing it
 
 	s_replyBuffer[0] = Report_Command;
 	s_replyBuffer[1] = BOOTLOADER_DNA_AT84_v1_00;
-
-	// Report_Command inferred; only one command is legal, so don't
-	// bother parsing it
-		
-#ifdef RELOCATE
-	g_addressBase = 0; // reset loader
-#else
-	g_addressBase = 0x800; // reset loader
-#endif
-
-//	g_codeChecksum = 0;
 	usbMsgPtr = (usbMsgPtr_t)s_replyBuffer;
+
 	return 4;
 }
 
 //------------------------------------------------------------------------------
 unsigned char usbFunctionWrite( unsigned char *data, unsigned char len )
 {
-	if ( !g_byteCountIn ) // a command is being sent down
+	data++;
+	if ( *data == USBCommandEnterApp ) // being asked to commit the code update and jump to the app
 	{
-		if ( data[1] == USBCommandEnterApp ) // being asked to commit the code update and jump to the app
+		cli();
+
+		// now safe to install page 0 (interrupt vector table)
+		// overwriting our USB hack
+		for( len=0; len<32; len++ ) // re-using param saves stack-frame constructions opcodes
 		{
-			cli();
-
-			if (  data[2] == g_codeChecksum ) // was the checksum accurate?
-			{
-				// now safe to install page 0 (interrupt vector table)
-				// overwriting our USB hack
-				for( len=0; len<32; len++ ) // re-using param saves stack-frame constructions opcodes
-				{
-					boot_page_fill( len*2, g_pageZero[len] );
-				}
-				
-				commitPage( 0 );
-				
-				asm volatile ("ijmp" ::"z" (0)); // jump to code start
-			}
-
-			// okay here is the thing, if the checksum is not accurate,
-			// there should be some cleanup to give 'another chance'
-			// but there is not enough program space left to do that,
-			// so I am settling for leaving interrupts disabled. This
-			// will have the effect of leaving the board 'frozen',
-			// requiring a power cycle. messy but 100% safe, and an
-			// indication that "something has gone wrong"
+			boot_page_fill( len*2, g_pageZero[len] );
 		}
 
-		// else it is a code page, the only other recognized command
-		// for the bootloader
-		
-		data += 2;
-		len -= 2;
-	}
-		
-	for( ; len ; len -= 2, g_byteCountIn += 2 )
-	{
-		uint16_t w = *data++;
-		w += (*data++) << 8;
-		g_codeChecksum += (w >> 8) + w;
+		commitPage( 0 );
 
-		if ( g_addressBase == 0 ) // don't commit page zero until very last, or our interrupts will be lost
-		{
-			g_pageZero[g_pageZeroIndex++] = w;
-		}
-		else
-		{
-			boot_page_fill( g_addressBase + g_byteCountIn, w );
-		}
+		asm volatile ("ijmp" ::"z" (0)); // jump to code start
 	}
 
-	if ( g_byteCountIn & 0x40 ) // done with this block?
+	// else it is a code page, the only other recognized command
+	// for the bootloader
+
+	data++;
+	unsigned char pos = *data++;
+	unsigned int w1 = *(unsigned int *)data;
+	unsigned int w2 = *(unsigned int *)(data + 2);
+
+	// if command checksum is good, do it
+	if ( pos == BootloaderCommandCommitPage )
 	{
-		if ( g_addressBase && (g_addressBase <= 0x18C0) )
-		{
-			commitPage( g_addressBase );
-		}
-		g_addressBase += 64;
-		return 1;
+		commitPage( w1 );
+	}
+	else if ( pos == BootloaderCommandLoadZeroPage )
+	{
+		g_pageZero[g_pageZeroIndex++] = w1;
+		g_pageZero[g_pageZeroIndex++] = w2;
+	}
+	else // pos is an actual code position
+	{
+		boot_page_fill( pos, w1 );
+		pos += 2;
+		boot_page_fill( pos, w2 );
 	}
 
-	return 0;
+	return 1;
 }
 
-#ifdef RELOCATE
 // manually locate the reset vector, since we took out the automatic
 // table generation in the custom linking file
 //------------------------------------------------------------------------------
@@ -171,48 +137,46 @@ void ResetVector (void)
 // PC space, not address space!
 const PROGMEM int isrJump[] =
 {
-	0x08C0, // c0 08  rjmp +8    -- rjmp to trampoline
+	0xC008, // c0 08  rjmp +16
+
 	0x93EF, // ef 93  push r30   -- INT0, push r30/31
 	0x93FF, // ff 93  push r31
-	0xEDEE, // ee ed  ldi  r30, 0xDE -- load them with the ISR vector for..
+	0xEFEE, // ee ef  ldi r30, 0xFE 
 	0xE0FC, // fc e0  ldi r31, 0x0C
 	0x9509, // 09 95  icall         -- an icall, so it can be reached WAAAY at the top of Flash
 	0x91FF, // ff 91  pop r31
 	0x91EF, // ef 91  pop r30
 	0x9508, // 08 95  ret
-	0xE6E0, // e0 e7  ldi r30, 0x60	-- ijmp to the bootloader
+
+	0xE8E0, // e0 e8  ldi r30, 0x80	-- ijmp to the bootloader
 	0xE0FC, // fc e0  ldi r31, 0x0C
 	0x9409, // 09 94  ijmp
+
 };
 
-#endif
-
 //------------------------------------------------------------------------------
-int __attribute__((noreturn)) main(void)
+int __attribute__((OS_main)) main(void)
 {
-#ifdef RELOCATE
-	
 	// Once the bootloader has been entered, hack up the interrupt vector table
 	
 	const int* isr = isrJump; // read array from program memory, saves copy step
 	unsigned char i;
-	for( i=0; i<24; i+=2 )
+	for( i=0; i<64; i+=2 )
 	{
 		boot_page_fill( i, pgm_read_word(isr++) ); // rewrite the ISR to jump way up to our USB int0 routine
 	}
 
 	commitPage( 0 );
 	
-#endif
+	DDRA = 0b10000000;
 
 	usbInit();
 	usbDeviceDisconnect();
-	_delay_ms( 250 );
+	_delay_ms(250);
 	usbDeviceConnect();
 
 	sei();
 
-	DDRA |= 0b10000000;
 	unsigned int c;
 	for(;;)
 	{

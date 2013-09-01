@@ -6,6 +6,7 @@
 
 #include "dna.h"
 #include "usb.h"
+#include "rna.h"
 #include "../../usbdrv/usbdrv.c"
 
 
@@ -47,40 +48,52 @@ unsigned char usbFunctionSetup( unsigned char data[8] )
 	
 	if( request->bRequest == USBRQ_HID_SET_REPORT )
 	{
-		s_status |= Status_CommandToMCUSetup;
+		s_status = Status_CommandToMCUSetup;
 		return USB_NO_MSG;
 	}
 	// USBRQ_HID_GET_REPORT is the only other supported message
 
-	s_status |= Status_DataFromMCUSetup;
+	s_status = Status_DataFromMCUSetup;
 	return 0xFF;
 }
 
 //------------------------------------------------------------------------------
 unsigned char usbFunctionWrite( unsigned char *data, unsigned char len )
 {
+	unsigned char consumed = 0;
 	if ( s_status & Status_CommandToMCUSetup ) // a command is being sent down
 	{
 		s_dataTransferRemaining = 66;
-		s_status &= ~Status_CommandToMCUSetup;
+		s_status = 0;
 
 		if ( data[1] == USBCommandEnterBootloader ) // soft entry to bootloader?
 		{
 			wdt_enable( WDTO_15MS ); // light the fuse
 		}
 
+		if ( data[1] == USBCommandRNACommand )
+		{
+			consumed = 3; // USB, command, address
+			s_status = (data[2] << 4) | Status_DataToRNA;
+		}
+
 		if ( data[1] == USBCommandWriteData ) // data send?
 		{
-			unsigned char consumed = 2;
-			consumed += dnaUsbInputSetup( data + 2, len - 2 );
-			if ( consumed < len )
-			{
-				dnaUsbInputStream( data + consumed, len - consumed );
-			}
+			consumed = dnaUsbInputSetup( data + 2, len - 2 ) + 2;
 		}
 	}
 
-	dnaUsbInputStream( data, len );
+	if ( consumed < len )
+	{
+		if ( s_status & Status_DataToRNA )
+		{
+			rnaSend( s_status & 0xF, data + consumed, len - consumed );
+		}
+		else
+		{
+			dnaUsbInputStream( data + consumed, len - consumed );
+		}
+	}
 
 	if ( !(s_dataTransferRemaining -= len) )
 	{
@@ -116,10 +129,6 @@ unsigned char usbFunctionRead( unsigned char *data, unsigned char len )
 			{
 				g_sendQueueLen = 0;
 			}
-		}
-		else
-		{
-			data[i] = 0; // be nice, null the data that is not written
 		}
 	}
 

@@ -10,20 +10,21 @@
 #include <avr/boot.h>
 #include <avr/pgmspace.h>
 #include <util/delay.h>
+#include <avr/interrupt.h>
 
 #include "bootloader_code.h"
 
 //------------------------------------------------------------------------------
-int main()
+int __attribute__((OS_main)) main()
 {
-	unsigned int pos = 0;
+	cli();
 	unsigned int address = g_origin;
-	unsigned char i;
+	unsigned int pos = 0;
 	const int* data = g_data;
-	
+
 	do
 	{
-		for( i=0; i<64; i+=2 )
+		for( unsigned char i=0; i<64; i+=2 )
 		{
 			if ( pos < g_size )
 			{
@@ -31,7 +32,7 @@ int main()
 			}
 			else
 			{
-				boot_page_fill( i, 0 );
+				boot_page_fill( i, 0xFFFF );
 			}
 
 			pos++;
@@ -45,6 +46,5 @@ int main()
 		
 	} while( pos < g_size );
 
-	asm	volatile ("ijmp" ::"z" (BOOTLOADER_ENTRY)); // jump to bootloader we just loaded
-	return 0;
+	asm	volatile ("ijmp" ::"z" (g_origin/2)); // jump to bootloader we just loaded
 }

@@ -31,7 +31,7 @@ int main( int argn, char *argv[] )
 
 	buffer.format( "unsigned int g_origin = 0x%04X;\n\n"
 				   "unsigned int g_size = 0x%04X;\n\n"
-				   "const PROGMEM int g_data[]=\n{", chunk->addressBase, chunk->size );
+				   "const PROGMEM int g_data[]=\n{", chunk->addressBase, chunk->size/2 );
 
 	for( unsigned int i=0; i<chunk->size; i += 2  )
 	{

@@ -3,23 +3,22 @@
 #* found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
 #* and in the LICENCE.txt file included with this distribution
 
-TARGET = morlock
+TARGET = button
 
 OBJS = \
-	objs/usbdrvasm.o \
-	objs/dna.o \
-	objs/usb.o \
 	objs/main.o \
-	objs/a2d.o \
 	objs/rna.o \
 
-MCU = attiny84
-CPU_FREQUENCY = 12000000
-PLATFORM = DNA
+BOBJS = \
+	objs/rna_bootloader.o
+
+MCU = attiny45
+CPU_FREQUENCY = 8000000
+PLATFORM = BUTTON
 
 CC = avr-gcc -Wall -I. -I../dna -MD -Os -std=gnu99 -fdata-sections -ffunction-sections -funsigned-char -funsigned-bitfields -fno-inline-small-functions -mmcu=$(MCU) -D$(PLATFORM)=1 -DF_CPU=$(CPU_FREQUENCY)
 
-all: $(TARGET).hex
+all: $(TARGET).hex $(TARGET)_bootloader.hex
 
 -include objs/*.d
 
@@ -28,35 +27,23 @@ clean:
 	@-mkdir objs
 	@-rm -f $(OBJS) $(TARGET).hex $(TARGET).elf $(TARGET).disassembly
 	
+$(TARGET)_bootloader.hex: $(BOBJS)
+	$(CC) -o $(TARGET)_bootloader.elf -Wl,-gc-sections $(OBJS) 
+	avr-objcopy -j .text -j .data -O ihex $(TARGET)_bootloader.elf $(TARGET)_bootloader.hex
+	avr-objdump -d $(TARGET)_bootloader.elf > $(TARGET)_bootloader.disassembly
+
+
 $(TARGET).hex: $(OBJS)
 	$(CC) -o $(TARGET).elf -Wl,-gc-sections $(OBJS) 
 	avr-objcopy -j .text -j .data -O ihex $(TARGET).elf $(TARGET).hex
 	avr-objdump -d $(TARGET).elf > $(TARGET).disassembly
-	..\..\loader\win32\loader -v -i $(TARGET).hex
-
-objs/usbdrvasm.o: ../../usbdrv/usbdrvasm.S
-	$(CC) -c -x assembler-with-cpp $< -o $@
-
-objs/dna.o: ../dna/dna.c
-	$(CC) -c $< -o $@
-
-objs/usb.o: ../dna/usb.c
-	$(CC) -c $< -o $@
+#	..\..\loader\loader -i $(TARGET).hex
 
 objs/main.o: main.c
 	$(CC) -c $< -o $@
 
-objs/rnar.o: ../dna/rna.c
-	$(CC) -c $< -o $@
-
-objs/a2d.o: ../dna/a2d.c
-	$(CC) -c $< -o $@
-
-objs/i2c.o: ../dna/i2c.c
-	$(CC) -c $< -o $@
-
-objs/24c512.o: ../dna/24c512.c
-	$(CC) -c $< -o $@
-
 objs/rna.o: ../dna/rna.c
 	$(CC) -c $< -o $@
+
+objs/rna_bootloader.o: ../dna/rna.c
+	$(CC) -DRNA_POLL_DRIVEN -c $< -o $@

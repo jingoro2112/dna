@@ -6,103 +6,32 @@
 
 #include "i2c_attiny.h"
 
-//unsigned char g_i2cDelay;
-
 //------------------------------------------------------------------------------
 unsigned char i2cWrite( unsigned char data )
 {
-	if ( data & 0b10000000 )
+	unsigned char bit = 0x80;
+	do
 	{
-		i2cSetSDAHigh();
-	}
-	else
-	{
-		i2cSetSDALow();
-	}
-	i2cSetSCLHigh();
-	i2cSetSCLLow();
-
-	if ( data & 0b01000000 )
-	{
-		i2cSetSDAHigh();
-	}
-	else
-	{
-		i2cSetSDALow();
-	}
-	i2cSetSCLHigh();
-	i2cSetSCLLow();
-
-	if ( data & 0b00100000 )
-	{
-		i2cSetSDAHigh();
-	}
-	else
-	{
-		i2cSetSDALow();
-	}
-	i2cSetSCLHigh();
-	i2cSetSCLLow();
-
-	if ( data & 0b00010000 )
-	{
-		i2cSetSDAHigh();
-	}
-	else
-	{
-		i2cSetSDALow();
-	}
-	i2cSetSCLHigh();
-	i2cSetSCLLow();
-
-	if ( data & 0b00001000 )
-	{
-		i2cSetSDAHigh();
-	}
-	else
-	{
-		i2cSetSDALow();
-	}
-	i2cSetSCLHigh();
-	i2cSetSCLLow();
-
-	if ( data & 0b00000100 )
-	{
-		i2cSetSDAHigh();
-	}
-	else
-	{
-		i2cSetSDALow();
-	}
-	i2cSetSCLHigh();
-	i2cSetSCLLow();
-
-	if ( data & 0b00000010 )
-	{
-		i2cSetSDAHigh();
-	}
-	else
-	{
-		i2cSetSDALow();
-	}
-	i2cSetSCLHigh();
-	i2cSetSCLLow();
-
-	if ( data & 0b00000001 )
-	{
-		i2cSetSDAHigh();
-	}
-	else
-	{
-		i2cSetSDALow();
-	}
-	i2cSetSCLHigh();
-	i2cSetSCLLow();
-
-
-	// check for ACK
+		if ( data & bit )
+		{
+			i2cSetSDAHigh();
+		}
+		else
+		{
+			i2cSetSDALow();
+		}
+		_delay_us( I2C_DELAY_CONST );
+		i2cSetSCLHigh();
+		_delay_us( I2C_DELAY_CONST );
+		i2cSetSCLLow();
+		_delay_us( I2C_DELAY_CONST );
+		
+	} while( bit >>= 1 );
+	
+	_delay_us( I2C_DELAY_CONST );
 	i2cSetSDAHigh();
 	i2cSetSCLHigh();
+	_delay_us( I2C_DELAY_CONST );
 	unsigned char ret = 0;
 	if ( i2cGetSDA() )
 	{
@@ -130,60 +59,29 @@ unsigned char i2cStartWrite( unsigned char address )
 // Read a bye, expecting more
 unsigned char i2cReadStream()
 {
+	unsigned char bit = 0x80;
 	unsigned char ret = 0;
-	i2cSetSCLHigh();
-	if ( i2cGetSDA() )
+	do
 	{
-		ret |= 0b10000000;
-	}
-	i2cSetSCLLow();
-	i2cSetSCLHigh();
-	if ( i2cGetSDA() )
-	{
-		ret |= 0b01000000;
-	}
-	i2cSetSCLLow();
-	i2cSetSCLHigh();
-	if ( i2cGetSDA() )
-	{
-		ret |= 0b00100000;
-	}
-	i2cSetSCLLow();
-	i2cSetSCLHigh();
-	if ( i2cGetSDA() )
-	{
-		ret |= 0b00010000;
-	}
-	i2cSetSCLLow();
-	i2cSetSCLHigh();
-	if ( i2cGetSDA() )
-	{
-		ret |= 0b00001000;
-	}
-	i2cSetSCLLow();
-	i2cSetSCLHigh();
-	if ( i2cGetSDA() )
-	{
-		ret |= 0b00000100;
-	}
-	i2cSetSCLLow();
-	i2cSetSCLHigh();
-	if ( i2cGetSDA() )
-	{
-		ret |= 0b00000010;
-	}
-	i2cSetSCLLow();
-	i2cSetSCLHigh();
-	if ( i2cGetSDA() )
-	{
-		ret |= 0b00000001;
-	}
-	i2cSetSCLLow();
-
+		i2cSetSCLHigh();
+		_delay_us( I2C_DELAY_CONST );
+		if ( i2cGetSDA() )
+		{
+			ret |= bit;
+		}
+		i2cSetSCLLow();
+		_delay_us( I2C_DELAY_CONST );
+		 
+	} while( bit >>= 1 );
+		
 	i2cSetSDALow(); // ack
+	_delay_us( I2C_DELAY_CONST );
 	i2cSetSCLHigh();
+	_delay_us( I2C_DELAY_CONST );
 	i2cSetSCLLow();
+	_delay_us( I2C_DELAY_CONST );
 	i2cSetSDAHigh();
+	_delay_us( I2C_DELAY_CONST );
 	
 	return ret;
 }
@@ -192,60 +90,20 @@ unsigned char i2cReadStream()
 // Read a single byte and terminate transmission
 unsigned char i2cReadByte()
 {
+	unsigned char bit = 0x80;
 	unsigned char ret = 0;
-	i2cSetSCLHigh();
-	if ( i2cGetSDA() )
+	do
 	{
-		ret |= 0b10000000;
-	}
-	i2cSetSCLLow();
-	i2cSetSCLHigh();
-	if ( i2cGetSDA() )
-	{
-		ret |= 0b01000000;
-	}
-	i2cSetSCLLow();
-	i2cSetSCLHigh();
-	if ( i2cGetSDA() )
-	{
-		ret |= 0b00100000;
-	}
-	i2cSetSCLLow();
-	i2cSetSCLHigh();
-	if ( i2cGetSDA() )
-	{
-		ret |= 0b00010000;
-	}
-	i2cSetSCLLow();
-	i2cSetSCLHigh();
-	if ( i2cGetSDA() )
-	{
-		ret |= 0b00001000;
-	}
-	i2cSetSCLLow();
-	i2cSetSCLHigh();
-	if ( i2cGetSDA() )
-	{
-		ret |= 0b00000100;
-	}
-	i2cSetSCLLow();
-	i2cSetSCLHigh();
-	if ( i2cGetSDA() )
-	{
-		ret |= 0b00000010;
-	}
-	i2cSetSCLLow();
-	i2cSetSCLHigh();
-	if ( i2cGetSDA() )
-	{
-		ret |= 0b00000001;
-	}
-	i2cSetSCLLow();
+		i2cSetSCLHigh();
+		_delay_us( I2C_DELAY_CONST );
+		if ( i2cGetSDA() )
+		{
+			ret |= bit;
+		}
+		i2cSetSCLLow();
+		_delay_us( I2C_DELAY_CONST );
 
-	i2cSetSDALow(); // ack
-	i2cSetSCLHigh();
-	i2cSetSCLLow();
-	i2cSetSDAHigh();
+	} while( bit >>= 1 );
 
 	return ret;
 }
@@ -253,23 +111,26 @@ unsigned char i2cReadByte()
 //------------------------------------------------------------------------------
 void i2cInit( unsigned char c )
 {
-//	g_i2cDelay = c;
-	DDRA  |= i2cSCL | i2cSDA; // set as output
-	PORTA &= ~(i2cSCL | i2cSDA); // assert low
-	DDRA  &= ~(i2cSCL | i2cSDA); // set as input
-	PORTA |= (i2cSCL | i2cSDA); // enable pullups
+	PORTA |= i2cSCL | i2cSDA;
+	DDRA |= i2cSCL | i2cSDA;
 }
 
 //------------------------------------------------------------------------------
 void i2cStart()
 {
+	i2cSetSDAHigh();
 	i2cSetSDALow(); // SDA low while SCL is high
+	_delay_us( I2C_DELAY_CONST );
 	i2cSetSCLLow(); // prepare to start clocking
+	_delay_us( I2C_DELAY_CONST );
 }
 
 //------------------------------------------------------------------------------
 void i2cStop()
 {
+	i2cSetSDALow();
 	i2cSetSCLHigh();
+	_delay_us( I2C_DELAY_CONST );
 	i2cSetSDAHigh(); // SDA high while SCL is high
+	_delay_us( I2C_DELAY_CONST );
 }

@@ -12,18 +12,27 @@
 #define DNA_AT84_v1_00				0x03
 #define BOOTLOADER_DNA_AT84_v1_00	0x04
 
-#define BOOTLOADER_ENTRY			0x0C60
+#define BOOTLOADER_ENTRY			0xC80
 
 #define DNA_PRODUCT_MASK			0x7F
 #define DNA_RTS						0x80
 
+//------------------------------------------------------------------------------
+enum BootloaderCommands
+{
+	BootloaderCommandLoadZeroPage = 0xA5,
+	BootloaderCommandCommitPage = 0xA6,
+};
+
 
 //------------------------------------------------------------------------------
-// RNABusDevices
-#define RNADeviceDNA 0x1
-#define RNADeviceOLED 0x2
-#define RNADeviceBUTTON 0x3
-#define RNADeviceTELEMETRY 0x4
+enum RNABusDevices
+{
+	RNADeviceDNA = 0x1,
+	RNADeviceOLED = 0x2,
+	RNADeviceBUTTON = 0x3,
+	RNADeviceTELEMETRY = 0x4,
+};
 
 
 // pins on the DNA
@@ -54,21 +63,27 @@ enum DNAUSBCommands
 	USBCommandEnterApp,
 	USBCommandEnterBootloader,
 	USBCommandWriteData,
+	USBCommandRNACommand,
 };
 
 //------------------------------------------------------------------------------
 enum DNARNACommands
 {
-	RNACommandCodePage = 1,
-	RNACommandEnterApp,
-	RNACommandEnterBootloader,
+	RNACommandAppJump = 1,
+	RNACommandCodePageWrite,
+	
 };
 
 //------------------------------------------------------------------------------
 enum StatusBits
 {
-	Status_DataFromMCUSetup = 1<<0,
-	Status_CommandToMCUSetup = 1<<1,
+	Status_RNAAddressBit0 = 1<<0,
+	Status_RNAAddressBit1 = 1<<1,
+	Status_RNAAddressBit2 = 1<<2,
+	Status_RNAAddressBit4 = 1<<3,
+	Status_DataFromMCUSetup = 1<<4,
+	Status_CommandToMCUSetup = 1<<5,
+	Status_DataToRNA = 1<<6,
 };
 
 #endif

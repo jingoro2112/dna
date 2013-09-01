@@ -9,18 +9,15 @@ OBJS = \
 	objs/rna.o \
 	objs/main.o \
 	objs/i2c.o \
-	objs/usb.o \
 	objs/oled.o \
 	objs/24c512.o \
 	objs/sram.o \
-#	objs/usbdrvasm.o \
 
-MCU = atmega88
-#CPU_FREQUENCY = 12000000
+MCU = attiny84
 CPU_FREQUENCY = 8000000
-PLATFORM = PROTO88
+PLATFORM = OLED
 
-CC = avr-gcc -Wall -I. -I../dna -MD -Os -fdata-sections -ffunction-sections -funsigned-char -funsigned-bitfields -fno-inline-small-functions -D$(PLATFORM)=1 -mmcu=$(MCU) -DF_CPU=$(CPU_FREQUENCY)
+CC = avr-gcc -Wall -I. -I../dna -MD -Os -std=gnu99 -fdata-sections -ffunction-sections -funsigned-char -funsigned-bitfields -fno-inline-small-functions -D$(PLATFORM)=1 -mmcu=$(MCU) -DF_CPU=$(CPU_FREQUENCY)
 
 all: $(TARGET).hex
 
@@ -35,10 +32,6 @@ $(TARGET).hex: $(OBJS)
 	$(CC) -o $(TARGET).elf -Wl,-gc-sections $(OBJS) 
 	avr-objcopy -j .text -j .data -O ihex $(TARGET).elf $(TARGET).hex
 	avr-objdump -d $(TARGET).elf > $(TARGET).disassembly
-#	..\..\loader\loader -i $(TARGET).hex
-
-objs/usbdrvasm.o: ../../usbdrv/usbdrvasm.S
-	$(CC) -c -x assembler-with-cpp $< -o $@
 
 objs/main.o: main.c
 	$(CC) -c $< -o $@
@@ -49,13 +42,13 @@ objs/i2c.o: ../dna/i2c.c
 objs/usb.o: ../dna/usb.c
 	$(CC) -c $< -o $@
 
-objs/oled.o: oled.c
+objs/oled.o: ../dna/oled.c
 	$(CC) -c $< -o $@
 
 objs/24c512.o: ../dna/24c512.c
 	$(CC) -c $< -o $@
 
-objs/sram.o: sram.c
+objs/sram.o: ../dna/sram.c
 	$(CC) -c $< -o $@
 
 objs/rna.o: ../dna/rna.c

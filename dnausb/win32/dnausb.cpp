@@ -20,6 +20,9 @@ extern "C"
 static SimpleLog Log;
 
 
+static unsigned int s_lastCommandTimestamp = 0;
+
+
 //------------------------------------------------------------------------------
 HANDLE DNAUSB::openDevice( int vid, int pid, const char* vendor, char* product )
 {
@@ -141,6 +144,8 @@ HANDLE DNAUSB::openDevice( int vid, int pid, const char* vendor, char* product )
 				continue;
 			}
 
+			Sleep(10);
+
 			HidD_GetProductString( handle, buf, 1024 );
 			temp.toChar( (wchar_t*)buf );
 
@@ -161,15 +166,31 @@ void DNAUSB::closeDevice( DNADEVICE device )
 }
 
 //------------------------------------------------------------------------------
+void waitForCommandInterval()
+{
+	unsigned int current = GetTickCount();
+	if ( (s_lastCommandTimestamp + 10) > current )
+	{
+		Sleep(10);
+	}
+	
+	s_lastCommandTimestamp = GetTickCount();
+}
+
+//------------------------------------------------------------------------------
 bool DNAUSB::getProductId( HANDLE device, unsigned char *id )
 {
 	char packet[66] = { Report_Command };	
+
+	waitForCommandInterval();
 	
-	if ( !HidD_GetFeature(device, packet, 66) )
+	if ( !HidD_GetFeature(device, packet, 7) )
 	{
 		Log( "failed to get status w/%d", GetLastError() );
 		return false;
 	}
+
+	Log( "product id status: [%d]\n", GetLastError() );
 
 	*id = packet[1] & DNA_PRODUCT_MASK;
 
@@ -180,19 +201,22 @@ bool DNAUSB::getProductId( HANDLE device, unsigned char *id )
 static bool sendCommand( DNADEVICE device, const unsigned char cmd, const unsigned char param =0 )
 {
 	unsigned char comm[66] = { Report_Command, cmd, param };
+	waitForCommandInterval();
 	if ( !HidD_SetFeature(device, comm, 66) &&  GetLastError() != 31 )
 	{
 		Log( "failed to send command [%d] w/%d", (int)cmd, GetLastError() );
 		return false;
 	}
 
+	Log( "command status: [%d]\n", GetLastError() );
+
 	return true;
 }
 
 //------------------------------------------------------------------------------
-bool DNAUSB::sendEnterApp( DNADEVICE device, unsigned char checksum )
+bool DNAUSB::sendEnterApp( DNADEVICE device )
 {
-	return sendCommand( device, USBCommandEnterApp, checksum );
+	return sendCommand( device, USBCommandEnterApp );
 }
 
 //------------------------------------------------------------------------------
@@ -202,30 +226,107 @@ bool DNAUSB::sendEnterBootloader( DNADEVICE device )
 }
 
 //------------------------------------------------------------------------------
-bool DNAUSB::sendCode( HANDLE device, const unsigned char* code, const unsigned int size, unsigned char *checksum )
+bool sendWithRetry( DNADEVICE device, unsigned char *command )
 {
-	unsigned char codePage[66] = { Report_Command, USBCommandCodePage };
-
-	if ( !checksum )
+	unsigned char status[8] = { Report_Command };	
+	do
 	{
-		return false;
-	}
-	
-	*checksum = 0;
-	for( unsigned int i=0; i<size; i++ )
-	{
-		*checksum += code[i];
-	}
-	
-	for( unsigned int pos = 0; pos < size; pos += 64 )
-	{
-		memcpy( codePage + 2, code + pos, (64 > size) ? size - pos : 64 );
-
-		//	asciiDump( codePage + 2, 64 );
-	
-		if ( !HidD_SetFeature(device, codePage, 66) &&  GetLastError() != 31 )
+		waitForCommandInterval();
+		if ( !HidD_SetFeature(device, command, 7) && GetLastError() != 31 )
 		{
-			Log( "failed to send code page[%d] w/%d", pos / 64, GetLastError() );
+			Log( "failed to send w/retry w/%d", GetLastError() );
+			return false;
+		}
+
+		waitForCommandInterval();
+		if ( !HidD_GetFeature(device, status, 7) )
+		{
+			Log( "failed to get return status w/%d", GetLastError() );
+			return false;
+		}
+
+		if ( status[2] )
+		{
+			Log( "command failure, retrying" );
+		}
+		
+	} while( status[2] );
+
+	return true;
+}
+
+
+//------------------------------------------------------------------------------
+bool DNAUSB::sendCode( HANDLE device, const unsigned char* code, const unsigned int size )
+{
+	unsigned char codePage[8] = { Report_Command, USBCommandCodePage };
+
+	unsigned int pos;
+	for( pos=0; pos<64; pos += 4 )
+	{
+		// first command zero page load
+		codePage[2] = BootloaderCommandLoadZeroPage;
+		codePage[3] = code[pos];
+		codePage[4] = code[pos + 1];
+		codePage[5] = code[pos + 2];
+		codePage[6] = code[pos + 3];
+		waitForCommandInterval();
+		if ( !HidD_SetFeature(device, codePage, 7) && GetLastError() != 31 )
+		{
+			Log( "failed to sendCode page zero w/%d", GetLastError() );
+			return false;
+		}
+	}
+
+	Log( "sent page zero", pos%64 );
+
+	unsigned short address = 64;
+	
+	// now load up the rest
+	while( pos < size )
+	{
+		codePage[2] = pos % 64;
+		codePage[3] = code[pos];
+		codePage[4] = code[pos + 1];
+		codePage[5] = code[pos + 2];
+		codePage[6] = code[pos + 3];
+		waitForCommandInterval();
+		if ( !HidD_SetFeature(device, codePage, 7) && GetLastError() != 31 )
+		{
+			Log( "failed to sendCode <1> w/%d", GetLastError() );
+			return false;
+		}
+
+		pos += 4;
+
+		if ( !(pos%64) )
+		{
+			codePage[2] = BootloaderCommandCommitPage;
+			codePage[3] = (unsigned char)address;
+			codePage[4] = (unsigned char)(address >> 8);
+			waitForCommandInterval();
+			if ( !HidD_SetFeature(device, codePage, 7) && GetLastError() != 31 )
+			{
+				Log( "failed to sendCode <2> w/%d", GetLastError() );
+				return false;
+			}
+
+			address += 64;
+
+			Log( "comitted page [%d/%d]", pos/64, size/64 );
+		}
+	}
+
+	// commit final page, if it was not written
+	if ( pos%64 )
+	{
+		codePage[2] = BootloaderCommandCommitPage;
+		codePage[3] = (unsigned char)address;
+		codePage[4] = (unsigned char)(address >> 8);
+		waitForCommandInterval();
+		if ( !HidD_SetFeature(device, codePage, 7) && GetLastError() != 31 )
+		{
+			Log( "failed to sendCode <3> w/%d", GetLastError() );
 			return false;
 		}
 	}
@@ -237,9 +338,10 @@ bool DNAUSB::sendCode( HANDLE device, const unsigned char* code, const unsigned 
 bool DNAUSB::sendData( HANDLE device, const unsigned char data[64] )
 {
 	unsigned char command[66] = { Report_Command, USBCommandWriteData };
-	memcpy( command + 2, data, 64 );
+	memcpy( command + 2, data, 6 );
 
-	if ( !HidD_SetFeature(device, command, 66) &&  GetLastError() != 31 )
+	waitForCommandInterval();
+	if ( !HidD_SetFeature(device, command, 8) &&  GetLastError() != 31 )
 	{
 		Log( "failed to send command w/%d", GetLastError() );
 		return false;
@@ -254,7 +356,8 @@ bool DNAUSB::getData( HANDLE device, unsigned char data[64] )
 	char message[66] = { Report_Command };
 	for(;;)
 	{
-		if ( !HidD_GetFeature(device, message, 66) )
+		waitForCommandInterval();
+		if ( !HidD_GetFeature(device, message, 8) )
 		{
 			Log( "failed to poll for available data w/%d", GetLastError() );
 			return false;

@@ -35,12 +35,12 @@ int usage()
 }
 
 //------------------------------------------------------------------------------
-void loaderSleep( unsigned int seconds )
+void loaderSleep( unsigned int microSeconds )
 {
 #ifdef _WIN32
-	Sleep(seconds * 1000);
+	Sleep( microSeconds );
 #else
-	sleep(seconds);
+	usleep( microSeconds );
 #endif
 }
 
@@ -165,7 +165,7 @@ int main( int argc, char *argv[] )
 				if ( DNAUSB::sendEnterBootloader(handle) )
 				{
 					Log( "Sending reset command" );
-					loaderSleep( 2 );
+					loaderSleep( 2000 );
 					looping = true;
 				}
 				else
@@ -185,9 +185,8 @@ int main( int argc, char *argv[] )
 
 				if ( trying )
 				{
-					unsigned char checksum;
-					DNAUSB::sendCode( handle, (unsigned char *)(chunk->data), chunk->size, &checksum );
-					DNAUSB::sendEnterApp( handle, checksum );
+					DNAUSB::sendCode( handle, (unsigned char *)(chunk->data), chunk->size );
+					DNAUSB::sendEnterApp( handle );
 				}
 
 				break;

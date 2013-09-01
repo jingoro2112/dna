@@ -138,28 +138,31 @@ struct EEPROMConstants
 		rampTimeout = DEFAULT_RAMP_TIMEOUT;
 	}
 
+	//------------------------------------------------------------------------------
+	void swap( unsigned short* word )
+	{
+		*us = (*us>>8) | (*us<<8);
+	}
+	
+	//------------------------------------------------------------------------------
 	// set the byte-order properly for values that are in host OS
 	// format but need to go to the AVR 
-	void valuesToHardware()
+	void transposeValues()
 	{
-		ballsPerSecondX10 = htons( ballsPerSecondX10 );
-		enhancedTriggerTimeout = htons( enhancedTriggerTimeout );
-		ABSTimeout = htons( ABSTimeout );
-		rampTimeout = htons( rampTimeout );
-	}
-
-	// set the byte-order properly for values that came from the AVR
-	// and need to be worked with on the hosthardware
-	void valuesFromHardware()
-	{
-		ballsPerSecondX10 = ntohs( ballsPerSecondX10 );
-		enhancedTriggerTimeout = ntohs( enhancedTriggerTimeout );
-		ABSTimeout = ntohs( ABSTimeout );
-		rampTimeout = ntohs( rampTimeout );
+		if ( htons(0x1234) != 0x1234 )
+		{
+			// little-endian machines are already in the right order
+			return;
+		}
+		swap( &ballsPerSecondX10 );
+		swap( &enhancedTriggerTimeout );
+		swap( &ABSTimeout );
+		swap( &rampTimeout );
 	}
 
 #endif
 };
+//__attribute__((__packed__))
 
 #ifdef _WIN32
 #pragma pack(pop)

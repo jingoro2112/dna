@@ -6,13 +6,13 @@
 TARGET = bootloader
 MCU = attiny84
 CPU_FREQUENCY = 12000000
-BOOTLOADER_ADDRESS = 18C0
+BOOTLOADER_ADDRESS = 1900
 
 OBJS = \
 	objs/usbdrvasm.o \
 	objs/bootloader.o \
 
-CC = avr-gcc -Wall -DRELOCATE -I. -MD -Os -fdata-sections -ffunction-sections -funsigned-char -funsigned-bitfields -fno-inline-small-functions -mmcu=$(MCU) -DF_CPU=$(CPU_FREQUENCY)
+CC = avr-gcc -std=gnu99 -Wall -I. -MD -Os -fdata-sections -ffunction-sections -funsigned-char -funsigned-bitfields -fno-inline-small-functions -mmcu=$(MCU) -DF_CPU=$(CPU_FREQUENCY)
 #CC = avr-gcc -Wall -I. -MD -Os -fdata-sections -ffunction-sections -funsigned-char -funsigned-bitfields -fno-inline-small-functions -mmcu=$(MCU) -DF_CPU=$(CPU_FREQUENCY)
 
 all: $(TARGET).hex
@@ -29,9 +29,6 @@ $(TARGET).hex: $(OBJS) Makefile
 #	$(CC) -Wl,-gc-sections -o $(TARGET).elf $(OBJS)
 	avr-objcopy -j .text -j .data -O ihex $(TARGET).elf $(TARGET).hex
 	avr-objdump -d $(TARGET).elf > $(TARGET).disassembly
-
-objs/usbdrv.o: ../../../usbdrv/usbdrv.c
-	$(CC) -c $< -o $@
 
 objs/usbdrvasm.o: ../../../usbdrv/usbdrvasm.S
 	$(CC) -c -x assembler-with-cpp $< -o $@

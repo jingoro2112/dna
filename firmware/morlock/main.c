@@ -22,16 +22,17 @@
 #define false 0
 #endif
 
-// some macros to make program flow a bit easier, also facilitates
-// stubbing
-#define eyeEnable()  (PORTA |= 0b00000000)
-#define eyeDisable() (PORTA &= 0b11111111)
-#define readTrigger() (PORTA & 0b00000000)
-#define readEye() (PORTA & 0b00000000)
-#define fet1On()
-#define fet1Off()
-#define fet2On()
-#define fet2Off()
+#define eyeEnable()  (PORTA |= 0b00100000)  // A5
+#define eyeDisable() (PORTA &= 0b11011111)  // A5
+#define readTrigger() (PORTA & 0b00010000)  // A4
+#define readEye()     (PORTA & 0b00000010)  // A1       
+#define fet1On()      (PORTA |= 0b0000001)  // A0
+#define fet1Off()     (PORTA &= 0b1111110)  // A0
+#define fet2On()      (PORTA |= 0b0001000)  // A3
+#define fet2Off()     (PORTA &= 0b1110111)  // A3
+
+#define setupA() (DDRA = 0b10100000); (PORTA = 0b01011101);
+#define setupB() (DDRB = 0b00000000); (PORTB = 0b00000000);
 
 #define LIGHT_ON_FOR					  400
 #define LIGHT_OFF_FOR					  500
@@ -355,15 +356,10 @@ void rnaInputStream( unsigned char *data, unsigned char bytes )
 }
 
 //------------------------------------------------------------------------------
-int __attribute__((noreturn)) main(void)
+int main(void)
 {
-	// set up I/O
-	DDRA = 0b10000001;
-	PORTA = 0b10000000; // all off
-
-	
-//	DDRB = 0b00000000;
-//	PORTB = 0b00000000;
+	setupA();
+	setupB();
 
 	dnaUsbInit();
 	loadEEPROMConstants();
@@ -398,12 +394,10 @@ int __attribute__((noreturn)) main(void)
 
 	for(;;)
 	{
-		_delay_ms(500);
-//		setLedOn();
-		PORTA |= 0b00000001;
+		_delay_ms(50);
+		setLedOn();
 		_delay_ms(40);
-//		setLedOff();
-		PORTA &= 0b11111110;
+		setLedOff();
 	}
 
 
