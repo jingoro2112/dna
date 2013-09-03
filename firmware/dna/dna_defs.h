@@ -12,7 +12,7 @@
 #define DNA_AT84_v1_00				0x03
 #define BOOTLOADER_DNA_AT84_v1_00	0x04
 
-#define BOOTLOADER_ENTRY			0xC80
+#define BOOTLOADER_ENTRY			0xCA0
 
 #define DNA_PRODUCT_MASK			0x7F
 #define DNA_RTS						0x80
@@ -20,7 +20,7 @@
 //------------------------------------------------------------------------------
 enum BootloaderCommands
 {
-	BootloaderCommandLoadZeroPage = 0xA5,
+	BootloaderCommandLoadPage = 0xA4,
 	BootloaderCommandCommitPage = 0xA6,
 };
 
@@ -53,7 +53,7 @@ enum RNABusDevices
 //------------------------------------------------------------------------------
 enum USBReports
 {
-	Report_Command = 1,
+	Report_Command = 0x01,
 };
 
 //------------------------------------------------------------------------------

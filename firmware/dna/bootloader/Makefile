@@ -6,7 +6,7 @@
 TARGET = bootloader
 MCU = attiny84
 CPU_FREQUENCY = 12000000
-BOOTLOADER_ADDRESS = 1900
+BOOTLOADER_ENTRY = 1940
 
 OBJS = \
 	objs/usbdrvasm.o \
@@ -25,7 +25,7 @@ clean:
 	@-rm -f $(OBJS) $(TARGET).hex $(TARGET).elf $(TARGET).disassembly
 	
 $(TARGET).hex: $(OBJS) Makefile
-	$(CC) -T avr25_custom.x  -Wl,--section-start=.text=$(BOOTLOADER_ADDRESS),-gc-sections -o $(TARGET).elf $(OBJS)
+	$(CC) -T avr25_custom.x  -Wl,--section-start=.text=$(BOOTLOADER_ENTRY),-gc-sections -o $(TARGET).elf $(OBJS)
 #	$(CC) -Wl,-gc-sections -o $(TARGET).elf $(OBJS)
 	avr-objcopy -j .text -j .data -O ihex $(TARGET).elf $(TARGET).hex
 	avr-objdump -d $(TARGET).elf > $(TARGET).disassembly

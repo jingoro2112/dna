@@ -4,10 +4,11 @@
  * and in the LICENCE.txt file included with this distribution
  */
 
+#include "../../usbdrv/usbdrv.c"
+
 #include "dna.h"
 #include "usb.h"
 #include "rna.h"
-#include "../../usbdrv/usbdrv.c"
 
 
 #include <util/delay.h>
@@ -87,7 +88,7 @@ unsigned char usbFunctionWrite( unsigned char *data, unsigned char len )
 	{
 		if ( s_status & Status_DataToRNA )
 		{
-			rnaSend( s_status & 0xF, data + consumed, len - consumed );
+//			rnaSend( s_status & 0xF, data + consumed, len - consumed );
 		}
 		else
 		{

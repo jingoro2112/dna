@@ -43,7 +43,7 @@ void __init()
 	
 	// give the pin a chance to stabilize and clock in, can't be too careful
 	_delay_us(50);
-	if ( !(PINB & 0b00001000) )
+	if ( 0 )//!(PINB & 0b00001000) )
 	{
 bootloader_jump:
 		asm	volatile ("ijmp" ::"z" (BOOTLOADER_ENTRY)); // jump to bootloader!

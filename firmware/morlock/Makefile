@@ -10,8 +10,8 @@ OBJS = \
 	objs/dna.o \
 	objs/usb.o \
 	objs/main.o \
-	objs/a2d.o \
-	objs/rna.o \
+#	objs/a2d.o \
+#	objs/rna.o \
 
 MCU = attiny84
 CPU_FREQUENCY = 12000000

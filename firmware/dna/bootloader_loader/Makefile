@@ -11,7 +11,7 @@ OBJS = \
 MCU = attiny84
 CPU_FREQUENCY = 12000000
 
-CC = avr-gcc -std=gnu99 -Wall -I../dna -MD -O0 -fdata-sections -ffunction-sections -funsigned-char -funsigned-bitfields -fno-inline-small-functions -mmcu=$(MCU) -DF_CPU=$(CPU_FREQUENCY)
+CC = avr-gcc -std=gnu99 -Wall -I../dna -MD -Os -fdata-sections -ffunction-sections -funsigned-char -funsigned-bitfields -fno-inline-small-functions -mmcu=$(MCU) -DF_CPU=$(CPU_FREQUENCY)
 
 all: $(TARGET).hex
 
@@ -29,5 +29,5 @@ $(TARGET).hex: $(OBJS)
 #	..\..\loader\loader -i $(TARGET).hex
 
 objs/main.o: main.c
-	../../../hex2header/hex2header ../bootloader/bootloader.hex bootloader_code.h
+#	../../../hex2header/hex2header ../bootloader/bootloader.hex bootloader_code.h
 	$(CC) -c $< -o $@

@@ -358,19 +358,20 @@ void rnaInputStream( unsigned char *data, unsigned char bytes )
 //------------------------------------------------------------------------------
 int main(void)
 {
-	setupA();
-	setupB();
+//	setupA();
+//	setupB();
 
 	dnaUsbInit();
+
 	loadEEPROMConstants();
 
 	// set up timer 0 to tick exactly 6000 per second:
 	// 12000000 / (8 * 250) = 6000
 	// accomplished by using timer0 in waveform generation mode 2
-	TCCR0B = 1<<CS01; // set 8-bit timer prescaler to div/8
-	OCR0A = 250;
-	TCCR0A = 1<<WGM01; // mode 2, reset counter when it reaches OCROA
-	TIMSK0 = 1<<OCIE0A; // fire off an interrupt every time it matches 250, thus dividing by exactly 2000 (overflow would work too)
+//	TCCR0B = 1<<CS01; // set 8-bit timer prescaler to div/8
+//	OCR0A = 250;
+//	TCCR0A = 1<<WGM01; // mode 2, reset counter when it reaches OCROA
+//	TIMSK0 = 1<<OCIE0A; // fire off an interrupt every time it matches 250, thus dividing by exactly 2000 (overflow would work too)
 	
 //	a2dSetChannel( 6 );
 //	a2dSetPrescaler( A2D_PRESCALE_16 ); 
@@ -394,10 +395,12 @@ int main(void)
 
 	for(;;)
 	{
-		_delay_ms(50);
-		setLedOn();
-		_delay_ms(40);
-		setLedOff();
+		usbPoll();
+
+//		_delay_ms(500);
+//		setLedOn();
+//		_delay_ms(40);
+//		setLedOff();
 	}
 
 
@@ -496,14 +499,6 @@ ISR( ADC_vect )
 // when the gun is cycling none of that logic will be engaged.
 ISR( TIM0_COMPA_vect )
 {
-	usbPoll();
-	return;
-
-
-
-
-
-	
 	// timers at the top have a very high resolution
 	if ( refireBox )
 	{

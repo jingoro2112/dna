@@ -34,15 +34,15 @@ const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
 	0x75, 0x08,				// REPORT_SIZE (8)
 
 	0x85, Report_Command,	// REPORT_ID
-	0x95, 0x06,				// REPORT_COUNT (pos[1], word[2], word[2])
+	0x95, 0x06,				// REPORT_COUNT (ID, index/command, word[2], word[2])
 	0x09, 0x00,				// USAGE (Undefined)
 	0xb2, 0x02, 0x01,		// FEATURE (Data,Var,Abs,Buf)
 
 	0xc0					// END_COLLECTION
 };
 
-static int g_pageZero[32]; // retain page zero (ISR) in RAM, commit only after load is complete and validated
-static unsigned char g_pageZeroIndex;
+//static int g_pageZero[32]; // retain page zero (ISR) in RAM, commit only after load is complete and validated
+//static unsigned char g_pageZeroIndex;
 static unsigned char s_replyBuffer[4];
 
 //------------------------------------------------------------------------------
@@ -75,49 +75,50 @@ unsigned char usbFunctionSetup( unsigned char data[8] )
 //------------------------------------------------------------------------------
 unsigned char usbFunctionWrite( unsigned char *data, unsigned char len )
 {
-	data++;
-	if ( *data == USBCommandEnterApp ) // being asked to commit the code update and jump to the app
-	{
-		cli();
+	data++; // skip header, which in this case is always 'Report_Command'
+	unsigned char index = *data++;
 
-		// now safe to install page 0 (interrupt vector table)
-		// overwriting our USB hack
-		for( len=0; len<32; len++ ) // re-using param saves stack-frame constructions opcodes
+	cli();
+
+	if ( index == BootloaderCommandCommitPage ) // faux index indicating we should commit the data we've been loading
+	{
+		unsigned int page = *(unsigned int*)data; // where to write this page
+		data += 2;
+
+		commitPage( page );
+		
+		if ( page == 0 )
 		{
-			boot_page_fill( len*2, g_pageZero[len] );
+			// okay that was page zero (by definition the last uploaded
+			// page, since it will render our current ISR unusable)
+			// checksum the entire in-place image before executing it
+			index = 0;
+			for( unsigned int i=0; i<*(unsigned int*)data; i++ )
+			{
+				index += pgm_read_byte( i );
+			}
+
+			data += 2;
+			
+			if ( index != *data )
+			{
+				asm volatile ("ijmp" ::"z" (BOOTLOADER_ENTRY)); // WARNING! DANGER! RESTART!
+			}
+			else
+			{
+				asm volatile ("ijmp" ::"z" (0)); // in with both feet...
+			}
 		}
-
-		commitPage( 0 );
-
-		asm volatile ("ijmp" ::"z" (0)); // jump to code start
 	}
-
-	// else it is a code page, the only other recognized command
-	// for the bootloader
-
-	data++;
-	unsigned char pos = *data++;
-	unsigned int w1 = *(unsigned int *)data;
-	unsigned int w2 = *(unsigned int *)(data + 2);
-
-	// if command checksum is good, do it
-	if ( pos == BootloaderCommandCommitPage )
+	else
 	{
-		commitPage( w1 );
-	}
-	else if ( pos == BootloaderCommandLoadZeroPage )
-	{
-		g_pageZero[g_pageZeroIndex++] = w1;
-		g_pageZero[g_pageZeroIndex++] = w2;
-	}
-	else // pos is an actual code position
-	{
-		boot_page_fill( pos, w1 );
-		pos += 2;
-		boot_page_fill( pos, w2 );
+		boot_page_fill( index, *(unsigned int *)data );
+		boot_page_fill( index + 2, *(unsigned int *)(data + 2) );
 	}
 
-	return 1;
+	sei();
+
+	return 1; // no need to check stream, command is always exactly 7 bytes long to fit in a single pass
 }
 
 // manually locate the reset vector, since we took out the automatic
@@ -137,12 +138,21 @@ void ResetVector (void)
 // PC space, not address space!
 const PROGMEM int isrJump[] =
 {
-	0xC008, // c0 08  rjmp +16
+	0xC008, // 08 c0  rjmp +16  -- trampoline for RESET vector
 
-	0x93EF, // ef 93  push r30   -- INT0, push r30/31
+	0x93EF, // ef 93  push r30   -- INT0 redirected to high ram with an ICALL
 	0x93FF, // ff 93  push r31
-	0xEFEE, // ee ef  ldi r30, 0xFE 
-	0xE0FC, // fc e0  ldi r31, 0x0C
+
+
+	
+//	0xEFEE, // ee ef  ldi r30, 0xFE 
+//	0xE0FC, // fc e0  ldi r31, 0x0C
+
+
+0xE1EE,//      ee e1           ldi     r30, 0x1E       ; 30
+0xE0FD,//1cc6:       fd e0           ldi     r31, 0x0D       ; 13
+
+	
 	0x9509, // 09 95  icall         -- an icall, so it can be reached WAAAY at the top of Flash
 	0x91FF, // ff 91  pop r31
 	0x91EF, // ef 91  pop r30
@@ -151,7 +161,6 @@ const PROGMEM int isrJump[] =
 	0xE8E0, // e0 e8  ldi r30, 0x80	-- ijmp to the bootloader
 	0xE0FC, // fc e0  ldi r31, 0x0C
 	0x9409, // 09 94  ijmp
-
 };
 
 //------------------------------------------------------------------------------
@@ -161,7 +170,7 @@ int __attribute__((OS_main)) main(void)
 	
 	const int* isr = isrJump; // read array from program memory, saves copy step
 	unsigned char i;
-	for( i=0; i<64; i+=2 )
+	for( i=0; i<24; i+=2 )
 	{
 		boot_page_fill( i, pgm_read_word(isr++) ); // rewrite the ISR to jump way up to our USB int0 routine
 	}

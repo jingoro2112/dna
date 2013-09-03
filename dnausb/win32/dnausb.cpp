@@ -169,7 +169,7 @@ void DNAUSB::closeDevice( DNADEVICE device )
 void waitForCommandInterval()
 {
 	unsigned int current = GetTickCount();
-	if ( (s_lastCommandTimestamp + 10) > current )
+//	if ( (s_lastCommandTimestamp + 10) > current )
 	{
 		Sleep(10);
 	}
@@ -259,77 +259,86 @@ bool sendWithRetry( DNADEVICE device, unsigned char *command )
 //------------------------------------------------------------------------------
 bool DNAUSB::sendCode( HANDLE device, const unsigned char* code, const unsigned int size )
 {
-	unsigned char codePage[8] = { Report_Command, USBCommandCodePage };
-
-	unsigned int pos;
-	for( pos=0; pos<64; pos += 4 )
-	{
-		// first command zero page load
-		codePage[2] = BootloaderCommandLoadZeroPage;
-		codePage[3] = code[pos];
-		codePage[4] = code[pos + 1];
-		codePage[5] = code[pos + 2];
-		codePage[6] = code[pos + 3];
-		waitForCommandInterval();
-		if ( !HidD_SetFeature(device, codePage, 7) && GetLastError() != 31 )
-		{
-			Log( "failed to sendCode page zero w/%d", GetLastError() );
-			return false;
-		}
-	}
-
-	Log( "sent page zero", pos%64 );
+	unsigned char codePage[8] = { Report_Command };
 
 	unsigned short address = 64;
-	
-	// now load up the rest
+	unsigned int pos = 64;
+
 	while( pos < size )
 	{
-		codePage[2] = pos % 64;
-		codePage[3] = code[pos];
-		codePage[4] = code[pos + 1];
-		codePage[5] = code[pos + 2];
-		codePage[6] = code[pos + 3];
-		waitForCommandInterval();
+		for( int i=0; i<32; i += 2 )
+		{
+			if ( pos < size )
+			{
+				codePage[1] = i*2;
+				codePage[2] = code[pos++];
+				codePage[3] = code[pos++];
+				codePage[4] = code[pos++];
+				codePage[5] = code[pos++];
+			}
+
+			if ( !HidD_SetFeature(device, codePage, 7) && GetLastError() != 31 )
+			{
+				Log( "failed to sendCode <1> w/%d", GetLastError() );
+				return false;
+			}
+		}
+
+		Log( "page[%d/%d]", pos / 64, size / 64 );
+
+		codePage[1] = BootloaderCommandCommitPage;
+		*(unsigned short *)(codePage + 2) = address;
+		address += 64;
+
 		if ( !HidD_SetFeature(device, codePage, 7) && GetLastError() != 31 )
 		{
 			Log( "failed to sendCode <1> w/%d", GetLastError() );
 			return false;
 		}
 
-		pos += 4;
-
-		if ( !(pos%64) )
-		{
-			codePage[2] = BootloaderCommandCommitPage;
-			codePage[3] = (unsigned char)address;
-			codePage[4] = (unsigned char)(address >> 8);
-			waitForCommandInterval();
-			if ( !HidD_SetFeature(device, codePage, 7) && GetLastError() != 31 )
-			{
-				Log( "failed to sendCode <2> w/%d", GetLastError() );
-				return false;
-			}
-
-			address += 64;
-
-			Log( "comitted page [%d/%d]", pos/64, size/64 );
-		}
+		Sleep( 10 );
 	}
 
-	// commit final page, if it was not written
-	if ( pos%64 )
+	pos = 0;
+	for( int i=0; i<32; i += 2 )
 	{
-		codePage[2] = BootloaderCommandCommitPage;
-		codePage[3] = (unsigned char)address;
-		codePage[4] = (unsigned char)(address >> 8);
-		waitForCommandInterval();
+		codePage[1] = BootloaderCommandLoadPage;
+		
+		if ( pos < size )
+		{
+			codePage[1] = i*2;
+			codePage[2] = code[pos++];
+			codePage[3] = code[pos++];
+			codePage[4] = code[pos++];
+			codePage[5] = code[pos++];
+		}
+
 		if ( !HidD_SetFeature(device, codePage, 7) && GetLastError() != 31 )
 		{
-			Log( "failed to sendCode <3> w/%d", GetLastError() );
+			Log( "failed to sendCode <1> w/%d", GetLastError() );
 			return false;
 		}
 	}
+
+	codePage[1] = BootloaderCommandCommitPage;
+	codePage[2] = 0;
+	codePage[3] = 0;
+	*(unsigned short *)(codePage + 4) = size;
+	codePage[6] = 0;
+	for( int j=0; j<size; j++ )
+	{
+		codePage[6] += code[j];
+	}
+
+	if ( !HidD_SetFeature(device, codePage, 7) && GetLastError() != 31 )
+	{
+		Log( "failed to sendCode <1> w/%d", GetLastError() );
+		return false;
+	}
+
+	Log( "comitted zero page" );
+
+	Sleep( 10 );
 
 	return true;
 }
