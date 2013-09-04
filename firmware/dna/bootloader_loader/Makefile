@@ -29,5 +29,5 @@ $(TARGET).hex: $(OBJS)
 #	..\..\loader\loader -i $(TARGET).hex
 
 objs/main.o: main.c
-#	../../../hex2header/hex2header ../bootloader/bootloader.hex bootloader_code.h
+	../../../hex2header/hex2header ../bootloader/bootloader.hex bootloader_code.h
 	$(CC) -c $< -o $@

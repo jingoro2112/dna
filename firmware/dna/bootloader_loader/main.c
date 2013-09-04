@@ -17,7 +17,6 @@
 //------------------------------------------------------------------------------
 int __attribute__((OS_main)) main()
 {
-	cli();
 	unsigned int address = g_origin;
 	unsigned int pos = 0;
 	const int* data = g_data;

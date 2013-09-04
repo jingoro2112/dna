@@ -26,7 +26,8 @@ void dnaUsbQueueData( unsigned char* data, unsigned char len );
 extern volatile unsigned char g_sendQueueLen;
 #define dnaUsbSendQueueBusy() (g_sendQueueLen != 0)
 
-unsigned char dnaUsbInputSetup( unsigned char *data, unsigned char len );
+unsigned char dnaUsbInputSetup( unsigned char dataSize, unsigned char *data, unsigned char len );
 void dnaUsbInputStream( unsigned char *data, unsigned char len );
+void dnaUsbCommand( unsigned char command, unsigned char data[5] );
 
 #endif

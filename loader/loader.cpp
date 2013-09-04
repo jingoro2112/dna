@@ -40,7 +40,7 @@ const unsigned char c_bootJumper[]=
 	0xf1, 0xf7, // brne	.-4      	; 0x384 <__init+0x1c>
 	0xb3, 0x99, // sbic	0x16, 3	; 22
 	0x03, 0xc0, // rjmp	.+6      	; 0x392 <__init+0x2a>
-	0xe0, 0xe8, // ldi	r30, 0x80	; 96
+	0xe0, 0xea, // ldi	r30, 0xA0	; 96
 	0xfc, 0xe0, // ldi	r31, 0x0C	; 12
 	0x09, 0x94, // ijmp
 };
@@ -87,7 +87,7 @@ bool checkDNAImage( const unsigned char* image, const unsigned int len, char* er
 }
 
 //------------------------------------------------------------------------------
-DNADEVICE Loader::openDevice( char* product )
+DNADEVICE openDevice( char* product )
 {
 	DNADEVICE handle = INVALID_DNADEVICE_VALUE;
 

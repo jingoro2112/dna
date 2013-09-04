@@ -11,6 +11,7 @@
 #include <windows.h>
 #define DNADEVICE HANDLE
 #define INVALID_DNADEVICE_VALUE INVALID_HANDLE_VALUE
+
 #else
 //#include <libusb.h>
 //#define DNADEVICE libusb_device_handle*
@@ -22,8 +23,6 @@
 
 #endif
 
-#define DNAUSB_DATA_SIZE 64
-
 namespace DNAUSB
 {
 
@@ -32,15 +31,18 @@ void closeDevice( DNADEVICE device );
 	
 bool getProductId( DNADEVICE device, unsigned char *id );
 
-bool sendEnterApp( DNADEVICE device );
 bool sendEnterBootloader( DNADEVICE device );
 
+// used just for the bootloader
 bool sendCode( DNADEVICE device, const unsigned char* code, const unsigned int size );
 
-bool sendData( DNADEVICE device, const unsigned char data[64] );
-bool getData( DNADEVICE device, unsigned char data[64] );
+bool sendData( DNADEVICE device, const unsigned char* data, const unsigned char size );
+bool getData( DNADEVICE device, unsigned char* data, unsigned char* size =0 );
 
-void setLoggingCallback( void (*callback)(const char* msg) );
+bool sendCommand( DNADEVICE device, const unsigned char command, const unsigned char data[5] =0 );
+
+bool HID_GetFeature( DNADEVICE device, unsigned char* buf, unsigned int len );
+bool HID_SetFeature( DNADEVICE device, unsigned char* buf, unsigned int len );
 
 };
 

@@ -49,14 +49,14 @@ int main( int argc, char *argv[] )
 {
 	MainArgs args( argc, argv );
 
-	if ( !args.isSet("-v") )
-	{
-		DNAUSB::setLoggingCallback( 0 );
-	}
-
 	if ( args.isSet("-?") )
 	{
 		return usage();
+	}
+
+	if ( !args.isSet("-v") )
+	{
+		Log.setCallback( 0 );
 	}
 
 	char image[256] = "application.hex";
@@ -67,19 +67,19 @@ int main( int argc, char *argv[] )
 	{
 		if ( !infile.fileToBuffer(image) )
 		{
-			Log( "Could not read [%s]", image );
+			printf( "Could not read [%s]\n", image );
 			return -1;
 		}
 
 		if ( !ReadHex::parse( chunklist, infile.c_str(), infile.size() ) )
 		{
-			Log( "Could not parse [%s]", image );
+			printf( "Could not parse [%s]\n", image );
 			return -1;
 		}
 
 		if ( chunklist.count() != 1 )
 		{
-			Log( "multiple chunks not supported" );
+			printf( "multiple chunks not supported\n" );
 			return -1;
 		}
 		chunk = chunklist.getFirst();
@@ -89,7 +89,7 @@ int main( int argc, char *argv[] )
 			char err[256];
 			if ( !Loader::checkDNAImage(chunk->data, chunk->size, err) )
 			{
-				Log( "%s", err );
+				printf( "%s\n", err );
 				return -1;
 			}
 		}
@@ -106,7 +106,7 @@ int main( int argc, char *argv[] )
 		handle = Loader::openDevice( product );
 		if ( handle == INVALID_DNADEVICE_VALUE )
 		{
-			Log( "Could not open DNA device\n" );
+			printf( "Could not open DNA device\n" );
 			return -1;
 		}
 
@@ -114,12 +114,12 @@ int main( int argc, char *argv[] )
 		{
 			unsigned char data[64];
 			data[0] = 1;
-			DNAUSB::sendData( handle, data );
+			DNAUSB::sendData( handle, data, 64 );
 
 			memset( data, 0xFF, 64 );
 			DNAUSB::getData( handle, data );
 
-			Log( "0x%02X 0x%02X 0x%02X 0x%02X", (unsigned int)data[0], (unsigned int)data[1], (unsigned int)data[2], (unsigned int)data[3] );
+			printf( "0x%02X 0x%02X 0x%02X 0x%02X\n", (unsigned int)data[0], (unsigned int)data[1], (unsigned int)data[2], (unsigned int)data[3] );
 			return 0;
 		}
 
@@ -129,12 +129,12 @@ int main( int argc, char *argv[] )
 			for(;;)
 			{
 				unsigned int data[64];
-				DNAUSB::sendData( handle, (unsigned char *)data );
+				DNAUSB::sendData( handle, (unsigned char *)data, 64 );
 				DNAUSB::getData( handle, (unsigned char *)data );
 				data[0] &= 0x03FF;
 				avg = (avg * 30.f) + data[0];
 				avg /= 31.f;
-				Log( "%.2f\t%d", avg, (int)data[0] );
+				printf( "%.2f\t%d\n", avg, (int)data[0] );
 			}
 
 			return 0;
@@ -143,13 +143,13 @@ int main( int argc, char *argv[] )
 		unsigned char id;
 		if ( !DNAUSB::getProductId( handle, &id ) )
 		{
-			Log( "failed to get product id" );
+			printf( "failed to get product id\n" );
 			DNAUSB::closeDevice( handle );
 			handle = INVALID_DNADEVICE_VALUE;
 			break;
 		}
 
-		Log( "product[%s] ID[0x%02X]", product, id );
+		printf( "product[%s] ID[0x%02X]\n", product, id );
 
 		if (args.isSet("-r") ) // report only
 		{
@@ -161,16 +161,15 @@ int main( int argc, char *argv[] )
 			case OLED_AM88_v1_00:
 			case DNA_AT84_v1_00:
 			{
-				Log( "Commanding bootloader entry" );
+				printf( "Commanding bootloader entry\n" );
 				if ( DNAUSB::sendEnterBootloader(handle) )
 				{
-					Log( "Sending reset command" );
 					loaderSleep( 2000 );
 					looping = true;
 				}
 				else
 				{
-					Log( "Reset command failed" );
+					printf( "Reset command failed\n" );
 				}
 				
 				DNAUSB::closeDevice( handle );
@@ -181,12 +180,11 @@ int main( int argc, char *argv[] )
 			case BOOTLOADER_OLED_AM88_v1_00:
 			case BOOTLOADER_DNA_AT84_v1_00:
 			{
-				Log( "Loading executeable" );
+				printf( "Loading executable\n" );
 
 				if ( trying )
 				{
 					DNAUSB::sendCode( handle, (unsigned char *)(chunk->data), chunk->size );
-					DNAUSB::sendEnterApp( handle );
 				}
 
 				break;
@@ -194,7 +192,7 @@ int main( int argc, char *argv[] )
 
 			default:
 			{
-				Log( "Unrecognized device [0x%02X]", (unsigned int)id );
+				printf( "Unrecognized device [0x%02X]\n", (unsigned int)id );
 				break;
 			}
 		}

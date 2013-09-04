@@ -20,10 +20,8 @@
 //------------------------------------------------------------------------------
 enum BootloaderCommands
 {
-	BootloaderCommandLoadPage = 0xA4,
-	BootloaderCommandCommitPage = 0xA6,
+	BootloaderCommandCommitPage = 0xFE,
 };
-
 
 //------------------------------------------------------------------------------
 enum RNABusDevices
@@ -34,36 +32,20 @@ enum RNABusDevices
 	RNADeviceTELEMETRY = 0x4,
 };
 
-
-// pins on the DNA
-// B0  the clock input, unavailable for use
-// B1  D- USB pin
-// B2  D+ USB pin
-// B3  servo/RNA bus wire
-//
-// A0  Pin8 MOSFET control (active high)
-// A1  Pin3 input (pulled low with 3.6k)
-// A2  Pin5 direct out, general purpose
-// A3  Pin10 MOSFET control (active high)
-// A4  Pin7 direct out, general purpose
-// A5  Pin9 LED drive
-// A6  Onboard LED drive (active low)
-// A7  Battery Voltage input
-
 //------------------------------------------------------------------------------
 enum USBReports
 {
-	Report_Command = 0x01,
+	Report_DNA = 0x01,
+	Report_DNA_Data = 0x02,
 };
 
 //------------------------------------------------------------------------------
 enum DNAUSBCommands
 {
-	USBCommandCodePage = 1,
-	USBCommandEnterApp,
+	USBCommandGetID = 1,
 	USBCommandEnterBootloader,
-	USBCommandWriteData,
 	USBCommandRNACommand,
+	USBCommandUser,
 };
 
 //------------------------------------------------------------------------------
@@ -71,7 +53,6 @@ enum DNARNACommands
 {
 	RNACommandAppJump = 1,
 	RNACommandCodePageWrite,
-	
 };
 
 //------------------------------------------------------------------------------
@@ -81,9 +62,7 @@ enum StatusBits
 	Status_RNAAddressBit1 = 1<<1,
 	Status_RNAAddressBit2 = 1<<2,
 	Status_RNAAddressBit4 = 1<<3,
-	Status_DataFromMCUSetup = 1<<4,
-	Status_CommandToMCUSetup = 1<<5,
-	Status_DataToRNA = 1<<6,
+	Status_DataToRNA = 1<<4,
 };
 
 #endif
