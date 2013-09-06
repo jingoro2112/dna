@@ -8,6 +8,7 @@
  */
 
 #ifdef _WIN32
+#include <winsock2.h>
 #include <windows.h>
 #define DNADEVICE HANDLE
 #define INVALID_DNADEVICE_VALUE INVALID_HANDLE_VALUE

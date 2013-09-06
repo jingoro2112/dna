@@ -32,8 +32,8 @@ const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
 	0x26, 0xff, 0x00,		// LOGICAL_MAXIMUM (255)
 	0x75, 0x08,				// REPORT_SIZE (8)
 
-	0x85, Report_DNA,		// REPORT_ID
-	0x95, 0x07,				// REPORT_COUNT (ID, index/command, word[2], word[2])
+	0x85, REPORT_DNA,		// REPORT_ID
+	0x95, REPORT_DNA_SIZE,	// REPORT_COUNT (ID, index/command, word[2], word[2])
 	0x09, 0x00,				// USAGE (Undefined)
 	0xb2, 0x02, 0x01,		// FEATURE (Data,Var,Abs,Buf)
 
@@ -62,7 +62,7 @@ unsigned char usbFunctionSetup( unsigned char data[8] )
 	// Report_DNA inferred; only one command is legal, so don't
 	// bother parsing it
 
-	s_replyBuffer[0] = Report_DNA;
+	s_replyBuffer[0] = REPORT_DNA;
 	s_replyBuffer[1] = BOOTLOADER_DNA_AT84_v1_00;
 	usbMsgPtr = (usbMsgPtr_t)s_replyBuffer;
 
@@ -162,7 +162,8 @@ const PROGMEM int isrJump[] =
 	0x9508, // 08 95  ret
 
 	// RESET trampoline to bootloader
-	0xE8E0, // e0 e8  ldi r30, 0x80	-- ijmp to the bootloader
+
+	0xEAE0, // e0 ea  ldi r30, 0xA0       ; 160
 	0xE0FC, // fc e0  ldi r31, 0x0C
 	0x9409, // 09 94  ijmp
 };

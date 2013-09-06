@@ -32,12 +32,10 @@ enum RNABusDevices
 	RNADeviceTELEMETRY = 0x4,
 };
 
-//------------------------------------------------------------------------------
-enum USBReports
-{
-	Report_DNA = 0x01,
-	Report_DNA_Data = 0x02,
-};
+#define REPORT_DNA  0x01
+#define REPORT_DNA_SIZE 0x07
+#define REPORT_DNA_DATA 0x02
+#define REPORT_DNA_DATA_SIZE 0x82
 
 //------------------------------------------------------------------------------
 enum DNAUSBCommands

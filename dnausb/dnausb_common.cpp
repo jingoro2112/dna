@@ -18,9 +18,9 @@ extern SimpleLog Log;
 //------------------------------------------------------------------------------
 bool DNAUSB::getProductId( DNADEVICE device, unsigned char *id )
 {
-	unsigned char packet[8] = { Report_DNA };
+	unsigned char packet[8] = { REPORT_DNA };
 
-	if ( !HID_GetFeature(device, packet, 8) )
+	if ( !HID_GetFeature(device, packet, REPORT_DNA_SIZE + 1) )
 	{
 		Log( "failed to get status" );
 		return false;
@@ -33,11 +33,11 @@ bool DNAUSB::getProductId( DNADEVICE device, unsigned char *id )
 //------------------------------------------------------------------------------
 static bool sendSystemCommand( DNADEVICE device, const unsigned char cmd, const unsigned char param =0 )
 {
-	unsigned char comm[8] = { Report_DNA };
+	unsigned char comm[8] = { REPORT_DNA };
 	comm[1] = cmd;
 	comm[2] = param;
 	
-	if ( !DNAUSB::HID_SetFeature(device, comm, 8) )
+	if ( !DNAUSB::HID_SetFeature(device, comm, REPORT_DNA_SIZE + 1) )
 	{
 		Log( "failed to send command [%d]", (int)cmd );
 		return false;
@@ -55,7 +55,7 @@ bool DNAUSB::sendEnterBootloader( DNADEVICE device )
 //------------------------------------------------------------------------------
 bool DNAUSB::sendCode( DNADEVICE device, const unsigned char* code, const unsigned int size )
 {
-	unsigned char codePage[8] = { Report_DNA };
+	unsigned char codePage[8] = { REPORT_DNA };
 
 	// todo- some fancy down-count so this is done in a single pass
 	// rather than up from page 1 then second pass for page zero. like
@@ -82,7 +82,7 @@ bool DNAUSB::sendCode( DNADEVICE device, const unsigned char* code, const unsign
 				pos += 4; // so the printf reads properly
 			}
 
-			if ( !HID_SetFeature(device, codePage, 8) )
+			if ( !HID_SetFeature(device, codePage, REPORT_DNA_SIZE + 1) )
 			{
 				Log( "failed to sendCode <1>" );
 				return false;
@@ -95,7 +95,7 @@ bool DNAUSB::sendCode( DNADEVICE device, const unsigned char* code, const unsign
 		*(unsigned short *)(codePage + 2) = address;
 		address += 64;
 
-		if ( !HID_SetFeature(device, codePage, 8) )
+		if ( !HID_SetFeature(device, codePage, REPORT_DNA_SIZE + 1) )
 		{
 			Log( "failed to send page commit <1>" );
 			return false;
@@ -117,7 +117,7 @@ bool DNAUSB::sendCode( DNADEVICE device, const unsigned char* code, const unsign
 			codePage[5] = code[pos++];
 		}
 
-		if ( !HID_SetFeature(device, codePage, 8) )
+		if ( !HID_SetFeature(device, codePage, REPORT_DNA_SIZE + 1) )
 		{
 			Log( "failed to sendCode <2>" );
 			return false;
@@ -136,7 +136,7 @@ bool DNAUSB::sendCode( DNADEVICE device, const unsigned char* code, const unsign
 		codePage[6] += code[j];
 	}
 
-	if ( !HID_SetFeature(device, codePage, 8) )
+	if ( !HID_SetFeature(device, codePage, REPORT_DNA_SIZE + 1) )
 	{
 		Log( "failed to send page commit <2>" );
 		return false;
@@ -152,11 +152,11 @@ bool DNAUSB::sendCode( DNADEVICE device, const unsigned char* code, const unsign
 //------------------------------------------------------------------------------
 bool DNAUSB::sendData( DNADEVICE device, const unsigned char* data, const unsigned char size )
 {
-	unsigned char packet[131] = { Report_DNA_Data };
+	unsigned char packet[131] = { REPORT_DNA_DATA };
 	packet[1] = size;
 	memcpy( packet + 2, data, size );
 
-	if ( !HID_SetFeature(device, packet, 131) )
+	if ( !HID_SetFeature(device, packet, REPORT_DNA_DATA_SIZE + 1) )
 	{
 		Log( "failed to send data" );
 		return false;
@@ -168,7 +168,7 @@ bool DNAUSB::sendData( DNADEVICE device, const unsigned char* data, const unsign
 //------------------------------------------------------------------------------
 bool DNAUSB::sendCommand( DNADEVICE device, const unsigned char command, const unsigned char data[5] )
 {
-	unsigned char packet[8] = { Report_DNA };
+	unsigned char packet[8] = { REPORT_DNA };
 	packet[1] = USBCommandUser;
 	packet[2] = command;
 	if ( data )
@@ -176,7 +176,7 @@ bool DNAUSB::sendCommand( DNADEVICE device, const unsigned char command, const u
 		memcpy( packet + 3, data, 5 );
 	}
 
-	if ( !HID_SetFeature(device, packet, 8) )
+	if ( !HID_SetFeature(device, packet, REPORT_DNA_SIZE + 1) )
 	{
 		Log( "failed to send command" );
 		return false;
@@ -188,10 +188,10 @@ bool DNAUSB::sendCommand( DNADEVICE device, const unsigned char command, const u
 //------------------------------------------------------------------------------
 bool DNAUSB::getData( DNADEVICE device, unsigned char* data, unsigned char* size /*=0*/ )
 {
-	unsigned char message[131] = { Report_DNA_Data };
+	unsigned char message[131] = { REPORT_DNA_DATA };
 	for(;;)
 	{
-		if ( !DNAUSB::HID_GetFeature(device, message, 131) )
+		if ( !DNAUSB::HID_GetFeature(device, message, REPORT_DNA_DATA_SIZE + 1) )
 		{
 			Log( "failed to poll for available data" );
 			return false;

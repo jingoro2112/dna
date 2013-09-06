@@ -10,7 +10,7 @@
 #ifdef _WIN32
 
 #pragma once
-//#include <winsock2.h>
+#include <winsock2.h>
 #include <windows.h>
 #include <conio.h>
 #include <process.h>
@@ -83,15 +83,16 @@ inline int gettid()
 }
 
 //------------------------------------------------------------------------------
-inline const char* asciiDump( const char* data, unsigned int len, Cstr* str =0 )
+inline const char* asciiDump( const void* v, unsigned int len, Cstr* str =0 )
 {
+	char* data = (char *)v;
 	Cstr local;
 	Cstr *use = str ? str : &local;
 	use->clear();
 	for( unsigned int i=0; i<len; i++ )
 	{
 		use->appendFormat( "0x%08X: ", i );
-		char dump[17];
+		char dump[18];
 		unsigned int j;
 		for( j=0; j<16 && i<len; j++, i++ )
 		{
@@ -105,7 +106,9 @@ inline const char* asciiDump( const char* data, unsigned int len, Cstr* str =0 )
 			use->appendFormat( "   " );
 		}
 		i--;
-		use->appendFormat( ": %s\n", dump );
+		use->appendFormat( ": " );
+		use->append( dump );
+		use->append( "\n" );
 	}
 
 	if ( !str )

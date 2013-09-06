@@ -25,13 +25,13 @@ const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
 	0x26, 0xff, 0x00,              // LOGICAL_MAXIMUM (255)
 	0x75, 0x08,                    // REPORT_SIZE (8)
 
-	0x85, Report_DNA,			   // REPORT_ID
-	0x95, 0x07,                    // REPORT_COUNT fits in one go
+	0x85, REPORT_DNA,			   // REPORT_ID
+	0x95, REPORT_DNA_SIZE,         // REPORT_COUNT fits in one go
 	0x09, 0x00,                    // USAGE (Undefined)
 	0xb2, 0x02, 0x01,              // FEATURE (Data,Var,Abs,Buf)
 
-	0x85, Report_DNA_Data,		   // REPORT_ID
-	0x95, 0x82,                    // REPORT_COUNT
+	0x85, REPORT_DNA_DATA,		   // REPORT_ID
+	0x95, REPORT_DNA_DATA_SIZE,    // REPORT_COUNT
 	0x09, 0x00,                    // USAGE (Undefined)
 	0xb2, 0x02, 0x01,              // FEATURE (Data,Var,Abs,Buf)
 
@@ -67,7 +67,7 @@ unsigned char usbFunctionWrite( unsigned char *data, unsigned char len )
 	if ( s_dataTransferRemaining == 0 )
 	{
 		// start of a new transfer, what are we doing?
-		if ( *data == Report_DNA ) // it is a command
+		if ( *data == REPORT_DNA ) // it is a command
 		{
 			if ( data[1] == USBCommandUser )
 			{
@@ -93,8 +93,8 @@ unsigned char usbFunctionWrite( unsigned char *data, unsigned char len )
 		}
 
 		// it was Report_DNA_Data: throw it to the app
-		s_dataTransferRemaining = 130;
-		consumed = dnaUsbInputSetup( *data, data + 1, len - 2 ) + 2;
+		s_dataTransferRemaining = REPORT_DNA_DATA_SIZE + 1;
+		consumed = dnaUsbInputSetup( data[1], data + 2, len - 2 ) + 2;
 	}
 
 	if ( consumed < len )
@@ -120,27 +120,29 @@ unsigned char usbFunctionWrite( unsigned char *data, unsigned char len )
 //------------------------------------------------------------------------------
 unsigned char usbFunctionRead( unsigned char *data, unsigned char len )
 {
-	int i = 0;
-	if ( !s_dataTransferRemaining )
+	int i = 0; // default to 'nothing consumed'
+	
+	if ( !s_dataTransferRemaining ) // if this is the first request, determine what we are doing
 	{
-		if ( s_transferType == Report_DNA_Data )
+		if ( s_transferType == REPORT_DNA_DATA )
 		{
-			// straight data, just defer to whatever is queued up
-			s_dataTransferRemaining = 129;
-			data[0] = Report_DNA_Data;
-			data[1] = g_sendQueueLen;
-			i = 2;
+			// straight data, shift up whatever is queued (if anything)
+			s_dataTransferRemaining = (REPORT_DNA_DATA_SIZE - 1); // all data requests are fixed size, set up streaming
+			data[0] = REPORT_DNA_DATA; // type
+			data[1] = g_sendQueueLen; // how much was waiting to be shifted
+			i = 2; // 2 bytes consumed
 		}
 		else
 		{
-			// status request
-			data[0] = Report_DNA;
+			// status request, report hardware/firmware version
+			data[0] = REPORT_DNA;
 			data[1] = DNA_AT84_v1_00;
 			data[2] = g_sendQueueLen;
-			return len;
+			return len; // requests are sized to be single-pass, no further calls will be made after this
 		}
 	}
 
+	// fill in available space with any available data
 	for( ; i<len ; i++ )
 	{
 		if ( g_sendQueueLen )

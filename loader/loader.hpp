@@ -16,6 +16,7 @@ namespace Loader
 
 bool checkDNAImage( const unsigned char* image, const unsigned int len, char* err =0 );
 DNADEVICE openDevice( char* product =0 );
+char* stringFromId( const unsigned char id, char* buf );
 
 }
    

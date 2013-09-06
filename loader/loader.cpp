@@ -119,4 +119,44 @@ DNADEVICE openDevice( char* product )
 	return handle;
 }
 
+//------------------------------------------------------------------------------
+char* stringFromId( const unsigned char id, char* buf )
+{
+	switch( id )
+	{
+		case OLED_AM88_v1_00:
+		{
+			strcpy( buf, "ATMega88 OLED v1.00" );
+			break;
+		}
+
+		case BOOTLOADER_OLED_AM88_v1_00:
+		{
+			strcpy( buf, "Bootloader ATMega88 OLED v1.00" );
+			break;
+		}
+
+		case DNA_AT84_v1_00:
+		{
+			strcpy( buf, "ATTiny84a DNA v1.00" );
+			break;
+		}
+
+		case BOOTLOADER_DNA_AT84_v1_00:
+		{
+			strcpy( buf, "Bootloader ATTiny84a DNA v1.00" );
+			break;
+		}
+
+		default:
+		{
+			strcpy( buf, "<undefined>" );
+			break;
+		}
+	}
+
+	return buf;
+}
+
+
 }
