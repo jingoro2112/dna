@@ -45,16 +45,16 @@ unsigned char galloc( unsigned char size )
 	// set up the block size (including the 2-byte overhead) and jump
 	// free pointer up to next free block
 #if GENE_BLOCK_SIZE == 1
-	s_firstFree[0] = size + 2; 
+	s_firstFree[0] = size + 2; // bytes
 	s_firstFree += s_firstFree[0];
 #else
-	s_firstFree[0] = size;
+	s_firstFree[0] = size; // blocks
 	s_firstFree += (unsigned int)s_firstFree[0] * GENE_BLOCK_SIZE + 2;
 #endif
 
 	// prepare the next handle
 	s_firstFree[1] = ret + 1;
-	s_firstFree[1] &= 0x7F; // wrap at 127
+	s_firstFree[1] &= 0x7F; // wrap at 127 (and hope they don't have blasters)
 	
 	return ret;
 }
@@ -67,9 +67,9 @@ looprestart:
 	for( unsigned char *b = s_heapStart;
 		 b < s_firstFree;
 #if GENE_BLOCK_SIZE == 1
-		 b += *b )
+		 b += *b ) // jump forward 'size' bytes
 #else
-		 b += (unsigned int)*b * GENE_BLOCK_SIZE + 2 )
+		 b += (unsigned int)*b * GENE_BLOCK_SIZE + 2 ) // jump forward 'blocks*blocksize + 2 bytes of overhead bytes
 #endif
 	{
 		if ( handle ) // looking for a handle, not actually defragging
@@ -107,9 +107,9 @@ looprestart:
 unconditionalCondense: 
 				
 #if GENE_BLOCK_SIZE == 1
-				size = *b;
+				size = *b; // size is stored as size
 #else
-				size = *b * GENE_BLOCK_SIZE + 2;
+				size = *b * GENE_BLOCK_SIZE + 2; // size is stored as blocks, must compute bytes
 #endif
 				from = b + size; // starting at the next block
 				to = b; // replace to here

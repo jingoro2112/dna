@@ -5,16 +5,16 @@
 
 CPP = g++ -m32 -O3 -Wall -Werror -MD -c
 
-all: loader
+all: splice
 
 -include objs/*.d
 
 clean:  
-	@-rm -rf objs loader
+	@-rm -rf objs splice
 	@-mkdir objs
 
-loader: objs/loader.o
-	g++ -m32 objs/loader.o ../../dnausb/mac/libdnausb.a -o loader -framework IOKit -framework CoreFoundation -framework CoreServices
+splice: objs/loader.o
+	g++ -m32 objs/splice.o ../../dnausb/mac/libdnausb.a -o splice -framework IOKit -framework CoreFoundation -framework CoreServices
 
-objs/loader.o: ../loader.cpp
+objs/splice.o: ../splice.cpp
 	$(CPP) -c $< -o $@
