@@ -5,6 +5,7 @@
  */
 
 #include "rna.h"
+#include "galloc.h"
 
 #include <util/atomic.h>
 
@@ -22,9 +23,10 @@ struct SendUnit
 	unsigned char *buf;
 	unsigned char toAddress;
 	unsigned char fromAddress;
+	unsigned char next; // handle
 };
-static unsigned char s_sendQueueSize;
-extern unsigned int __heap_start;
+static unsigned char s_SendUnitHead;
+
 unsigned int rnaHeapStart;
 
 // debug annunciator, timing can be tight so need to be VERY careful
@@ -206,7 +208,7 @@ void rnaInit()
 
 	rnaSetHigh(); // idle
 
-	s_sendQueueSize = 0;
+	s_sendUnitHead = 0;
 	s_busBusy = 0;
 
 	rnaHeapStart = __heap_start;

@@ -53,8 +53,10 @@ unsigned char galloc( unsigned char size )
 #endif
 
 	// prepare the next handle
-	s_firstFree[1] = ret + 1;
-	s_firstFree[1] &= 0x7F; // wrap at 127 (and hope they don't have blasters)
+	if ( (s_firstFree[1] = ret + 1) & 0x80 ) // if it wraps, reset it
+	{
+		s_firstFree[1] = 0x1;
+	}
 	
 	return ret;
 }
