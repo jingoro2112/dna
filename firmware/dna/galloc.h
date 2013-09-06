@@ -38,8 +38,8 @@
  gpointer( handle ) Map a handle to a block of memory, guaranteed valid until
                     (and only until) any call is made to gfree()
 
- gitHeap( start ) locate heap in a place other than __heap_start
-                  NOTE: This invalidates all existing allocations
+ grelocateHeap( start ) locate heap in a place other than __heap_start
+                        NOTE: This invalidates all existing allocations
 
  gramUsage() report how much RAM has been allocated
 
@@ -90,7 +90,7 @@ handle1 = gmalloc( sizeof(SomeStruct) );
 // unless you really really REALLY need larger allocations than 256 bytes
 #define GENE_BLOCK_SIZE 1
 
-void ginitHeap( unsigned char* heapStart ); // if you want to locate the heap elsewhere than __heap_start
+void grelocateHeap( unsigned char* heapStart ); // if you want to locate the heap elsewhere than __heap_start
 unsigned int gramUsage(); // report how many bytes (including overhead) has been allocated
 unsigned char galloc( unsigned char size ); // allocate a block of memory of 'size' bytes and return a handle to it
 char* gdefragEx( unsigned char handle ); // internal utility method, do not call

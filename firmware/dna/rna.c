@@ -15,8 +15,6 @@ volatile static unsigned char s_busBusy;
 // dynamically allocated where the heap would normall go, in a FIFO
 // arrangement, If 'send' is called from within the RNA receive ISR
 // (s_busBusy). They are shifted out immediately after that.
-//
-// if 
 struct SendUnit
 {
 	unsigned char size;
@@ -25,9 +23,7 @@ struct SendUnit
 	unsigned char fromAddress;
 	unsigned char next; // handle
 };
-static unsigned char s_SendUnitHead;
-
-unsigned int rnaHeapStart;
+static unsigned char s_sendUnitHead;
 
 // debug annunciator, timing can be tight so need to be VERY careful
 // where these are placed!
@@ -211,8 +207,6 @@ void rnaInit()
 	s_sendUnitHead = 0;
 	s_busBusy = 0;
 
-	rnaHeapStart = __heap_start;
-
 	rnaINTArm();
 	rnaClearINT();
 	rnaEnableINT();
@@ -274,12 +268,33 @@ void rnaSendEx( unsigned char address, unsigned char fromAddress, unsigned char 
 {
 	if ( s_busBusy ) // being called from within the ISR: queue data for immediate transfer after its reti()
 	{
-		struct SendUnit *send = ((struct SendUnit *)rnaHeapStart) + s_sendQueueSize;
+		unsigned char newSend = galloc( sizeof(struct SendUnit) );
+	
+		if ( s_sendUnitHead )
+		{
+			// find the end of the list
+			struct SendUnit *S;
+
+			// in-place traverse
+			for( S = (struct SendUnit *)gpointer(s_sendUnitHead);
+				 S->next;
+				 S = (struct SendUnit *)gpointer(S->next) );
+			
+			S->next = newSend;
+		}
+		else
+		{
+			s_sendUnitHead = newSend;
+		}
+
+		struct SendUnit *send = (struct SendUnit *)gpointer( newSend );
+		
 		send->toAddress = address;
 		send->size = len;
 		send->buf = data;
 		send->fromAddress = fromAddress;
-		s_sendQueueSize++;
+		send->next = 0;
+		
 		return;
 	}
 
@@ -464,13 +479,15 @@ ISR( RNA_ISR )
 
 		s_busBusy = 0;
 
-		unsigned char i;
-		for( i = 0; i<s_sendQueueSize; i++ )
+		// now that we are not busy, see if any requests were queued up
+		while( s_sendUnitHead )
 		{
-			struct SendUnit *send = ((struct SendUnit *)rnaHeapStart) + i;
+			struct SendUnit *send = (struct SendUnit *)gpointer( s_sendUnitHead );
 			rnaSend( send->toAddress, send->buf, send->size );
+			unsigned char next = send->next;
+			gfree( s_sendUnitHead );
+			s_sendUnitHead = next;
 		}
-		s_sendQueueSize = 0;
 	}
 
 	rnaOff();

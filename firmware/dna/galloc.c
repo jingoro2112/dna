@@ -16,7 +16,7 @@ static unsigned char* s_firstFree = &__heap_start;
 // [size in blocks:8][handle:8]
 
 //------------------------------------------------------------------------------
-void ginitHeap( unsigned char* newHeap )
+void grelocateHeap( unsigned char* newHeap )
 {
 	s_heapStart = newHeap;
 	s_firstFree = newHeap;
@@ -31,7 +31,7 @@ unsigned int gramUsage()
 //------------------------------------------------------------------------------
 unsigned char galloc( unsigned char size )
 {
-	// by definition no allocations have taken place, and there fore no
+	// by definition no allocations have taken place, and therefore no
 	// handles can be valid. this also has the effect of auto-initting
 	// to keep things safe, at the cost of a few extra cycles
 	if ( s_firstFree == s_heapStart ) 
