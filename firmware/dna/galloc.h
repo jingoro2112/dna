@@ -42,8 +42,48 @@
                   NOTE: This invalidates all existing allocations
 
  gramUsage() report how much RAM has been allocated
-                
+
+sample code:
+
+
+// typical usage:
+unsigned char handle1 = gmalloc( sizeof(SomeStruct) );
+unsigned char handle2 = gmalloc( sizeof(SomeStruct) ); // get some RAM
+
+SomeStruct *s1 = (SomeStruct *)gpointer( handle1 );
+SomeStruct *s2 = (SomeStruct *)gpointer( handle2 ); // map to a structure
+
+// do some stuff...
+s1->thing1 = 2;
+s1->thing2 = 4;
+s2->thing1 = 10;
+s2->thing2 = 20;
+
+// free the first handle
+gfree( handle1 );
+
+// which invalidates all other pointers, be sure to re-get them. this
+// is the 'gotcha' of galloc, and I welcome suggestions on how to get
+// around it, but I don't think its possible. personally I consider it
+// a small price to pay for the functionality
+s2 = gpointer( handle2 );
+
+// do some more stuff..
+s2->thing1 = 40;
+
+// and free it
+gfree( handle2 );
+
+
+// alternately, this is cumbersome but guaranteed to never get you:
+handle1 = gmalloc( sizeof(SomeStruct) );
+
+((SomeStruct *)gpointer(handle1))->thing1 = 20; // de-reference each time it is used
+//....
+
+
 */
+
 
 // Any value technically works, but powers of two make much nicer code.
 // The 'special' value of 1 allows much tighter code, best to leave it
