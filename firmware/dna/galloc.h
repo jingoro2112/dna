@@ -93,8 +93,9 @@ handle1 = gmalloc( sizeof(SomeStruct) );
 void grelocateHeap( unsigned char* heapStart ); // if you want to locate the heap elsewhere than __heap_start
 unsigned int gramUsage(); // report how many bytes (including overhead) has been allocated
 unsigned char galloc( unsigned char size ); // allocate a block of memory of 'size' bytes and return a handle to it
-char* gdefragEx( unsigned char handle ); // internal utility method, do not call
-#define gfree( handle ) gdefragEx((handle) | 0x80) // free the memory, tolerant of zero
-#define gpointer( handle ) gdefragEx( handle ) // map a handle to a pointer, valid until ANY call is made to gfree()
+
+char* _gtraverse( unsigned char handle ); // internal utility method, call only with following macros:
+#define gfree( handle ) _gtraverse((handle) | 0x80); // free the memory, tolerant of zero
+#define gpointer( handle ) _gtraverse( handle ) // map a handle to a pointer, valid until ANY call is made to gfree()
 
 #endif

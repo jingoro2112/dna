@@ -5,15 +5,12 @@
  */
 #include "galloc.h"
 
-#include <stdlib.h>
-#include <avr/io.h>
-
 extern unsigned char __heap_start;
 static unsigned char* s_heapStart = &__heap_start;
 static unsigned char* s_firstFree = &__heap_start;
 
 // blocks have 2-byte overhead:
-// [size in blocks:8][handle:8]
+// [size in blocks:8][unnused:1][handle:8]
 
 //------------------------------------------------------------------------------
 void grelocateHeap( unsigned char* newHeap )
@@ -32,15 +29,14 @@ unsigned int gramUsage()
 unsigned char galloc( unsigned char size )
 {
 	// by definition no allocations have taken place, and therefore no
-	// handles can be valid. this also has the effect of auto-initting
-	// to keep things safe, at the cost of a few extra cycles
+	// handles are valid, so assume first-time alloc, set to 1 thus auto-initting
+	// at the cost of a few extra cycles
 	if ( s_firstFree == s_heapStart ) 
 	{
 		s_firstFree[1] = 0x1;
 	}
 	
 	unsigned char ret = s_firstFree[1]; // next handle is pre-allocated, prepare to return it
-	s_firstFree[1] |= 0x80; // mark this block as allocated
 
 	// set up the block size (including the 2-byte overhead) and jump
 	// free pointer up to next free block
@@ -52,20 +48,37 @@ unsigned char galloc( unsigned char size )
 	s_firstFree += (unsigned int)s_firstFree[0] * GENE_BLOCK_SIZE + 2;
 #endif
 
-	// prepare the next handle
-	if ( (s_firstFree[1] = ret + 1) & 0x80 ) // if it wraps, reset it
+	if ( (s_firstFree[1] = ret + 1) & 0x80 )
 	{
 		s_firstFree[1] = 0x1;
 	}
+	
+	_gtraverse( ret );
 	
 	return ret;
 }
 
 //------------------------------------------------------------------------------
-char* gdefragEx( unsigned char handle )
+// this started as a defragger and sort of kept the name, but is now
+// the all-purpose function. The reason is to only have the "traverse
+// the alloc table" logic residing in one place in flash, thus keeping
+// the code ultra-compact. Depending on context this function returns a
+// handle, frees a handle, or 
+char* _gtraverse( unsigned char handle )
 {
 	// traverse table
+#if GENE_BLOCK_SIZE == 1
+	unsigned char size;
+#else
+	unsigned int size;
+#endif
+	unsigned char* from;
+	unsigned char* to;
+	unsigned char currentFreeHandle;
+
 looprestart:
+	currentFreeHandle = s_firstFree[1];
+
 	for( unsigned char *b = s_heapStart;
 		 b < s_firstFree;
 #if GENE_BLOCK_SIZE == 1
@@ -73,57 +86,41 @@ looprestart:
 #else
 		 b += (unsigned int)*b * GENE_BLOCK_SIZE + 2 ) // jump forward 'blocks*blocksize + 2 bytes of overhead bytes
 #endif
-	{
-		if ( handle ) // looking for a handle, not actually defragging
+	 {
+		if ( (handle & 0x7F) == *(b + 1) ) // match?
 		{
-			if ( (handle | 0x80) == *(b + 1) )
+			if ( !(handle & 0x80) ) // just wanted it returned?
 			{
-				if ( handle & 0x80 )
-				{
-					goto unconditionalCondense; // looking to reap it
-				}
-				else
-				{
-					return (char *)(b + 2); // looking to return it
-				}
+				return (char *)(b + 2);
 			}
+
+			// no, wanted to free it
+#if GENE_BLOCK_SIZE == 1
+			size = *b; // size is stored as size
+#else
+			size = *b * GENE_BLOCK_SIZE + 2; // size is stored as blocks, must compute bytes
+#endif
+			from = b + size; // starting at the next block
+			to = b; // replace to here
+			while( from < (s_firstFree + 2) )
+			{
+				*to++ = *from++;
+			}
+
+			s_firstFree -= size; // adjust free pointer down
+
+			break; // no need to continue, a free cannot cause a collision
 		}
-		else
+
+		// check for handle collision
+		if ( currentFreeHandle == *(b + 1) )
 		{
-#if GENE_BLOCK_SIZE == 1
-			unsigned char size;
-#else
-			unsigned int size;
-#endif
-			unsigned char* from;
-			unsigned char* to;
-
-			if ( *s_firstFree == *b )
+			if ( ++currentFreeHandle & 0x80 )
 			{
-				(*s_firstFree)++; // handle collision is unlikely but possible, make sure next handle returned is unique
-				goto looprestart; // restart entire process to be sure we didn't just grab ANOTHER collided handle
+				currentFreeHandle = 0x1;
 			}
-
-			if ( !(*b & 0x7F) ) // if this block was marked free, condense
-			{
-unconditionalCondense: 
-				
-#if GENE_BLOCK_SIZE == 1
-				size = *b; // size is stored as size
-#else
-				size = *b * GENE_BLOCK_SIZE + 2; // size is stored as blocks, must compute bytes
-#endif
-				from = b + size; // starting at the next block
-				to = b; // replace to here
-				while( from < (s_firstFree + 2) )
-				{
-					*to++ = *from++;
-				}
-
-				s_firstFree -= size; // adjust free pointer down
-
-				break; // by definition only a single block can be marked, this ain't garbage collection
-			}
+			s_firstFree[1] = currentFreeHandle;
+			goto looprestart; // restart entire process to be sure we didn't just install another collided handle
 		}
 	}
 
