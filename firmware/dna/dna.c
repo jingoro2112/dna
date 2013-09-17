@@ -44,7 +44,7 @@ void __init()
 	// careful, dont want to enter the bootloader accidentally, since
 	// it is an irreversible action (it overwrites the vector table)
 	_delay_us(50);
-	if ( 0 )//!(PINB & 0b00001000) )
+	if ( !(PINB & 0b00001000) )
 	{
 bootloader_jump:
 		asm	volatile ("ijmp" ::"z" (BOOTLOADER_ENTRY)); // jump to bootloader!

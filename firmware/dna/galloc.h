@@ -19,7 +19,7 @@
  resources: 4 bytes statically allocated RAM to track head and tail
               of heap
             2 bytes per heap allocation
-            ~210 bytes Flash with a block size of 1 (any other size, ~240 bytes)
+            ~250 bytes Flash with a block size of 1 (any other size, ~290 bytes)
 
  limitations: maximum of 127 allocations total
               maximum 256 blocks per allocation

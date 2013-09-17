@@ -25,7 +25,7 @@ struct Chunk
 };
 
 //------------------------------------------------------------------------------
-bool parse( CLinkList<Chunk>& chunklist, const char* data, const int size )
+inline bool parse( CLinkList<Chunk>& chunklist, const char* data, const int size )
 {
 	if ( !data )
 	{

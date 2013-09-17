@@ -8,7 +8,11 @@
 
 #include "dna.h"
 #include "usb.h"
-#include "rna.h"
+
+//#define USB_COPY_DATA_TO_PRIVATE_BUFFER
+#ifdef USB_COPY_DATA_TO_PRIVATE_BUFFER
+#include "galloc.h"
+#endif
 
 #include <util/delay.h>
 #include <avr/interrupt.h>
@@ -41,7 +45,11 @@ const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
 volatile unsigned char g_sendQueueLen; // global so it can be inspected by an extern from the header
 
 static unsigned char s_sendQueuePosition;
+#ifdef USB_COPY_DATA_TO_PRIVATE_BUFFER
+static unsigned char s_sendQueueBufferHandle;
+#else
 static unsigned char *s_sendQueueBuffer;
+#endif
 static unsigned char s_dataTransferRemaining;
 static unsigned char s_transferType;
 
@@ -71,6 +79,7 @@ unsigned char usbFunctionWrite( unsigned char *data, unsigned char len )
 		{
 			if ( data[1] == USBCommandUser )
 			{
+				// user command, call up to app
 				dnaUsbCommand( data[2], data + 3 );
 			}
 			else if ( data[1] == USBCommandEnterBootloader ) // soft entry to bootloader?
@@ -126,6 +135,11 @@ unsigned char usbFunctionRead( unsigned char *data, unsigned char len )
 	{
 		if ( s_transferType == REPORT_DNA_DATA )
 		{
+			if ( !g_sendQueueLen ) // if nothing is queued, send a 'stall' message
+			{
+				return -1;
+			}
+			
 			// straight data, shift up whatever is queued (if anything)
 			s_dataTransferRemaining = (REPORT_DNA_DATA_SIZE - 1); // all data requests are fixed size, set up streaming
 			data[0] = REPORT_DNA_DATA; // type
@@ -136,8 +150,9 @@ unsigned char usbFunctionRead( unsigned char *data, unsigned char len )
 		{
 			// status request, report hardware/firmware version
 			data[0] = REPORT_DNA;
-			data[1] = DNA_AT84_v1_00;
-			data[2] = g_sendQueueLen;
+			data[1] = DNA_AT84;
+			data[2] = DNA_VERSION;
+			data[3] = g_sendQueueLen;
 			return len; // requests are sized to be single-pass, no further calls will be made after this
 		}
 	}
@@ -147,11 +162,22 @@ unsigned char usbFunctionRead( unsigned char *data, unsigned char len )
 	{
 		if ( g_sendQueueLen )
 		{
+#ifdef USB_COPY_DATA_TO_PRIVATE_BUFFER
+			data[i] = gpointer( s_sendQueueBufferHandle )[s_sendQueuePosition++];
+#else
 			data[i] = s_sendQueueBuffer[s_sendQueuePosition++];
+#endif
 			if ( s_sendQueuePosition == g_sendQueueLen )
 			{
+#ifdef USB_COPY_DATA_TO_PRIVATE_BUFFER
+				gfree( s_sendQueueBufferHandle );
+#endif
 				g_sendQueueLen = 0;
 			}
+		}
+		else
+		{
+			data[i] = 0xDE;
 		}
 		s_dataTransferRemaining--;
 	}
@@ -163,9 +189,21 @@ unsigned char usbFunctionRead( unsigned char *data, unsigned char len )
 void dnaUsbQueueData( unsigned char* data, unsigned char len )
 {
 	cli();
+	
+#ifdef USB_COPY_DATA_TO_PRIVATE_BUFFER
+	gfree( s_sendQueueBufferHandle );
+	char* p = gpointer( (s_sendQueueBufferHandle = galloc(len)) );
+	for( unsigned char i=0; i<len; i++ )
+	{
+		p[i] = data[i];
+	}
+#else
+	s_sendQueueBuffer = data;
+#endif
+
 	s_sendQueuePosition = 0;
 	g_sendQueueLen = len;
-	s_sendQueueBuffer = data;
+	
 	sei();
 }
 

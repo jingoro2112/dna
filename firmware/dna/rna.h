@@ -10,6 +10,7 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <util/delay.h>
+
 #include <rna_config.h>
 
 #define RNA_CONCAT(x, y)  x##y
@@ -24,16 +25,11 @@
 #define rnaSetLow() (RNA_DDR |= (1<<RNA_PIN_NUMBER))
 #define rnaIsHigh() (RNA_PIN & (1<<RNA_PIN_NUMBER))
 #define rnaIsLow()  (!(RNA_PIN & (1<<RNA_PIN_NUMBER)))
+#define rnaSetIdle()  do { RNA_DDR &= ~(1<<RNA_PIN_NUMBER); RNA_PORT |= (1<<RNA_PIN_NUMBER); } while(0);
+#define rnaSetActive()  do { RNA_DDR &= ~(1<<RNA_PIN_NUMBER); RNA_PORT &= ~(1<<RNA_PIN_NUMBER); } while(0);
 
-#ifndef RNA_POLL_DRIVEN
+/*
 #if defined (PROTO88)
-	#define rnaOn()  (PORTD |= 0b01000000)
-	#define rnaOff() (PORTD &= 0b10111111)
-	#define rnaEnableINT()  (EIMSK |= (1 << INT1))
-	#define rnaClearINT()  (EIFR |= (1<<INTF1))
-	#define rnaDisableINT() (EIMSK &= ~(1 << INT1))
-	#define rnaINTArm() (EICRA |= (1 << ISC11)); (EICRA &= ~(1 << ISC10))
-	#define RNA_ISR INT1_vect
 #elif defined (DNA)
 	#define rnaOn()  (PORTA |= 0b10000000)
 	#define rnaOff() (PORTA &= 0b01111111)
@@ -75,6 +71,7 @@
 	#define rnaDisableINT()
 	#define rnaINTArm()
 #endif
+*/
 
 //------------------------------------------------------------------------------
 enum RNASystemCommands
@@ -88,13 +85,14 @@ void rnaInit();
 unsigned char rnaShiftOutByte( unsigned char data, unsigned char high );
 unsigned char rnaShiftInByte( unsigned char high );
 
-void rnaSend( unsigned char address, unsigned char *data, unsigned char len );
-void rnaSendSystem( unsigned char address, unsigned char *data, unsigned char len );
-unsigned char rnaProbe( unsigned char address );
+unsigned char rnaSendEx( unsigned char address, unsigned char fromAddress, unsigned char *data, unsigned char len );
+
+#define rnaSend( address, data, len ) rnaSendEx((address), RNA_MY_ADDRESS, (data), (len))
+#define rnaSendSystem( address, data, len ) rnaSendEx((address), 0, (data), (len))
+#define rnaProbe( address ) rnaSendEx((address), RNA_MY_ADDRESS, 0, 0)
 void rnaPoll();
 
 unsigned char rnaInputSetup( unsigned char *data, unsigned char from, unsigned char len );
 void rnaInputStream( unsigned char *data, unsigned char bytes );
-
 
 #endif

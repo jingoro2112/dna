@@ -12,15 +12,14 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\firmware\dna\galloc.c">
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsCpp</CompileAs>
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">CompileAsCpp</CompileAs>
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsCpp</CompileAs>
     </ClCompile>
-    <ClCompile Include="..\loader.cpp" />
     <ClCompile Include="..\main.cpp" />
+    <ClCompile Include="..\splice.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\firmware\dna\galloc.h" />
-    <ClInclude Include="..\loader.hpp" />
+    <ClInclude Include="..\splice.hpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{278E3E48-F89C-4EE3-8408-4C3CD8C7F556}</ProjectGuid>

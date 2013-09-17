@@ -7,7 +7,7 @@
 #include <winsock2.h>
 #include <windows.h>
 
-#include "loader.hpp"
+#include "splice.hpp"
 
 #include "../util/read_hex.hpp"
 #include "../util/str.hpp"
@@ -18,8 +18,6 @@
 
 #include "../../morlock/firmware/morlock_defs.h"
 
-#include "../firmware/dna/galloc.h"
-
 #include <stdio.h>
 #include <ctype.h>
 #include <stdlib.h>
@@ -29,7 +27,7 @@ SimpleLog Log;
 //------------------------------------------------------------------------------
 int usage()
 {
-	printf( "loader.exe\n"
+	printf( "Usage: splice <options>\n"
 			"\n"
 			"-f, --flash <image>\n"
 			"    flash firmware <image>\n"
@@ -52,63 +50,109 @@ int usage()
 	return 0;
 }
 
-//------------------------------------------------------------------------------
-void loaderSleep( unsigned int microSeconds )
-{
-#ifdef _WIN32
-	Sleep( microSeconds );
-#else
-	usleep( microSeconds );
-#endif
-}
 
-unsigned int __heap_start;
+//#include "../firmware/dna/galloc.h"
+//unsigned char __heap_start;
+
 
 //------------------------------------------------------------------------------
 int main( int argc, char *argv[] )
 {
-	char block[1024];
-	__heap_start = (unsigned int)block;
-	gallocInit( 0 );
+	/*
+	unsigned char heap[2048];
+	grelocateHeap( heap );
 
-	unsigned char h1 = galloc( 10 );
-	unsigned char h2 = galloc( 10 );
-	unsigned char h3 = galloc( 10 );
-	unsigned char h4 = galloc( 10 );
-
-	int i;
-	for( i=0; i<10; i++ )
+	for( int j=0; j<122; j++ )
 	{
-		gpointer(h1)[i] = i;
-		gpointer(h2)[i] = i + 0x10;
-		gpointer(h3)[i] = i + 0x20;
-		gpointer(h4)[i] = i + 0x30;
+		unsigned char h = galloc(1);	
 	}
-	
-	gfree( h3 );
-	gfree( h3 );
 
-	h3 = galloc( 20 );
-	for( i=0; i<20; i++ )
-		gpointer(h3)[i] = i + 0x40;
-	
-	gfree( h1 );
-	h1 = galloc( 30 );
-	for( i=0; i<30; i++ )
-		gpointer(h1)[i] = i + 0x50;
-	
-	gfree( h3 );
-	gfree( h3 );
-	gfree( h4 );
-	h3 = galloc( 0 );
-	gfree( h2 );
-	gfree( h3 );
-	gfree( h1 );
+	for(;;)
+	{
+		unsigned char h1 = galloc(10);
+		memset( gpointer(h1), 0x11, 10 );
+		unsigned char h2 = galloc(11);
+		memset( gpointer(h2), 0x22, 11 );
+		unsigned char h3 = galloc(20);
+		memset( gpointer(h3), 0x33, 20 );
+		unsigned char h4 = galloc(50);
+		memset( gpointer(h4), 0x44, 50 );
+		gfree( h3 );
+		gfree( h2 );
+		gfree( h4 );
+		gfree( h1 );
+
+		h1 = galloc(10);
+		memset( gpointer(h1), 0x11, 10 );
+		h2 = galloc(11);
+		memset( gpointer(h2), 0x22, 11 );
+		h3 = galloc(20);
+		memset( gpointer(h3), 0x33, 20 );
+		h4 = galloc(50);
+		memset( gpointer(h4), 0x44, 50 );
+		gfree( h4 );
+		gfree( h3 );
+		gfree( h2 );
+		gfree( h1 );
+
+
+		h1 = galloc(10);
+		memset( gpointer(h1), 0x11, 10 );
+		h2 = galloc(11);
+		memset( gpointer(h2), 0x22, 11 );
+		h3 = galloc(20);
+		memset( gpointer(h3), 0x33, 20 );
+		h4 = galloc(50);
+		memset( gpointer(h4), 0x44, 50 );
+		gfree( h1 );
+		gfree( h2 );
+		gfree( h3 );
+		gfree( h4 );
+
+
+		h1 = galloc(10);
+		memset( gpointer(h1), 0x11, 10 );
+		h2 = galloc(11);
+		memset( gpointer(h2), 0x22, 11 );
+		h3 = galloc(20);
+		memset( gpointer(h3), 0x33, 20 );
+		h4 = galloc(50);
+		memset( gpointer(h4), 0x44, 50 );
+		gfree( h1 );
+		gfree( h4 );
+		gfree( h3 );
+		gfree( h2 );
+
+
+		h1 = galloc(10);
+		memset( gpointer(h1), 0x11, 10 );
+		h2 = galloc(11);
+		memset( gpointer(h2), 0x22, 11 );
+		h3 = galloc(20);
+		memset( gpointer(h3), 0x33, 20 );
+		h4 = galloc(50);
+		memset( gpointer(h4), 0x44, 50 );
+		gfree( h2 );
+		gfree( h1 );
+		gfree( h3 );
+		gfree( h4 );
+	}
+*/
 
 
 
 
-	
+
+
+
+
+
+
+
+
+
+
+
 
 	
 	MainArgs args( argc, argv );
@@ -123,10 +167,104 @@ int main( int argc, char *argv[] )
 		Log.setCallback( 0 );
 	}
 
+	char product[256];
+	DNADEVICE handle;
+	
+	handle = DNAUSB::openDevice( 0x16C0, 0x05DF, "p@northarc.com", product );
+	if ( handle == INVALID_DNADEVICE_VALUE )
+	{
+		printf( "Could not open DNA device\n" );
+		return -1;
+	}
+
+	if ( args.isSet("-t") )
+	{
+		unsigned char buffer[256];
+		EEPROMConstants *consts = (EEPROMConstants *)buffer;
+
+		for(;;)
+		{
+			Arch::sleep(100);
+
+		if ( !DNAUSB::sendCommand( handle, ceCommandGetEEPROMConstants) )
+		{
+			DNAUSB::closeDevice( handle );
+			printf( "command failed\n" );
+			return -1;
+		}
+
+		unsigned char len;
+		if ( !DNAUSB::getData(handle, buffer, &len) )
+		{
+			DNAUSB::closeDevice( handle );
+			printf( "fetch failed\n" );
+			return -1;
+		}
+
+		Arch::asciiDump( consts, sizeof(*consts) );
+
+		printf( "len[%d]\n", (int)len );
+		printf( "singleSolenoid[%08X][%d]\n", (unsigned int)consts->singleSolenoid, (unsigned int)consts->singleSolenoid );
+		printf( "fireMode[%08X][%d]\n", (unsigned int)consts->fireMode, (unsigned int)consts->fireMode );
+		printf( "ballsPerSecondX10[%08X][%d]\n", (unsigned int)consts->ballsPerSecondX10, (unsigned int)consts->ballsPerSecondX10 );
+		printf( "burstCount[%08X][%d]\n", (unsigned int)consts->burstCount, (unsigned int)consts->burstCount );
+		printf( "enhancedTriggerTimeout[%08X][%d]\n", (unsigned int)consts->enhancedTriggerTimeout, (unsigned int)consts->enhancedTriggerTimeout );
+		printf( "boltHoldoff[%08X][%d]\n", (unsigned int)consts->boltHoldoff, (unsigned int)consts->boltHoldoff );
+		printf( "accessoryRunTime[%08X][%d]\n", (unsigned int)consts->accessoryRunTime, (unsigned int)consts->accessoryRunTime );
+		printf( "dimmer[%08X][%d]\n", (unsigned int)consts->dimmer, (unsigned int)consts->dimmer );
+		printf( "ABSTimeout[%08X][%d]\n", (unsigned int)consts->ABSTimeout, (unsigned int)consts->ABSTimeout );
+		printf( "ABSAddition[%08X][%d]\n", (unsigned int)consts->ABSAddition, (unsigned int)consts->ABSAddition );
+		printf( "rebounce[%08X][%d]\n", (unsigned int)consts->rebounce, (unsigned int)consts->rebounce );
+		printf( "debounce[%08X][%d]\n", (unsigned int)consts->debounce, (unsigned int)consts->debounce );
+		printf( "dwell1[%08X][%d]\n", (unsigned int)consts->dwell1, (unsigned int)consts->dwell1 );
+		printf( "dwell2Holdoff[%08X][%d]\n", (unsigned int)consts->dwell2Holdoff, (unsigned int)consts->dwell2Holdoff );
+		printf( "dwell2[%08X][%d]\n", (unsigned int)consts->dwell2, (unsigned int)consts->dwell2 );
+		printf( "maxDwell2[%08X][%d]\n", (unsigned int)consts->maxDwell2, (unsigned int)consts->maxDwell2 );
+		printf( "eyeEnabled[%08X][%d]\n", (unsigned int)consts->eyeEnabled, (unsigned int)consts->eyeEnabled );
+		printf( "eyeHoldoff[%08X][%d]\n", (unsigned int)consts->eyeHoldoff, (unsigned int)consts->eyeHoldoff );
+		printf( "eyeHighBlocked[%08X][%d]\n", (unsigned int)consts->eyeHighBlocked, (unsigned int)consts->eyeHighBlocked );
+		printf( "eyeDetectLevel[%08X][%d]\n", (unsigned int)consts->eyeDetectLevel, (unsigned int)consts->eyeDetectLevel );
+		printf( "eyeDetectHoldoff[%08X][%d]\n", (unsigned int)consts->eyeDetectHoldoff, (unsigned int)consts->eyeDetectHoldoff );
+		printf( "locked[%08X][%d]\n", (unsigned int)consts->locked, (unsigned int)consts->locked );
+		printf( "rampEnableCount[%08X][%d]\n", (unsigned int)consts->rampEnableCount, (unsigned int)consts->rampEnableCount );
+		printf( "rampClimb[%08X][%d]\n", (unsigned int)consts->rampClimb, (unsigned int)consts->rampClimb );
+		printf( "rampTopMode[%08X][%d]\n", (unsigned int)consts->rampTopMode, (unsigned int)consts->rampTopMode );
+		printf( "rampTimeout[%08X][%d]\n", (unsigned int)consts->rampTimeout, (unsigned int)consts->rampTimeout );
+		printf( "shortCyclePreventionInterval[%08X][%d]\n", (unsigned int)consts->shortCyclePreventionInterval, (unsigned int)consts->shortCyclePreventionInterval );
+		printf( "eyeLevel[%08X][%d]\n", (unsigned int)consts->eyeLevel, (unsigned int)consts->eyeLevel );
+
+		
+		printf( "eye[0x%02X] %s\n", (int)consts->eyeLevel, (consts->eyeLevel < consts->eyeDetectLevel) ? "blocked":"clear" );
+
+		}
+		DNAUSB::closeDevice( handle );
+		return 0;
+	}
+
+	unsigned char id;
+	unsigned char version;
+	if ( !DNAUSB::getProductId( handle, &id, &version ) )
+	{
+		printf( "failed to get product id\n" );
+		DNAUSB::closeDevice( handle );
+		return 0;
+	}
+
+	DNAUSB::closeDevice( handle );
+
+	char buf[256];
+	printf( "product[%s] [0x%02X]:%s  version[%d]\n", product, id, Splice::stringFromId(id, buf), version );
+
+	if (args.isSet("-r") || args.isSet("--report") ) // report only
+	{
+		return 0;
+	}
+
 	char image[256] = "application.hex";
 	CLinkList<ReadHex::Chunk> chunklist;
 	Cstr infile;
 	ReadHex::Chunk *chunk = 0;
+	unsigned int percent;
 	if ( args.isStringSet("-f", image) || args.isStringSet("-i", image) || args.isStringSet("--flash", image) )
 	{
 		if ( !infile.fileToBuffer(image) )
@@ -156,228 +294,17 @@ int main( int argc, char *argv[] )
 		if ( !args.isSet("-dnv") ) 
 		{
 			char err[256];
-			if ( !Loader::checkDNAImage(chunk->data, chunk->size, err) )
+			percent = Splice::checkDNAImage( chunk->data, chunk->size, err );
+			if ( !percent )
 			{
 				printf( "%s\n", err );
 				return -1;
 			}
 		}
+
+		DNAUSB::sendCode( 0x16C0, 0x05DF, "p@northarc.com", (unsigned char *)(chunk->data), chunk->size, 0 );
 	}
 
-	bool trying = true;
-	char product[256];
-	DNADEVICE handle;
-	
-	bool looping;
-	do
-	{
-		looping = false;
-		handle = Loader::openDevice( product );
-		if ( handle == INVALID_DNADEVICE_VALUE )
-		{
-			printf( "Could not open DNA device\n" );
-			return -1;
-		}
-
-		if ( args.isSet("-t") )
-		{
-			if ( !DNAUSB::sendCommand( handle, ceCommandGetEEPROMConstants) )
-			{
-				DNAUSB::closeDevice( handle );
-				printf( "command failed\n" );
-				return -1;
-			}
-
-			unsigned char buffer[256];
-			EEPROMConstants *consts = (EEPROMConstants *)buffer;
-			if ( !DNAUSB::getData(handle, buffer) )
-			{
-				DNAUSB::closeDevice( handle );
-				printf( "fetch failed\n" );
-				return -1;
-			}
-			
-			consts->transposeValues();
-
-			printf( "singleSolenoid [0x%02X]\n", consts->singleSolenoid );
-			printf( "fireMode [0x%02X]\n", consts->fireMode );
-			printf( "ballsPerSecondX10 [0x%04X]\n", consts->ballsPerSecondX10 );
-			printf( "burstCount [0x%02X]\n", consts->burstCount );
-			printf( "enhancedTriggerTimeout [0x%04X]\n", consts->enhancedTriggerTimeout );
-			printf( "boltHoldoff [0x%02X]\n", consts->boltHoldoff );
-			printf( "accessoryRunTime [0x%02X]\n", consts->accessoryRunTime );
-			printf( "dimmer [0x%02X]\n", consts->dimmer );
-			printf( "ABSTimeout [0x%04X]\n", consts->ABSTimeout );
-			printf( "ABSAddition [0x%02X]\n", consts->ABSAddition );
-			printf( "rebounce [0x%02X]\n", consts->rebounce );
-			printf( "debounce [0x%02X]\n", consts->debounce );
-			printf( "dwell1 [0x%02X]\n", consts->dwell1 );
-			printf( "dwell2Holdoff [0x%02X]\n", consts->dwell2Holdoff );
-			printf( "dwell2 [0x%02X]\n", consts->dwell2 );
-			printf( "maxDwell2 [0x%02X]\n", consts->maxDwell2 );
-			printf( "eyeHoldoff [0x%02X]\n", consts->eyeHoldoff );
-			printf( "eyeHighBlocked [0x%02X]\n", consts->eyeHighBlocked );
-			printf( "eyeEnabled [0x%02X]\n", consts->eyeEnabled );
-			printf( "locked [0x%02X]\n", consts->locked );
-			printf( "rampEnableCount [0x%02X]\n", consts->rampEnableCount );
-			printf( "rampClimb [0x%02X]\n", consts->rampClimb );
-			printf( "rampTopMode [0x%02X]\n", consts->rampTopMode );
-			printf( "rampTimeout [0x%04X]\n", consts->rampTimeout );
-
-
-
-
-			consts->singleSolenoid = 0x55;
-			consts->fireMode = 0x55;
-			consts->ballsPerSecondX10 = 0x55;
-			consts->burstCount = 0x55;
-			consts->enhancedTriggerTimeout = 0x55;
-			consts->boltHoldoff = 0x55;
-			consts->accessoryRunTime = 0x55;
-			consts->dimmer = 0x55;
-			consts->ABSTimeout = 0x55;
-			consts->ABSAddition = 0x55;
-			consts->rebounce = 0x55;
-			consts->debounce = 0x55;
-			consts->dwell1 = 0x55;
-			consts->dwell2Holdoff = 0x55;
-			consts->dwell2 = 0x55;
-			consts->maxDwell2 = 0x55;
-			consts->eyeHoldoff = 0x55;
-			consts->eyeHighBlocked = 0x55;
-			consts->eyeEnabled = 0x55;
-			consts->locked = 0x55;
-			consts->rampEnableCount = 0x55;
-			consts->rampClimb = 0x55;
-			consts->rampTopMode = 0x55;
-			consts->rampTimeout = 0x55;
-
-
-
-
-			
-			consts->transposeValues();
-			buffer[0] = ceCommandSetEEPROMConstants;
-			memcpy( buffer + 1, consts, sizeof(EEPROMConstants) );
-			if ( !DNAUSB::sendData(handle, buffer, sizeof(EEPROMConstants) + 1 ) )
-			{
-				DNAUSB::closeDevice( handle );
-				printf( "put failed\n" );
-				return -1;
-			}
-
-
-
-			if ( !DNAUSB::sendCommand( handle, ceCommandGetEEPROMConstants) )
-			{
-				DNAUSB::closeDevice( handle );
-				printf( "command failed\n" );
-				return -1;
-			}
-
-
-			if ( !DNAUSB::getData(handle, buffer) )
-			{
-				DNAUSB::closeDevice( handle );
-				printf( "fetch failed\n" );
-				return -1;
-			}
-
-			consts->transposeValues();
-
-			printf( "singleSolenoid [0x%02X]\n", consts->singleSolenoid );
-			printf( "fireMode [0x%02X]\n", consts->fireMode );
-			printf( "ballsPerSecondX10 [0x%04X]\n", consts->ballsPerSecondX10 );
-			printf( "burstCount [0x%02X]\n", consts->burstCount );
-			printf( "enhancedTriggerTimeout [0x%04X]\n", consts->enhancedTriggerTimeout );
-			printf( "boltHoldoff [0x%02X]\n", consts->boltHoldoff );
-			printf( "accessoryRunTime [0x%02X]\n", consts->accessoryRunTime );
-			printf( "dimmer [0x%02X]\n", consts->dimmer );
-			printf( "ABSTimeout [0x%04X]\n", consts->ABSTimeout );
-			printf( "ABSAddition [0x%02X]\n", consts->ABSAddition );
-			printf( "rebounce [0x%02X]\n", consts->rebounce );
-			printf( "debounce [0x%02X]\n", consts->debounce );
-			printf( "dwell1 [0x%02X]\n", consts->dwell1 );
-			printf( "dwell2Holdoff [0x%02X]\n", consts->dwell2Holdoff );
-			printf( "dwell2 [0x%02X]\n", consts->dwell2 );
-			printf( "maxDwell2 [0x%02X]\n", consts->maxDwell2 );
-			printf( "eyeHoldoff [0x%02X]\n", consts->eyeHoldoff );
-			printf( "eyeHighBlocked [0x%02X]\n", consts->eyeHighBlocked );
-			printf( "eyeEnabled [0x%02X]\n", consts->eyeEnabled );
-			printf( "locked [0x%02X]\n", consts->locked );
-			printf( "rampEnableCount [0x%02X]\n", consts->rampEnableCount );
-			printf( "rampClimb [0x%02X]\n", consts->rampClimb );
-			printf( "rampTopMode [0x%02X]\n", consts->rampTopMode );
-			printf( "rampTimeout [0x%04X]\n", consts->rampTimeout );
-
-			
-			
-
-			DNAUSB::closeDevice( handle );
-			return 0;
-		}
-		
-		unsigned char id;
-		if ( !DNAUSB::getProductId( handle, &id ) )
-		{
-			printf( "failed to get product id\n" );
-			DNAUSB::closeDevice( handle );
-			handle = INVALID_DNADEVICE_VALUE;
-			break;
-		}
-
-		char buf[256];
-		printf( "product[%s] [0x%02X]:%s\n", product, id, Loader::stringFromId(id, buf) );
-
-		if (args.isSet("-r") || args.isSet("--report") ) // report only
-		{
-			return 0;
-		}
-
-		switch( id )
-		{
-			case OLED_AM88_v1_00:
-			case DNA_AT84_v1_00:
-			{
-				printf( "Commanding bootloader entry\n" );
-				if ( DNAUSB::sendEnterBootloader(handle) )
-				{
-					loaderSleep( 2000 );
-					looping = true;
-				}
-				else
-				{
-					printf( "Reset command failed\n" );
-				}
-				
-				DNAUSB::closeDevice( handle );
-				handle = INVALID_DNADEVICE_VALUE;
-				break;
-			}
-
-			case BOOTLOADER_OLED_AM88_v1_00:
-			case BOOTLOADER_DNA_AT84_v1_00:
-			{
-				printf( "Loading executable\n" );
-
-				if ( trying )
-				{
-					DNAUSB::sendCode( handle, (unsigned char *)(chunk->data), chunk->size );
-				}
-
-				break;
-			}
-
-			default:
-			{
-				printf( "Unrecognized device [0x%02X]\n", (unsigned int)id );
-				break;
-			}
-		}
-		
-	} while( looping );
-
-	DNAUSB::closeDevice( handle );
 	return 0;
 }
 

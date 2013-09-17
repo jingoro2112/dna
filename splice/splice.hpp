@@ -7,15 +7,18 @@
  * and in the LICENCE.txt file included with this distribution
  */
 
+#if defined(_WIN32) && defined(MFC_GUI)
+#include <stdafx.h>
+#endif
 
 #include "../dnausb/dnausb.h"
 
 //------------------------------------------------------------------------------
-namespace Loader
+namespace Splice
 {
 
-bool checkDNAImage( const unsigned char* image, const unsigned int len, char* err =0 );
-DNADEVICE openDevice( char* product =0 );
+// reutrns % the image will fill, 0 for error
+unsigned int checkDNAImage( const unsigned char* image, const unsigned int len, char* err =0 );
 char* stringFromId( const unsigned char id, char* buf );
 
 }

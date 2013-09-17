@@ -9,6 +9,10 @@
 
 #include <util/atomic.h>
 
+#if (F_CPU != 12000000) && (F_CPU != 8000000)
+#error unsupported F_CPU for RNA driver, must be 8 or 12 mHz
+#endif		
+
 volatile static unsigned char s_busBusy;
 
 //------------------------------------------------------------------------------
@@ -26,13 +30,7 @@ struct SendUnit
 static unsigned char s_sendUnitHead;
 
 // debug annunciator, timing can be tight so need to be VERY careful
-// where these are placed!
-#if 1
-#undef rnaOn
-#define rnaOn()
-#undef rnaOff
-#define rnaOff()
-#endif
+// where these are placed, if enabled
 
 //------------------------------------------------------------------------------
 unsigned char rnaShiftOutByte( unsigned char data, unsigned char high )
@@ -41,9 +39,8 @@ unsigned char rnaShiftOutByte( unsigned char data, unsigned char high )
 	// preparation for the first clock pulse, which is always a rising
 	// edge
 	unsigned char collisionOccured = 0;
-	unsigned char i;
 	unsigned char bit = 0x80;
-	for( i=8; i; i-- )
+	for( unsigned char i=8; i; i-- )
 	{
 		// clock is just a flip from whatever state it was left in by
 		// the last data byte
@@ -181,8 +178,7 @@ void rnaWaitForBusClear()
 {
 	// manchester guarantees loads of transitions, high for more than 10
 	// loop cycles (even at 12mhz) is more than enough to detect idle-ness
-	unsigned char time;
-	for ( time = 20; time; time-- )
+	for ( unsigned char time = 20; time; time-- )
 	{
 		if ( rnaIsLow() ) // oops not idle, keep waiting
 		{
@@ -194,78 +190,17 @@ void rnaWaitForBusClear()
 //------------------------------------------------------------------------------
 void rnaInit()
 {
-	// turn on pullup
-	rnaSetHigh();
-	RNA_PORT |= (1<<RNA_PIN_NUMBER);
-	
-	// assert low
-	rnaSetLow();
-	RNA_PORT &= ~(1<<RNA_PIN_NUMBER);
-
-	rnaSetHigh(); // idle
-
-	s_sendUnitHead = 0;
-	s_busBusy = 0;
-
+	rnaSetIdle();
 	rnaINTArm();
 	rnaClearINT();
 	rnaEnableINT();
 }
 
 //------------------------------------------------------------------------------
-static unsigned char attention( unsigned char header )
+unsigned char rnaSendEx( unsigned char address, unsigned char fromAddress, unsigned char *data, unsigned char len )
 {
-	rnaWaitForBusClear();
+	rnaSetActive();
 
-	rnaSetLow();
-	_delay_us( 11 );
-	
-	return rnaShiftOutByte( header, 0 );
-}
-
-//------------------------------------------------------------------------------
-unsigned char rnaProbe( unsigned char address )
-{
-	if ( s_busBusy ) // cannot call this from within an ISR, fail gracefully
-	{
-		return 0;
-	}
-
-	ATOMIC_BLOCK( ATOMIC_RESTORESTATE )
-	{
-		for(;;)
-		{
-			cli();
-
-			unsigned char ret = attention( address | (RNA_MY_ADDRESS<<4) );
-			if ( ret == 1 )
-			{
-				rnaShiftOutByte( 0, 1 ); // send zero-length transmission
-				return 1;
-			}
-			else if ( ret == 0 ) // no one home
-			{
-				return 0;
-			}
-
-			// otherwise there might have been a collision, try again
-			_delay_us( RNA_MY_ADDRESS << 3 );
-		}
-
-		rnaSetHigh();
-
-#ifndef RNA_POLL_DRIVEN
-		rnaClearINT();
-#endif
-	}
-
-	rnaOff();
-	return 1;
-}
-
-//------------------------------------------------------------------------------
-void rnaSendEx( unsigned char address, unsigned char fromAddress, unsigned char *data, unsigned char len )
-{
 	if ( s_busBusy ) // being called from within the ISR: queue data for immediate transfer after its reti()
 	{
 		unsigned char newSend = galloc( sizeof(struct SendUnit) );
@@ -294,64 +229,55 @@ void rnaSendEx( unsigned char address, unsigned char fromAddress, unsigned char 
 		send->buf = data;
 		send->fromAddress = fromAddress;
 		send->next = 0;
-		
-		return;
 	}
-
-	ATOMIC_BLOCK( ATOMIC_RESTORESTATE )
+	else
 	{
-		for( unsigned char retries=0; retries<5; retries++ )
+		ATOMIC_BLOCK( ATOMIC_RESTORESTATE )
 		{
-			unsigned char ret = attention( address | (fromAddress<<4) );
-
-			if ( ret == 1 )
+			for( unsigned char retries = 0; retries<5; retries++ )
 			{
-				// header was placed on the wire and acked
+				rnaWaitForBusClear();
 
-				if ( rnaShiftOutByte(len, 1) != 1 ) // length..
-				{
-					break; // not sure how to continue, chip died mid-transmission?
-				}
+				rnaSetLow(); // attention!
+				_delay_us( 11 ); // wait a reasonable amount of time for the remote chip to trigger its interrupt, more than this and it might be WAY more than this
 
-				// now just start shifting out data, if a problem is detected, scrap attempt
-				unsigned char byte;
-				for( byte = 0; byte < len; byte++ )
+				if ( rnaShiftOutByte(address | (fromAddress<<4), 0) == 1 )
 				{
-					if ( rnaShiftOutByte(data[byte], 1) != 1 ) 
+					// header was placed on the wire and acked
+
+					if ( rnaShiftOutByte(len, 1) != 1 ) // length..
 					{
+						len = 0;
 						break;
 					}
+
+					// now just start shifting out data, if a problem is detected, scrap attempt
+					for( unsigned char byte = 0; byte < len; byte++ )
+					{
+						if ( rnaShiftOutByte(data[byte], 1) != 1 ) 
+						{
+							len = 0;
+						}
+					}
+
+					break;
 				}
 
-				break;
+				// no one home or collision, back off and try again
+				_delay_us( RNA_MY_ADDRESS << 3 );
 			}
 
-			// no one home or collision, back off and try again
-			_delay_us( RNA_MY_ADDRESS << 3 );
-		}
-
-		rnaSetHigh();
-		rnaOff();
+			rnaOff();
 
 #ifndef RNA_POLL_DRIVEN
-		rnaClearINT(); // clear the interrupt condition caused by the pin toggling
+			rnaClearINT(); // clear the interrupt condition caused by the pin toggling
 #endif
-
+		}
 	}
-}
 
-//------------------------------------------------------------------------------
-// send a message to a device as if we are the virtual system device,
-// use with caution!
-void rnaSendSystem( unsigned char address, unsigned char *data, unsigned char len )
-{
-	rnaSendEx( address, 0, data, len );
-}
+	rnaSetIdle();
 
-//------------------------------------------------------------------------------
-void rnaSend( unsigned char address, unsigned char *data, unsigned char len )
-{
-	rnaSendEx( address, RNA_MY_ADDRESS, data, len );
+	return len;
 }
 
 //------------------------------------------------------------------------------
@@ -365,6 +291,9 @@ ISR( RNA_ISR )
 	{
 		return;
 	}
+
+	rnaSetActive();
+
 
 #ifdef RNA_POLL_DRIVEN
 	cli();
@@ -453,13 +382,6 @@ ISR( RNA_ISR )
 				else
 				{
 					unsigned char consumed;
-#ifndef DNA
-					if ( !header )
-					{
-						// came from the 'zeroth' device. only one command is valid: jump to bootloader
-						asm	volatile ("ijmp" ::"z" (RNA_BOOTLOADER_ENTRY));
-					}
-#endif
 					
 					consumed = rnaInputSetup( data, header, index );
 					if ( consumed < index )
@@ -483,7 +405,7 @@ ISR( RNA_ISR )
 		while( s_sendUnitHead )
 		{
 			struct SendUnit *send = (struct SendUnit *)gpointer( s_sendUnitHead );
-			rnaSend( send->toAddress, send->buf, send->size );
+			rnaSendEx( send->toAddress, send->fromAddress, send->buf, send->size );
 			unsigned char next = send->next;
 			gfree( s_sendUnitHead );
 			s_sendUnitHead = next;
@@ -491,6 +413,8 @@ ISR( RNA_ISR )
 	}
 
 	rnaOff();
+
+	rnaSetIdle();
 
 #ifdef RNA_POLL_DRIVEN
 	reti();

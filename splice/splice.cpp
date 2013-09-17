@@ -1,10 +1,10 @@
-/* Copyright: (c) 2013 by Curt Hartung
+/* Copyright: (c) 2013 by Curt Hartung avr@northarc.com
  * This work is released under the Creating Commons 3.0 license
  * found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
  * and in the LICENCE.txt file included with this distribution
  */
 
-#include "loader.hpp"
+#include "splice.hpp"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -15,8 +15,9 @@
 #include <stdio.h>
 #include "../firmware/dna/dna_defs.h"
 #include "../util/str.hpp"
+#include "../util/architecture.hpp"
 
-namespace Loader
+namespace Splice
 {
 	
 //------------------------------------------------------------------------------
@@ -46,15 +47,15 @@ const unsigned char c_bootJumper[]=
 };
 
 //------------------------------------------------------------------------------
-bool checkDNAImage( const unsigned char* image, const unsigned int len, char* err /*=0*/ )
+unsigned int checkDNAImage( const unsigned char* image, const unsigned int len, char* err /*=0*/ )
 {
 	if ( len >= (BOOTLOADER_ENTRY*2) )
 	{
 		if ( err )
 		{
-			sprintf( err, "code too large [0x%08X], must be below bootloader @ 0x%08X", len, (BOOTLOADER_ENTRY*2) );
+			sprintf( err, "code too large [0x%08X], must be below bootSplice @ 0x%08X", len, (BOOTLOADER_ENTRY*2) );
 		}
-		return false;
+		return 0;
 	}
 
 	// decompile the rjmp instruction to find out where it is pointed to
@@ -65,7 +66,7 @@ bool checkDNAImage( const unsigned char* image, const unsigned int len, char* er
 		if ( err )
 		{
 			sprintf( err, "Invalid rjmp offset found for reset vector in image [%s]", image );
-			return false;
+			return 0;
 		}
 	}
 	
@@ -78,45 +79,12 @@ bool checkDNAImage( const unsigned char* image, const unsigned int len, char* er
 			if ( err )
 			{
 				sprintf( err, "Bootjumper signature not found [0x%02X] != [0x%02X] @ instruction #%d\n", image[offset + i], c_bootJumper[i], i/2 );
-				return false;
+				return 0;
 			}
 		}
 	}
 
-	return true;
-}
-
-//------------------------------------------------------------------------------
-DNADEVICE openDevice( char* product )
-{
-	DNADEVICE handle = INVALID_DNADEVICE_VALUE;
-
-	int tries = 10;
-	for( int t = 0; t < tries; t++ )
-	{
-//		Log( "attempting connection [%d/%d]", t+1, tries );
-
-		// okay find our device on th USB
-		char prod[256];
-		handle = DNAUSB::openDevice( 0x16C0, 0x05DF, "p@northarc.com", prod );
-		if ( product )
-		{
-			strcpy( product, prod );
-		}
-
-		if ( handle != INVALID_DNADEVICE_VALUE )
-		{
-			break;
-		}
-
-#ifdef _WIN32
-		Sleep(2000);
-#else
-		sleep(2);
-#endif
-	}
-
-	return handle;
+	return (len * 100) / (BOOTLOADER_ENTRY * 2);
 }
 
 //------------------------------------------------------------------------------
@@ -124,27 +92,27 @@ char* stringFromId( const unsigned char id, char* buf )
 {
 	switch( id )
 	{
-		case OLED_AM88_v1_00:
+		case OLED_AM88:
 		{
-			strcpy( buf, "ATMega88 OLED v1.00" );
+			strcpy( buf, "ATMega88 OLED" );
 			break;
 		}
 
-		case BOOTLOADER_OLED_AM88_v1_00:
+		case BOOTLOADER_OLED_AM88:
 		{
-			strcpy( buf, "Bootloader ATMega88 OLED v1.00" );
+			strcpy( buf, "BootSplice ATMega88 OLED" );
 			break;
 		}
 
-		case DNA_AT84_v1_00:
+		case DNA_AT84:
 		{
-			strcpy( buf, "ATTiny84a DNA v1.00" );
+			strcpy( buf, "ATTiny84a DNA" );
 			break;
 		}
 
-		case BOOTLOADER_DNA_AT84_v1_00:
+		case BOOTLOADER_DNA_AT84:
 		{
-			strcpy( buf, "Bootloader ATTiny84a DNA v1.00" );
+			strcpy( buf, "BootSplice ATTiny84a DNA" );
 			break;
 		}
 

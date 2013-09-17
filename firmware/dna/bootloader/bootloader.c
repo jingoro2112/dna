@@ -63,7 +63,7 @@ unsigned char usbFunctionSetup( unsigned char data[8] )
 	// bother parsing it
 
 	s_replyBuffer[0] = REPORT_DNA;
-	s_replyBuffer[1] = BOOTLOADER_DNA_AT84_v1_00;
+	s_replyBuffer[1] = BOOTLOADER_DNA_AT84;
 	usbMsgPtr = (usbMsgPtr_t)s_replyBuffer;
 
 	return 4;

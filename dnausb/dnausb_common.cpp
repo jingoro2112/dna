@@ -1,5 +1,4 @@
-/*------------------------------------------------------------------------------*/
-/* Copyright: (c) 2013 by Curt Hartung
+/* Copyright: (c) 2013 by Curt Hartung avr@northarc.com
  * This work is released under the Creating Commons 3.0 license
  * found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
  * and in the LICENCE.txt file included with this distribution
@@ -16,9 +15,9 @@ extern SimpleLog Log;
 #include "../firmware/dna/dna_defs.h"
 
 //------------------------------------------------------------------------------
-bool DNAUSB::getProductId( DNADEVICE device, unsigned char *id )
+bool DNAUSB::getProductId( DNADEVICE device, unsigned char *id, unsigned char *version )
 {
-	unsigned char packet[8] = { REPORT_DNA };
+	unsigned char packet[REPORT_DNA_SIZE + 1] = { REPORT_DNA };
 
 	if ( !HID_GetFeature(device, packet, REPORT_DNA_SIZE + 1) )
 	{
@@ -27,13 +26,17 @@ bool DNAUSB::getProductId( DNADEVICE device, unsigned char *id )
 	}
 
 	*id = packet[1];
+	if ( version )
+	{
+		*version = packet[2];
+	}
 	return true;
 }
 
 //------------------------------------------------------------------------------
 static bool sendSystemCommand( DNADEVICE device, const unsigned char cmd, const unsigned char param =0 )
 {
-	unsigned char comm[8] = { REPORT_DNA };
+	unsigned char comm[REPORT_DNA_SIZE + 1] = { REPORT_DNA };
 	comm[1] = cmd;
 	comm[2] = param;
 	
@@ -53,106 +56,194 @@ bool DNAUSB::sendEnterBootloader( DNADEVICE device )
 }
 
 //------------------------------------------------------------------------------
-bool DNAUSB::sendCode( DNADEVICE device, const unsigned char* code, const unsigned int size )
+bool DNAUSB::sendCode( const int vid, const int pid, const char* vendor,
+					   const unsigned char* code,
+					   const unsigned int size,
+					   void (*status)(const unsigned int percent) /*=0*/ )
 {
-	unsigned char codePage[8] = { REPORT_DNA };
+	bool confirm = false;
+	DNADEVICE device;
 
-	// todo- some fancy down-count so this is done in a single pass
-	// rather than up from page 1 then second pass for page zero. like
-	// I have the time to be fancy?
-
-	// upload all the code starting from page 1, so the Interrupt
-	// Vector Table is loaded last
-	unsigned short address = 64;
-	unsigned int pos = 64;
-	while( pos < size )
+	if ( status )
 	{
-		for( int i=0; i<32; i += 2 )
+		status( 25 );
+	}
+
+	int tries = 0;
+	for(;;)
+	{
+		Arch::sleep( 100 );
+
+		for( ; tries < 10; tries++ )
 		{
-			if ( pos < size )
+			if ( (device = DNAUSB::openDevice(vid, pid, vendor)) != INVALID_DNADEVICE_VALUE )
 			{
-				codePage[1] = i*2;
-				codePage[2] = code[pos++];
-				codePage[3] = code[pos++];
-				codePage[4] = code[pos++];
-				codePage[5] = code[pos++];
-			}
-			else
-			{
-				pos += 4; // so the printf reads properly
+				break;
 			}
 
-			if ( !HID_SetFeature(device, codePage, REPORT_DNA_SIZE + 1) )
-			{
-				Log( "failed to sendCode <1>" );
-				return false;
-			}
+			Arch::sleep( 2000 );
 		}
-
-		Log( "page[%d/%d]", (pos/64) - 1, size/64 );
-
-		codePage[1] = BootloaderCommandCommitPage;
-		*(unsigned short *)(codePage + 2) = address;
-		address += 64;
-
-		if ( !HID_SetFeature(device, codePage, REPORT_DNA_SIZE + 1) )
+		
+		if ( tries >= 10 )
 		{
-			Log( "failed to send page commit <1>" );
+			Log( "Could not open device" );
 			return false;
 		}
-
-		Arch::sleep( 10 ); // nmust give the chip time to commit the page or bad things happen
-	}
-
-	// now load page zero
-	pos = 0;
-	for( int i=0; i<32; i += 2 )
-	{
-		if ( pos < size )
+		
+		unsigned char id;
+		if ( !DNAUSB::getProductId(device, &id) )
 		{
-			codePage[1] = i*2;
-			codePage[2] = code[pos++];
-			codePage[3] = code[pos++];
-			codePage[4] = code[pos++];
-			codePage[5] = code[pos++];
+			Log( "failed to get product id" );
+			DNAUSB::closeDevice( device );
 		}
 
-		if ( !HID_SetFeature(device, codePage, REPORT_DNA_SIZE + 1) )
+		switch( id )
 		{
-			Log( "failed to sendCode <2>" );
-			return false;
+			case BOOTLOADER_OLED_AM88:
+			case BOOTLOADER_DNA_AT84:
+			{
+				unsigned char codePage[REPORT_DNA_SIZE + 1] = { REPORT_DNA };
+
+				// todo- some fancy down-count so this is done in a single pass
+				// rather than up from page 1 then second pass for page zero. like
+				// I have the time to be fancy?
+
+				// upload all the code starting from page 1, so the Interrupt
+				// Vector Table is loaded last
+				unsigned short address = 64;
+				unsigned int pos = 64;
+				while( pos < size )
+				{
+					for( int i=0; i<32; i += 2 )
+					{
+						if ( pos < size )
+						{
+							codePage[1] = i*2;
+							codePage[2] = code[pos++];
+							codePage[3] = code[pos++];
+							codePage[4] = code[pos++];
+							codePage[5] = code[pos++];
+						}
+						else
+						{
+							pos += 4; // so the printf reads properly
+						}
+
+						if ( !DNAUSB::HID_SetFeature(device, codePage, REPORT_DNA_SIZE + 1) )
+						{
+							Log( "failed to sendCode <1>" );
+							DNAUSB::closeDevice( device );
+							return false;
+						}
+					}
+
+					if ( status )
+					{
+						status( (((pos/64) - 1) * 100) / ((size/64)+1) );
+					}
+					Log( "page[%d/%d]", (pos/64) - 1, size/64 );
+
+					codePage[1] = BootloaderCommandCommitPage;
+					*(unsigned short *)(codePage + 2) = address;
+					address += 64;
+
+					if ( !DNAUSB::HID_SetFeature(device, codePage, REPORT_DNA_SIZE + 1) )
+					{
+						Log( "failed to send page commit <1>" );
+						DNAUSB::closeDevice( device );
+						return false;
+					}
+
+					Arch::sleep( 10 ); // nmust give the chip time to commit the page or bad things happen
+				}
+
+				// now load page zero
+				pos = 0;
+				for( int i=0; i<32; i += 2 )
+				{
+					if ( pos < size )
+					{
+						codePage[1] = i*2;
+						codePage[2] = code[pos++];
+						codePage[3] = code[pos++];
+						codePage[4] = code[pos++];
+						codePage[5] = code[pos++];
+					}
+
+					if ( !DNAUSB::HID_SetFeature(device, codePage, REPORT_DNA_SIZE + 1) )
+					{
+						Log( "failed to sendCode <2>" );
+						DNAUSB::closeDevice( device );
+						return false;
+					}
+				}
+
+				// comitting this page will also cause the bootloader to jump to
+				// the new code, if the checksum passes
+				codePage[1] = BootloaderCommandCommitPage;
+				codePage[2] = 0;
+				codePage[3] = 0;
+				*(unsigned short *)(codePage + 4) = size;
+				codePage[6] = 0;
+				for( unsigned int j=0; j<size; j++ )
+				{
+					codePage[6] += code[j];
+				}
+
+				if ( !DNAUSB::HID_SetFeature(device, codePage, REPORT_DNA_SIZE + 1) )
+				{
+					Log( "failed to send page commit <2>" );
+					DNAUSB::closeDevice( device );
+					return false;
+				}
+
+				// "comitted zero page, app should be running
+				
+				Arch::sleep( 100 ); // must give the I/O layer time to commit/flush
+				
+				confirm = true;
+				DNAUSB::closeDevice( device );
+				device = INVALID_DNADEVICE_VALUE;
+				
+				break;
+			}
+
+			default:
+			{
+				if ( confirm )
+				{
+					if ( status )
+					{
+						status( 100 );
+					}
+
+					DNAUSB::closeDevice( device );
+					return true;
+				}
+
+				if ( status )
+				{
+					status( 25 );
+				}
+				
+				if ( !DNAUSB::sendEnterBootloader(device) )
+				{
+					DNAUSB::closeDevice( device );
+					return false;
+				}
+
+				DNAUSB::closeDevice( device );
+				device = INVALID_DNADEVICE_VALUE;
+				break;
+			}
 		}
 	}
-
-	// comitting this page will also cause the bootloader to jump to
-	// the new code, if the checksum passes
-	codePage[1] = BootloaderCommandCommitPage;
-	codePage[2] = 0;
-	codePage[3] = 0;
-	*(unsigned short *)(codePage + 4) = size;
-	codePage[6] = 0;
-	for( unsigned int j=0; j<size; j++ )
-	{
-		codePage[6] += code[j];
-	}
-
-	if ( !HID_SetFeature(device, codePage, REPORT_DNA_SIZE + 1) )
-	{
-		Log( "failed to send page commit <2>" );
-		return false;
-	}
-
-	printf( "comitted zero page, app should be running\n" );
-
-	Arch::sleep( 10 ); // nmust give the chip time to commit the page or bad things happen
-
-	return true;
 }
 
 //------------------------------------------------------------------------------
 bool DNAUSB::sendData( DNADEVICE device, const unsigned char* data, const unsigned char size )
 {
-	unsigned char packet[131] = { REPORT_DNA_DATA };
+	unsigned char packet[REPORT_DNA_DATA_SIZE + 1] = { REPORT_DNA_DATA };
 	packet[1] = size;
 	memcpy( packet + 2, data, size );
 
@@ -168,7 +259,7 @@ bool DNAUSB::sendData( DNADEVICE device, const unsigned char* data, const unsign
 //------------------------------------------------------------------------------
 bool DNAUSB::sendCommand( DNADEVICE device, const unsigned char command, const unsigned char data[5] )
 {
-	unsigned char packet[8] = { REPORT_DNA };
+	unsigned char packet[REPORT_DNA_SIZE + 1] = { REPORT_DNA };
 	packet[1] = USBCommandUser;
 	packet[2] = command;
 	if ( data )
@@ -186,18 +277,20 @@ bool DNAUSB::sendCommand( DNADEVICE device, const unsigned char command, const u
 }
 
 //------------------------------------------------------------------------------
-bool DNAUSB::getData( DNADEVICE device, unsigned char* data, unsigned char* size /*=0*/ )
+bool DNAUSB::getData( DNADEVICE device, unsigned char* data, unsigned char* size /*=0*/, unsigned char sizeExpected /*=0*/ )
 {
-	unsigned char message[131] = { REPORT_DNA_DATA };
+	unsigned char message[REPORT_DNA_DATA_SIZE + 1] = { REPORT_DNA_DATA };
+	memset( message + 1, 0xFE, REPORT_DNA_DATA_SIZE );
+	
 	for(;;)
 	{
 		if ( !DNAUSB::HID_GetFeature(device, message, REPORT_DNA_DATA_SIZE + 1) )
 		{
-			Log( "failed to poll for available data" );
+			printf( "failed to poll for available data" );
 			return false;
 		}
 
-		if ( message[1] )
+		if ( message[1] ) // [1] is the outgoing queue length
 		{
 			break;
 		}
@@ -206,12 +299,19 @@ bool DNAUSB::getData( DNADEVICE device, unsigned char* data, unsigned char* size
 		Arch::sleep( 100 );
 	}
 
+	// this is defined as fatal!
+	if ( sizeExpected && (message[1] != sizeExpected) )
+	{
+		return false;
+	}
+	
 	if ( size )
 	{
 		*size = message[1];
 	}
-	
-	memcpy( data, message + 2, message[1] );
+
+	memcpy( data, message + 2, sizeExpected ? sizeExpected :  message[1] );
+
 	return true;
 }
 

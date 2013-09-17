@@ -52,7 +52,10 @@ unsigned char galloc( unsigned char size )
 	{
 		s_firstFree[1] = 0x1;
 	}
-	
+
+	// by asking for our own pointer (by definition the last in line)
+	// as a side-effect the current 'free' handle is checked for
+	// collision
 	_gtraverse( ret );
 	
 	return ret;
