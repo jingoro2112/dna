@@ -95,4 +95,6 @@ void rnaPoll();
 unsigned char rnaInputSetup( unsigned char *data, unsigned char from, unsigned char len );
 void rnaInputStream( unsigned char *data, unsigned char bytes );
 
+void rnaDebugMessage( char* message );
+
 #endif

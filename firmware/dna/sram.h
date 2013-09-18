@@ -41,21 +41,17 @@
 #define SRAM_READ_STATUS   0x05
 
 void sramStartRead( unsigned int address );
+unsigned char sramReadByte();
 void sramStartWrite( unsigned int address );
-
-void sramClockOutBit( unsigned char bit );
-void sramClockOutByte( unsigned char byte );
-
-unsigned char sramClockInBit();
-unsigned char sramClockInByte();
-
-unsigned char sramRead( unsigned int address );
-
-void sramWrite( unsigned int address, unsigned char data );
-void sramInit();
+void sramWriteByte( unsigned char byte );
 #define sramStop() sramSetCSHigh();
 
+unsigned char sramAtomicRead( unsigned int address );
+void sramAtomicWrite( unsigned int address, unsigned char data );
+
+void sramInit();
+
+#include <util/delay.h>
+#define sramDelay() _delay_us(5)
+
 #endif
-
-
-

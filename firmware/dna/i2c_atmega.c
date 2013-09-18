@@ -1,9 +1,10 @@
-#include "i2c.h"
-/* Copyright: (c) 2013 by Curt Hartung
+/* Copyright: (c) 2013 by Curt Hartung avr@northarc.com
  * This work is released under the Creating Commons 3.0 license
  * found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
  * and in the LICENCE.txt file included with this distribution
  */
+
+#include "i2c_atmega.h"
 
 //------------------------------------------------------------------------------
 void i2cWaitLoop()

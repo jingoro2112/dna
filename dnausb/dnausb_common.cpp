@@ -90,7 +90,7 @@ bool DNAUSB::sendCode( const int vid, const int pid, const char* vendor,
 			return false;
 		}
 		
-		unsigned char id;
+		unsigned char id = 0;
 		if ( !DNAUSB::getProductId(device, &id) )
 		{
 			Log( "failed to get product id" );

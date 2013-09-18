@@ -422,3 +422,26 @@ ISR( RNA_ISR )
 	rnaClearINT();
 #endif
 }
+
+/*
+//------------------------------------------------------------------------------
+void rnaDebugMessage( char* message )
+{
+	unsigned char len = 0;
+	for( ; message[len]; len++ );
+	len++;
+
+	unsigned char hndl = galloc( len );
+	char* msg = gpointer( hndl );
+	msg
+	
+
+	unsigned char newSend = galloc( sizeof(struct SendUnit) );
+
+	if ( RNA_MY_ADDRESS != 0x1 ) // not the master
+	{
+		while( 
+		rnaSendEx( 0x1, RNA_MY_ADDRESS, message,  )
+	}
+}
+*/

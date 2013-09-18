@@ -7,10 +7,6 @@
  * and in the LICENCE.txt file included with this distribution
  */
 
-#if !defined(DNA) && !defined(OLED) && !defined(PROTO88) && !defined(DNAPROTO)
-#error Must define a hardware platform
-#endif
-
 // not using typedef sine C-ish libraris #DEFINE this and that collides
 // when include-order matters
 #ifndef uchar

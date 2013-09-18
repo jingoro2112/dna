@@ -8,20 +8,14 @@
 #define USBUTIL_H
 
 #ifdef _WIN32
-#include <winsock2.h>
-#include <windows.h>
-#define DNADEVICE HANDLE
-#define INVALID_DNADEVICE_VALUE INVALID_HANDLE_VALUE
-
+ #include <winsock2.h>
+ #include <windows.h>
+ #define DNADEVICE HANDLE
+ #define INVALID_DNADEVICE_VALUE INVALID_HANDLE_VALUE
 #else
-//#include <libusb.h>
-//#define DNADEVICE libusb_device_handle*
-//#define INVALID_DNADEVICE_VALUE 0
-
-#include "linux/hidapi/hidapi.h"
-#define DNADEVICE hid_device*
-#define INVALID_DNADEVICE_VALUE 0
-
+ #include "linux/hidapi/hidapi.h"
+ #define DNADEVICE hid_device*
+ #define INVALID_DNADEVICE_VALUE 0
 #endif
 
 namespace DNAUSB

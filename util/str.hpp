@@ -349,7 +349,7 @@ bool Cstr::fileToBuffer( const char* fileName )
 		return false;
 	}
 
-#ifdef WIN32
+#ifdef _WIN32
 	struct _stat sbuf;
 	int ret = _stat( fileName, &sbuf );
 #else
@@ -632,7 +632,7 @@ bool Cstr::isMatch( const char* buf, bool matchCase /*=true*/, bool matchPartial
 	}
 	else
 	{
-#ifdef WIN32
+#ifdef _WIN32
 		return _strnicmp( m_str, buf, len ) == 0;
 #else
 		return strncasecmp( m_str, buf, len ) == 0;

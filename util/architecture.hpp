@@ -1,29 +1,24 @@
-#ifndef ARCHITECTURE_H
-#define ARCHITECTURE_H
-/*------------------------------------------------------------------------------*/
-/* Copyright: (c) 2013 by Curt Hartung
+/* Copyright: (c) 2013 by Curt Hartung avr@northarc.com
  * This work is released under the Creating Commons 3.0 license
  * found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
  * and in the LICENCE.txt file included with this distribution
  */
+#ifndef ARCHITECTURE_H
+#define ARCHITECTURE_H
 
-#ifdef _WIN32
-
-#pragma once
-#include <winsock2.h>
-#include <windows.h>
-#include <conio.h>
-#include <process.h>
-
+#if defined(_WIN32)
+ #include <conio.h>
+ #include <winsock2.h>
+ #include <windows.h>
+ #include <process.h>
 #else
-
-#include <unistd.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <sys/syscall.h>
-#define InterlockedIncrement(V) __sync_add_and_fetch((V), 1)
-#define InterlockedDecrement(V) __sync_sub_and_fetch((V), 1)
-
+ #include <time.h>
+ #include <unistd.h>
+ #include <sys/time.h>
+ #include <sys/types.h>
+ #include <sys/syscall.h>
+ #define InterlockedIncrement(V) __sync_add_and_fetch((V), 1)
+ #define InterlockedDecrement(V) __sync_sub_and_fetch((V), 1)
 #endif
 
 #include <stdio.h>
@@ -36,7 +31,7 @@ namespace Arch
 
 inline int kbhit()
 {
-#ifdef _WIN32
+#if defined(_WIN32)
 	return ::kbhit();
 #else
 	struct timeval tv;
@@ -55,7 +50,7 @@ inline int kbhit()
 //------------------------------------------------------------------------------
 inline void sleep( unsigned int milliseconds )
 {
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__CYGWIN__)
 	::Sleep( milliseconds );
 #else
 	usleep( milliseconds * 1000 );
@@ -65,7 +60,7 @@ inline void sleep( unsigned int milliseconds )
 //------------------------------------------------------------------------------
 inline int getpid()
 {
-#ifdef _WIN32
+#if defined(_WIN32)
 	return (int)_getpid();
 #else
 	return (int)::getpid();
@@ -75,7 +70,7 @@ inline int getpid()
 //------------------------------------------------------------------------------
 inline int gettid()
 {
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__CYGWIN__)
 	return (int)GetCurrentThreadId();
 #else
 	return (int)syscall(SYS_gettid);

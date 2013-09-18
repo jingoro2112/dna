@@ -39,22 +39,27 @@ void __init()
 		WDTCSR = 0;
 		goto bootloader_jump; // waste not, want not, this saves a few bytes (ijmp take 3 instructions, goto only 1)
 	}
+
+	// The logic is a little tortured; the reason is to put the
+	// bootloader jump at the very end, since it's target location
+	// will vary and therefore can't be brute-force checked like the
+	// rest of this code by the loader
+
+	_delay_us(50); // give state a chance to settle
 	
-	// give the pin a chance to stabilize and clock in, can't be too
-	// careful, dont want to enter the bootloader accidentally, since
-	// it is an irreversible action (it overwrites the vector table)
-	_delay_us(50);
-	if ( !(PINB & 0b00001000) )
+	for( unsigned int i=0xFFFF; i; i-- )
 	{
-bootloader_jump:
-		asm	volatile ("ijmp" ::"z" (BOOTLOADER_ENTRY)); // jump to bootloader!
+		// pin must be HELD low, make sure spurious RNA requests do not reset us!
+		if ( PINB & 0b00001000 ) 
+		{
+			goto normalExit;
+		}
 	}
-
-	// The logic is a little tortured; the reason is to put this jump
-	// at the very end, since it's target location will vary and
-	// therefore can't be brute-force checked like the rest of this
-	// code by the loader
-
-	asm volatile ( "rjmp __ctors_end" ); // return to our regularly scheduled C program
+	
+bootloader_jump:
+	asm	volatile ("ijmp" ::"z" (BOOTLOADER_ENTRY)); // jump to bootloader!
+	
+normalExit:
+	asm volatile ( "rjmp __ctors_end" ); // recovery not called for; return to the regularly scheduled C program
 }
 

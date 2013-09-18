@@ -19,8 +19,14 @@
 
 namespace Splice
 {
-	
+
 //------------------------------------------------------------------------------
+// this EXACT code signature must be found for splice to consent to
+// uploading code. It is checked that the RESET vector points to this
+// code block, and that it is byte-for-byte intact. The reason is
+// emergency recovery in the case that pooched software is uploaded,
+// this will recover the board in all but the worst-case scenario
+// (where the Flash and/or bootloader has been corrupted)
 const unsigned char c_bootJumper[]=
 {
 	0x11, 0x24, // eor	r1, r1
@@ -29,19 +35,23 @@ const unsigned char c_bootJumper[]=
 	0x88, 0xbb, // out	0x18, r24	; 24
 	0x01, 0xb4, // in	r0, 0x21	; 33
 	0x03, 0xfe, // sbrs	r0, 3
-	0x06, 0xc0, // rjmp	.+12     	; 0x382 <__init+0x1a>
+	0x06, 0xc0, // rjmp	.+12     	; 0x38a <__init+0x1a>
 	0x14, 0xbe, // out	0x34, r1	; 52
 	0x81, 0xb5, // in	r24, 0x21	; 33
 	0x88, 0x61, // ori	r24, 0x18	; 24
 	0x81, 0xbd, // out	0x21, r24	; 33
 	0x11, 0xbc, // out	0x21, r1	; 33
-	0x05, 0xc0, // rjmp	.+10     	; 0x38c <__init+0x24>
+	0x09, 0xc0, // rjmp	.+18     	; 0x39c <__init+0x2c>
 	0x88, 0xec, // ldi	r24, 0xC8	; 200
 	0x8a, 0x95, // dec	r24
-	0xf1, 0xf7, // brne	.-4      	; 0x384 <__init+0x1c>
+	0xf1, 0xf7, // brne	.-4      	; 0x38c <__init+0x1c>
+	0x8f, 0xef, // ldi	r24, 0xFF	; 255
+	0x9f, 0xef, // ldi	r25, 0xFF	; 255
 	0xb3, 0x99, // sbic	0x16, 3	; 22
-	0x03, 0xc0, // rjmp	.+6      	; 0x392 <__init+0x2a>
-	0xe0, 0xea, // ldi	r30, 0xA0	; 96
+	0x05, 0xc0, // rjmp	.+10     	; 0x3a2 <__init+0x32>
+	0x01, 0x97, // sbiw	r24, 0x01	; 1
+	0xe1, 0xf7, // brne	.-8      	; 0x394 <__init+0x24>
+	0xe0, 0xea, // ldi	r30, 0xA0	; 160
 	0xfc, 0xe0, // ldi	r31, 0x0C	; 12
 	0x09, 0x94, // ijmp
 };
@@ -58,7 +68,7 @@ unsigned int checkDNAImage( const unsigned char* image, const unsigned int len, 
 		return 0;
 	}
 
-	// decompile the rjmp instruction to find out where it is pointed to
+	// decompile the RESET vector rjmp instruction to find out where it is pointed to
 	unsigned int offset = 2 * ( 1 + (image[0] + (((int)image[1] & 0x3F) << 8)));
 	
 	if ( (offset + sizeof(c_bootJumper)) >= len )
@@ -78,7 +88,7 @@ unsigned int checkDNAImage( const unsigned char* image, const unsigned int len, 
 		{
 			if ( err )
 			{
-				sprintf( err, "Bootjumper signature not found [0x%02X] != [0x%02X] @ instruction #%d\n", image[offset + i], c_bootJumper[i], i/2 );
+				sprintf( err, "Bootjumper signature corrupt/absent [0x%02X] != [0x%02X] @ instruction #%d\n", image[offset + i], c_bootJumper[i], i/2 );
 				return 0;
 			}
 		}

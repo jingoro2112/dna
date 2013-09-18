@@ -109,7 +109,7 @@ unsigned char i2cReadByte()
 }
 
 //------------------------------------------------------------------------------
-void i2cInit( unsigned char c )
+void i2cInit()
 {
 	PORTA |= i2cSCL | i2cSDA;
 	DDRA |= i2cSCL | i2cSDA;

@@ -11,37 +11,23 @@
 //------------------------------------------------------------------------------
 void sramStartRead( unsigned int address )
 {
-	sramClockOutByte( 0b00000011 ); // start a read
-	sramClockOutByte( (unsigned char)(address >> 8) );
-	sramClockOutByte( (unsigned char)address );
+	sramSetCSLow();
+	sramWriteByte( 0b00000011 ); // start a read
+	sramWriteByte( (unsigned char)(address >> 8) );
+	sramWriteByte( (unsigned char)address );
 }
 
 //------------------------------------------------------------------------------
 void sramStartWrite( unsigned int address )
 {
-	sramClockOutByte( 0b00000010 ); // start a write
-	sramClockOutByte( (unsigned char)(address >> 8) );
-	sramClockOutByte( (unsigned char)address );
+	sramSetCSLow();
+	sramWriteByte( 0b00000010 ); // start a write
+	sramWriteByte( (unsigned char)(address >> 8) );
+	sramWriteByte( (unsigned char)address );
 }
 
 //------------------------------------------------------------------------------
-void sramClockOutBit( unsigned char bit )
-{
-	if( bit )
-	{
-		sramSetSIHigh();
-	}
-	else
-	{
-		sramSetSILow();
-	}
-	
-	sramSetSCKHigh();
-	sramSetSCKLow();
-}
-
-//------------------------------------------------------------------------------
-void sramClockOutByte( unsigned char byte )
+void sramWriteByte( unsigned char byte )
 {
 	unsigned char bit = 0x80;
 	do
@@ -54,33 +40,28 @@ void sramClockOutByte( unsigned char byte )
 		{
 			sramSetSILow();
 		}
+		sramDelay();
 		sramSetSCKHigh();
+		sramDelay();
 		sramSetSCKLow();
 
 	} while( bit >>= 1 );
 }
 
 //------------------------------------------------------------------------------
-unsigned char sramClockInBit()
-{
-	sramSetSCKHigh();
-	unsigned char ret = sramGetSO();
-	sramSetSCKLow();
-	return ret;
-}
-
-//------------------------------------------------------------------------------
-unsigned char sramClockInByte()
+unsigned char sramReadByte()
 {
 	unsigned char bit = 0x80;
 	unsigned char ret = 0;
 	do
 	{
+		sramDelay();
 		sramSetSCKHigh();
 		if ( sramGetSO() )
 		{
 			ret |= bit;
 		}
+		sramDelay();
 		sramSetSCKLow();
 				
 	} while( bit >>= 1 );
@@ -89,24 +70,19 @@ unsigned char sramClockInByte()
 }
 
 //------------------------------------------------------------------------------
-unsigned char sramRead( unsigned int address )
+unsigned char sramAtomicRead( unsigned int address )
 {
-	sramSetCSLow();
-
 	sramStartRead( address );
-	unsigned char ret = sramClockInByte();
-	
+	unsigned char ret = sramReadByte();
 	sramSetCSHigh();
-	
 	return ret;
 }
 
 //------------------------------------------------------------------------------
-void sramWrite( unsigned int address, unsigned char data )
+void sramAtomicWrite( unsigned int address, unsigned char data )
 {
-	sramSetCSLow();
 	sramStartWrite( address );
-	sramClockOutByte( data );
+	sramWriteByte( data );
 	sramSetCSHigh();
 }
 
@@ -114,10 +90,11 @@ void sramWrite( unsigned int address, unsigned char data )
 void sramInit()
 {
 	// set up port directions
-	SRAM_CS_DDR_L |= (1<<SRAM_CS_PIN);
-	SRAM_SI_DDR_L |= (1<<SRAM_SI_PIN);
-	SRAM_SO_DDR_L &= ~(1<<SRAM_SO_PIN);
-	SRAM_SCK_DDR_L |= (1<<SRAM_SCK_PIN);
+	SRAM_CS_DDR_L |= (1<<SRAM_CS_PIN); // chip select
+	SRAM_SI_DDR_L |= (1<<SRAM_SI_PIN); // serial in (output to the SRAM)
+	SRAM_SO_DDR_L &= ~(1<<SRAM_SO_PIN); // serial out (input from the SRAM)
+	SRAM_SO_PORT_L |= (1<<SRAM_SO_PIN); // turn on pullup
+	SRAM_SCK_DDR_L |= (1<<SRAM_SCK_PIN); // clock
 
 	// init state
 	sramSetCSHigh();
@@ -125,7 +102,7 @@ void sramInit()
 
 	// set internal options
 	sramSetCSLow();
-	sramClockOutByte( 0b00000001 );
-	sramClockOutByte( 0b01000001 );
+	sramWriteByte( 0b00000001 ); // write to status register
+	sramWriteByte( 0b01000001 ); // set sequential mode
 	sramSetCSHigh();
 }

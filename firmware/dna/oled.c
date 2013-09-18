@@ -5,8 +5,10 @@
  * and in the LICENCE.txt file included with this distribution
  */
 
-#include <i2c.h>
 #include <util/delay.h>
+#include <avr/io.h>
+
+#include "i2c_interface.h"
 
 //------------------------------------------------------------------------------
 // ineffcient in time, yes, small code space making this
@@ -48,8 +50,13 @@ void oledClear()
 }
 
 //------------------------------------------------------------------------------
-void oledInit(void)
+void oledInit()
 {
+	OLED_CS_DDR |= 1<<OLED_CS_PIN_NUMBER;
+	OLED_RESET_DDR |= 1<<OLED_RESET_PIN_NUMBER;
+
+	oledCSLow();
+
 	oledResetLow();
 	_delay_ms( 100 );
 	oledResetHigh();

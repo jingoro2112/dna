@@ -8,17 +8,12 @@ TARGET = oled
 OBJS = \
 	objs/rna.o \
 	objs/main.o \
-	objs/i2c_brute.o \
-	objs/oled.o \
-	objs/24c512.o \
-	objs/sram.o \
-	objs/galloc.o \
 
 MCU = attiny84
 CPU_FREQUENCY = 8000000
 PLATFORM = OLED
 
-CC = avr-gcc -Wall -I. -I../dna -MD -Os -std=gnu99 -fdata-sections -ffunction-sections -funsigned-char -funsigned-bitfields -fno-inline-small-functions -D$(PLATFORM)=1 -mmcu=$(MCU) -DF_CPU=$(CPU_FREQUENCY)
+CC = avr-gcc -Wall -I. -I../../dna -DRNA_POLL_DRIVEN=1 -MD -Os -fdata-sections -ffunction-sections -funsigned-char -funsigned-bitfields -fno-inline-small-functions -D$(PLATFORM)=1 -mmcu=$(MCU) -DF_CPU=$(CPU_FREQUENCY)
 
 all: $(TARGET).hex
 
@@ -37,23 +32,5 @@ $(TARGET).hex: $(OBJS)
 objs/main.o: main.c
 	$(CC) -c $< -o $@
 
-objs/i2c_brute.o: ../dna/i2c_brute.c
-	$(CC) -c $< -o $@
-
-objs/usb.o: ../dna/usb.c
-	$(CC) -c $< -o $@
-
-objs/oled.o: ../dna/oled.c
-	$(CC) -c $< -o $@
-
-objs/24c512.o: ../dna/24c512.c
-	$(CC) -c $< -o $@
-
-objs/sram.o: ../dna/sram.c
-	$(CC) -c $< -o $@
-
-objs/rna.o: ../dna/rna.c
-	$(CC) -c $< -o $@
-
-objs/galloc.o: ../dna/galloc.c
+objs/rna.o: ../../dna/rna.c
 	$(CC) -c $< -o $@

@@ -15,7 +15,7 @@ unsigned char i2cStartWrite( unsigned char address );
 unsigned char i2cWrite( unsigned char data );
 unsigned char i2cReadStream(); // Read a bye, expecting more (ack)
 unsigned char i2cReadByte(); // Read a single byte and terminate transmission (nack)
-void i2cInit( unsigned char c );
+void i2cInit();
 void i2cStart();
 void i2cStop();
 
@@ -29,7 +29,6 @@ void i2cStop();
 #define i2cSetSDAHigh() (DDRA &= ~i2cSDA);
 #define i2cSetSCLLow() (PORTA &= ~i2cSCL);
 #define i2cSetSCLHigh() (PORTA |= i2cSCL);
-
 
 #define i2cGetSDA() (PINA & i2cSDA)
 

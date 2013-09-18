@@ -1,11 +1,8 @@
-/* Copyright: (c) 2013 by Curt Hartung
+/* Copyright: (c) 2013 by Curt Hartung avr@northarc.com
  * This work is released under the Creating Commons 3.0 license
  * found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
  * and in the LICENCE.txt file included with this distribution
  */
-
-#include <winsock2.h>
-#include <windows.h>
 
 #include "splice.hpp"
 
@@ -15,8 +12,6 @@
 #include "../util/mainargs.hpp"
 #include "../util/architecture.hpp"
 #include "../firmware/dna/dna_defs.h"
-
-#include "../../morlock/firmware/morlock_defs.h"
 
 #include <stdio.h>
 #include <ctype.h>
@@ -50,111 +45,9 @@ int usage()
 	return 0;
 }
 
-
-//#include "../firmware/dna/galloc.h"
-//unsigned char __heap_start;
-
-
 //------------------------------------------------------------------------------
 int main( int argc, char *argv[] )
 {
-	/*
-	unsigned char heap[2048];
-	grelocateHeap( heap );
-
-	for( int j=0; j<122; j++ )
-	{
-		unsigned char h = galloc(1);	
-	}
-
-	for(;;)
-	{
-		unsigned char h1 = galloc(10);
-		memset( gpointer(h1), 0x11, 10 );
-		unsigned char h2 = galloc(11);
-		memset( gpointer(h2), 0x22, 11 );
-		unsigned char h3 = galloc(20);
-		memset( gpointer(h3), 0x33, 20 );
-		unsigned char h4 = galloc(50);
-		memset( gpointer(h4), 0x44, 50 );
-		gfree( h3 );
-		gfree( h2 );
-		gfree( h4 );
-		gfree( h1 );
-
-		h1 = galloc(10);
-		memset( gpointer(h1), 0x11, 10 );
-		h2 = galloc(11);
-		memset( gpointer(h2), 0x22, 11 );
-		h3 = galloc(20);
-		memset( gpointer(h3), 0x33, 20 );
-		h4 = galloc(50);
-		memset( gpointer(h4), 0x44, 50 );
-		gfree( h4 );
-		gfree( h3 );
-		gfree( h2 );
-		gfree( h1 );
-
-
-		h1 = galloc(10);
-		memset( gpointer(h1), 0x11, 10 );
-		h2 = galloc(11);
-		memset( gpointer(h2), 0x22, 11 );
-		h3 = galloc(20);
-		memset( gpointer(h3), 0x33, 20 );
-		h4 = galloc(50);
-		memset( gpointer(h4), 0x44, 50 );
-		gfree( h1 );
-		gfree( h2 );
-		gfree( h3 );
-		gfree( h4 );
-
-
-		h1 = galloc(10);
-		memset( gpointer(h1), 0x11, 10 );
-		h2 = galloc(11);
-		memset( gpointer(h2), 0x22, 11 );
-		h3 = galloc(20);
-		memset( gpointer(h3), 0x33, 20 );
-		h4 = galloc(50);
-		memset( gpointer(h4), 0x44, 50 );
-		gfree( h1 );
-		gfree( h4 );
-		gfree( h3 );
-		gfree( h2 );
-
-
-		h1 = galloc(10);
-		memset( gpointer(h1), 0x11, 10 );
-		h2 = galloc(11);
-		memset( gpointer(h2), 0x22, 11 );
-		h3 = galloc(20);
-		memset( gpointer(h3), 0x33, 20 );
-		h4 = galloc(50);
-		memset( gpointer(h4), 0x44, 50 );
-		gfree( h2 );
-		gfree( h1 );
-		gfree( h3 );
-		gfree( h4 );
-	}
-*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	
 	MainArgs args( argc, argv );
 
 	if ( args.isSet("-?") || args.isSet("-help") || args.isSet("--help") )
@@ -179,6 +72,7 @@ int main( int argc, char *argv[] )
 
 	if ( args.isSet("-t") )
 	{
+		/*
 		unsigned char buffer[256];
 		EEPROMConstants *consts = (EEPROMConstants *)buffer;
 
@@ -239,6 +133,7 @@ int main( int argc, char *argv[] )
 		}
 		DNAUSB::closeDevice( handle );
 		return 0;
+		*/
 	}
 
 	unsigned char id;
