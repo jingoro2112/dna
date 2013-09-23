@@ -92,8 +92,8 @@ unsigned char rnaSendEx( unsigned char address, unsigned char fromAddress, unsig
 #define rnaProbe( address ) rnaSendEx((address), RNA_MY_ADDRESS, 0, 0)
 void rnaPoll();
 
-unsigned char rnaInputSetup( unsigned char *data, unsigned char from, unsigned char len );
-void rnaInputStream( unsigned char *data, unsigned char bytes );
+unsigned char rnaInputSetup( unsigned char *data, unsigned char dataLen, unsigned char from, unsigned char totalLen );
+void rnaInputStream( unsigned char *data, unsigned char dataLen );
 
 void rnaDebugMessage( char* message );
 

@@ -1,4 +1,5 @@
-/* Copyright: (c) 2013 by Curt Hartung
+/*------------------------------------------------------------------------------*
+ * Copyright: (c) 2013 by Curt Hartung avr@northarc.com
  * This work is released under the Creating Commons 3.0 license
  * found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
  * and in the LICENCE.txt file included with this distribution
@@ -11,7 +12,6 @@
 #include <avr/interrupt.h>
 #include <avr/boot.h>
 #include <avr/pgmspace.h>
-#include <avr/wdt.h>
 #include <util/delay.h>
 
 // for some reason this compiles larger under Win-AVR than linux
@@ -108,6 +108,9 @@ unsigned char usbFunctionWrite( unsigned char *data, unsigned char len )
 
 				if ( index != *data )
 				{
+					// we just overwrote page zero and the checksum
+					// didn't match! 'abort' by completely
+					// restarting, thus re-installing the trampoline
 					asm volatile ("ijmp" ::"z" (BOOTLOADER_ENTRY)); // WARNING! DANGER! REBOOT!
 				}
 				else

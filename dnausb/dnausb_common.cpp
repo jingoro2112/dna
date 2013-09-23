@@ -241,17 +241,32 @@ bool DNAUSB::sendCode( const int vid, const int pid, const char* vendor,
 }
 
 //------------------------------------------------------------------------------
-bool DNAUSB::sendData( DNADEVICE device, const unsigned char* data, const unsigned char size )
+bool DNAUSB::sendData( DNADEVICE device, const unsigned char* data, const unsigned int size )
 {
 	unsigned char packet[REPORT_DNA_DATA_SIZE + 1] = { REPORT_DNA_DATA };
-	packet[1] = size;
-	memcpy( packet + 2, data, size );
 
-	if ( !HID_SetFeature(device, packet, REPORT_DNA_DATA_SIZE + 1) )
+	unsigned int offset = 0;
+	int sz = (int)size;
+	do
 	{
-		Log( "failed to send data" );
-		return false;
-	}
+		packet[1] = (sz > MAX_USER_DATA_REPORT_SIZE) ? (MAX_USER_DATA_REPORT_SIZE) : sz;
+		memcpy( packet + 2, data + offset, packet[1]);
+		packet[packet[1] + 2] = 0xCC;
+
+		Arch::asciiDump( packet, REPORT_DNA_DATA_SIZE + 1 );
+
+		if ( !HID_SetFeature(device, packet, REPORT_DNA_DATA_SIZE + 1) )
+		{
+			Log( "failed to send data" );
+			return false;
+		}
+
+		offset += MAX_USER_DATA_REPORT_SIZE;
+		sz -= MAX_USER_DATA_REPORT_SIZE;
+
+		Arch::sleep( 15 );
+		
+	} while( sz > 0 );
 
 	return true;
 }
@@ -298,6 +313,7 @@ bool DNAUSB::getData( DNADEVICE device, unsigned char* data, unsigned char* size
 		// zero size, poll until the data is available I guess
 		Arch::sleep( 100 );
 	}
+
 
 	// this is defined as fatal!
 	if ( sizeExpected && (message[1] != sizeExpected) )

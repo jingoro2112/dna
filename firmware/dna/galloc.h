@@ -1,6 +1,7 @@
 #ifndef GALLOC_H
 #define GALLOC_H
-/* Copyright: (c) 2013 by Curt Hartung avr@northarc.com
+/*------------------------------------------------------------------------------*
+ * Copyright: (c) 2013 by Curt Hartung avr@northarc.com
  * This work is released under the Creating Commons 3.0 license
  * found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
  * and in the LICENCE.txt file included with this distribution
@@ -47,11 +48,10 @@ sample code:
 
 
 // typical usage:
-unsigned char handle1 = gmalloc( sizeof(SomeStruct) );
-unsigned char handle2 = gmalloc( sizeof(SomeStruct) ); // get some RAM
-
-SomeStruct *s1 = (SomeStruct *)gpointer( handle1 );
-SomeStruct *s2 = (SomeStruct *)gpointer( handle2 ); // map to a structure
+SomeStruct *s1;
+SomeStruct *s2;
+unsigned char handle1 = galloc( sizeof(SomeStruct), &s1 );
+unsigned char handle2 = galloc( sizeof(SomeStruct), &s2 ); // get some RAM
 
 // do some stuff...
 s1->thing1 = 2;
@@ -71,31 +71,35 @@ s2 = gpointer( handle2 );
 // do some more stuff..
 s2->thing1 = 40;
 
-// and free it
+// free second handle
 gfree( handle2 );
-
-
-// alternately, this is cumbersome but guaranteed to never get you:
-handle1 = gmalloc( sizeof(SomeStruct) );
-
-((SomeStruct *)gpointer(handle1))->thing1 = 20; // de-reference each time it is used
-//....
-
 
 */
 
-
 // Any value technically works, but powers of two make much nicer code.
-// The 'special' value of 1 allows much tighter code, best to leave it
+// The 'special' value of 1 allows the tightest code, best to leave it
 // unless you really really REALLY need larger allocations than 256 bytes
 #define GENE_BLOCK_SIZE 1
 
-void grelocateHeap( unsigned char* heapStart ); // if you want to locate the heap elsewhere than __heap_start
-unsigned int gramUsage(); // report how many bytes (including overhead) has been allocated
-unsigned char galloc( unsigned char size ); // allocate a block of memory of 'size' bytes and return a handle to it
+// if you want to locate the heap elsewhere than __heap_start
+void grelocateHeap( unsigned char* heapStart );
 
-char* _gtraverse( unsigned char handle ); // internal utility method, call only with following macros:
-#define gfree( handle ) _gtraverse((handle) | 0x80); // free the memory, tolerant of zero
-#define gpointer( handle ) _gtraverse( handle ) // map a handle to a pointer, valid until ANY call is made to gfree()
+// report how many bytes (including overhead) has been allocated
+unsigned int gramUsage(); 
+
+// allocate a block of memory of 'size' bytes and return a handle to
+// it, ptr will return the allocated pointer
+unsigned char galloc( unsigned char size, void** ptr ); 
+
+// Free a handle (safe to call with any value, invalid values
+// gracefully fail)
+#define gfree( handle ) _gtraverse((handle) | 0x80);
+
+// given a handle, return the pointer, or NULL if the handle is not
+// found
+#define gpointer( handle ) _gtraverse( handle )
+
+// internal utility method
+char* _gtraverse( unsigned char handle ); 
 
 #endif

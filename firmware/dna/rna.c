@@ -9,10 +9,6 @@
 
 #include <util/atomic.h>
 
-#if (F_CPU != 12000000) && (F_CPU != 8000000)
-#error unsupported F_CPU for RNA driver, must be 8 or 12 mHz
-#endif		
-
 volatile static unsigned char s_busBusy;
 
 //------------------------------------------------------------------------------
@@ -28,6 +24,7 @@ struct SendUnit
 	unsigned char next; // handle
 };
 static unsigned char s_sendUnitHead;
+static unsigned char s_sendUnitTail;
 
 // debug annunciator, timing can be tight so need to be VERY careful
 // where these are placed, if enabled
@@ -55,18 +52,12 @@ unsigned char rnaShiftOutByte( unsigned char data, unsigned char high )
 			rnaSetHigh();
 		}
 
-#if F_CPU == 12000000
-		_delay_loop_1( 4 );
-#elif F_CPU == 8000000
-		_delay_loop_1( 2 );
-#endif		
+		_delay_us( 2 );
 
 		if ( data & bit )
 		{
 			rnaSetHigh();
 			high = 1;
-			asm volatile("nop"); // make up the jump/branch opcode that causes the first case to execute two cycles faster
-			asm volatile("nop");
 		}
 		else
 		{
@@ -75,12 +66,8 @@ unsigned char rnaShiftOutByte( unsigned char data, unsigned char high )
 		}
 
 		bit >>= 1;
-		
-#if F_CPU == 12000000
-		_delay_loop_1( 4 );
-#elif F_CPU == 8000000
-		_delay_loop_1( 2 );
-#endif		
+
+		_delay_us( 2 );
 
 		// detect collision
 		if ( high && rnaIsLow() )
@@ -89,25 +76,14 @@ unsigned char rnaShiftOutByte( unsigned char data, unsigned char high )
 		}
 
 		rnaOff();
-		
-#if F_CPU == 12000000
-		_delay_loop_1( 4 );
-#elif F_CPU == 8000000
-		_delay_loop_1( 2 );
-#endif
-		
 	}
 
 	rnaSetHigh(); // idle bus waiting for ack
 
 	if ( !collisionOccured ) // if there was a collision we're done
 	{
-#if F_CPU == 12000000
-		_delay_loop_1( 11 );
-#elif F_CPU == 8000000
-		_delay_loop_1( 4 );
-#endif		
-		
+		_delay_us( 2 );
+
 		rnaOn();
 
 		if ( rnaIsLow() ) // was there an ack?
@@ -128,37 +104,28 @@ unsigned char rnaShiftInByte( unsigned char high )
 	unsigned char limit = 0;
 	unsigned char i;
 	unsigned char bit = 0x80;
-	
+
 	for( i=8; i; i-- )
 	{
 		if ( high )
 		{
 			while( rnaIsHigh() && --limit ); // wait for start (with breakout, high level might be idle bus)
-			
-#if F_CPU == 8000000
-			_delay_loop_1( 3 ); // slightly less since the 'limit' dec pushes us out a little
-#endif		
 		}
 		else
 		{
 			while( rnaIsLow() ); // wait for start
-
-#if F_CPU == 8000000
-			_delay_loop_1( 5 );
-#endif		
 		}
 
 		rnaOn();
 
-#if F_CPU == 12000000
-		_delay_loop_1( 10 );
-#endif		
+		_delay_us(3); // 2us setup plus 1us to sample middle of data
 
 		if ( rnaIsHigh() ) // and read it
 		{
 			rnaOff();
 			byte |= bit;
 			high = 1; // bus is high, next clock pulse will be a falling edge
+			limit = 0;
 		}
 		else
 		{
@@ -203,27 +170,19 @@ unsigned char rnaSendEx( unsigned char address, unsigned char fromAddress, unsig
 
 	if ( s_busBusy ) // being called from within the ISR: queue data for immediate transfer after its reti()
 	{
-		unsigned char newSend = galloc( sizeof(struct SendUnit) );
-	
+		struct SendUnit *send;
+		unsigned char newSend = galloc( sizeof(struct SendUnit), (void**)&send );
+
 		if ( s_sendUnitHead )
 		{
-			// find the end of the list
-			struct SendUnit *S;
-
-			// in-place traverse
-			for( S = (struct SendUnit *)gpointer(s_sendUnitHead);
-				 S->next;
-				 S = (struct SendUnit *)gpointer(S->next) );
-			
-			S->next = newSend;
+			((struct SendUnit *)gpointer(s_sendUnitTail))->next = newSend;
 		}
 		else
 		{
 			s_sendUnitHead = newSend;
 		}
+		s_sendUnitTail = newSend;
 
-		struct SendUnit *send = (struct SendUnit *)gpointer( newSend );
-		
 		send->toAddress = address;
 		send->size = len;
 		send->buf = data;
@@ -239,7 +198,7 @@ unsigned char rnaSendEx( unsigned char address, unsigned char fromAddress, unsig
 				rnaWaitForBusClear();
 
 				rnaSetLow(); // attention!
-				_delay_us( 11 ); // wait a reasonable amount of time for the remote chip to trigger its interrupt, more than this and it might be WAY more than this
+				_delay_us( 11 ); // wait a reasonable amount of time for the remote chip to trigger it's interrupt
 
 				if ( rnaShiftOutByte(address | (fromAddress<<4), 0) == 1 )
 				{
@@ -296,132 +255,130 @@ ISR( RNA_ISR )
 
 
 #ifdef RNA_POLL_DRIVEN
-	cli();
+	ATOMIC_BLOCK( ATOMIC_RESTORESTATE )
+	{
 #endif
-	
-	rnaOn();
-
-	unsigned char header = rnaShiftInByte( 0 );
-
-	if ( (header & 0x0F) != RNA_MY_ADDRESS )
-	{
-		// not meant for me, wait for an idle bus so we do not try and
-		// interpret garbage on the next interrupt
-		rnaWaitForBusClear();
-	}
-	else
-	{
-		rnaSetLow(); // was meant for me, ack it!
-
-		// all the time in the world for bookkeeping, bus is being held
-		s_busBusy = 1;
 
 		rnaOn();
-		
-		header >>= 4; // shift off our address and just leave source
 
-#if F_CPU == 12000000
-		_delay_loop_1( 9 );
-#elif F_CPU == 8000000
-		_delay_loop_1( 6 );
-#endif		
+		unsigned char header = rnaShiftInByte( 0 );
 
-		rnaOff();
-		rnaSetHigh();
-
-		unsigned char len = rnaShiftInByte( 1 ); // get the expected length
-
-		rnaSetLow(); // ack and HOLD for sample setup
-
-#if F_CPU == 12000000
-		_delay_loop_1( 16 );
-#elif F_CPU == 8000000
-		_delay_loop_1( 8 );
-#endif
-
-		if ( len )
+		if ( (header & 0x0F) != RNA_MY_ADDRESS )
 		{
-			unsigned char index = 0;
-			unsigned char setup = 0;
-			unsigned char pos = 0;
-			do
+			// not meant for me, wait for an idle bus so we do not try and
+			// interpret garbage on the next interrupt
+			rnaWaitForBusClear();
+		}
+		else
+		{
+			rnaSetLow(); // was meant for me, ack it!
+
+			// all the time in the world for bookkeeping, bus is being held
+			s_busBusy = 1;
+
+			rnaOn();
+
+			header >>= 4; // shift off our address and just leave source
+
+			_delay_us( 3 );
+
+			rnaOff();
+			rnaSetHigh();
+
+			unsigned char len = rnaShiftInByte( 1 ); // get the expected length
+
+			rnaSetLow(); // ack and HOLD for sample setup
+			_delay_us( 3 );
+
+			if ( len )
 			{
-				// break this up into bite-sized chunks, 8 bytes seems
-				// like a good compromise, don't want to consume to
-				// omuch memory for long messages ,let the callback do
-				// that if it so deems. This is not really a problem
-				// since the processing overhead is fairly small
-				unsigned char data[8];
-
-				for( index=0; index<8; index++ )
+				unsigned char setup = 0;
+				unsigned char pos = 0;
+				unsigned char index;
+				unsigned char consumed;
+				do
 				{
-					rnaSetHigh(); // release bus
-
-					data[index] = rnaShiftInByte( 1 ); // get some data (expect bus high intro)
-
-					rnaSetLow(); // ack and hold/extend for (potential) processing
-
-#if F_CPU == 12000000
-					_delay_loop_1( 11 );
-#elif F_CPU == 8000000
-					_delay_loop_1( 4 );
-#endif
-
-					if ( ++pos >= len ) // reach the end of the stream?
+					// break this up into bite-sized chunks, 8 bytes seems
+					// like a good compromise, don't want to consume too
+					// much memory for long messages, let the callback do
+					// that if it so deems. This is not really a problem
+					// since the processing overhead is fairly small
+					unsigned char data[8];
+					index = 0;
+					for(;;)
 					{
-						break;
-					}
-				}
+						rnaSetHigh(); // release bus
+						data[index] = rnaShiftInByte( 1 ); // get some data (expect bus high intro)
+						rnaSetLow(); // ack
 
-				rnaOn();
-				
-				if ( setup )
-				{
-					rnaInputStream( data, index ); // setup has been called, this data better be expected
-				}
-				else
-				{
-					unsigned char consumed;
-					
-					consumed = rnaInputSetup( data, header, index );
+						index++;
+						pos++;
+
+						// minimum ack setup time, theoretically this can be
+						// skipped if we are going to jump to the
+						// processing section (thus it would make sense to
+						// put this delay AFTER the following if check)
+						// but the timing is tight enough that a few extra
+						// cycles would need to be added if the callbacks
+						// were trivially implemented. So just eat the extra few cycles
+						// every 8 bytes as a compromise for stability and
+						// code size
+						_delay_us( 3 );
+
+						// check for completion
+						if ( (index == 8) || (pos == len) ) // reach the end of the stream?
+						{
+							break;
+						}
+					}
+
+					rnaOn();
+
+					consumed = 0;
+
+					if ( !setup )
+					{
+						setup = 1;
+						consumed = rnaInputSetup( data, index, header, len );
+					}
+
 					if ( consumed < index )
 					{
-						rnaInputStream( data + consumed, index - consumed );	
+						rnaInputStream( data + consumed, index - consumed );
 					}
-					
-					setup = 1;
-				}
 
-				rnaOff();
-				
-			} while( pos < len );
+					rnaOff();
+
+				} while( pos < len );
+			}
+
+			rnaSetHigh(); // bus idle
+
+			s_busBusy = 0;
+
+			// now that we are not busy, see if any requests were queued up
+			while( s_sendUnitHead )
+			{
+				struct SendUnit *send = (struct SendUnit *)gpointer( s_sendUnitHead );
+				rnaSendEx( send->toAddress, send->fromAddress, send->buf, send->size );
+				unsigned char next = send->next;
+				gfree( s_sendUnitHead );
+				s_sendUnitHead = next;
+			}
+			s_sendUnitTail = 0;
 		}
-		
-		rnaSetHigh(); // bus idle
 
-		s_busBusy = 0;
+		rnaOff();
 
-		// now that we are not busy, see if any requests were queued up
-		while( s_sendUnitHead )
-		{
-			struct SendUnit *send = (struct SendUnit *)gpointer( s_sendUnitHead );
-			rnaSendEx( send->toAddress, send->fromAddress, send->buf, send->size );
-			unsigned char next = send->next;
-			gfree( s_sendUnitHead );
-			s_sendUnitHead = next;
-		}
-	}
-
-	rnaOff();
-
-	rnaSetIdle();
+		rnaSetIdle();
 
 #ifdef RNA_POLL_DRIVEN
-	reti();
+	}
 #else
-	rnaClearINT();
+		rnaClearINT();
 #endif
 }
+
 
 /*
 //------------------------------------------------------------------------------

@@ -1,4 +1,5 @@
-/* Copyright: (c) 2013 by Curt Hartung
+/*------------------------------------------------------------------------------*
+ * Copyright: (c) 2013 by Curt Hartung avr@northarc.com
  * This work is released under the Creating Commons 3.0 license
  * found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
  * and in the LICENCE.txt file included with this distribution
@@ -26,7 +27,7 @@ unsigned int gramUsage()
 }
 
 //------------------------------------------------------------------------------
-unsigned char galloc( unsigned char size )
+unsigned char galloc( unsigned char size, void** ptr )
 {
 	// by definition no allocations have taken place, and therefore no
 	// handles are valid, so assume first-time alloc, set to 1 thus auto-initting
@@ -53,10 +54,9 @@ unsigned char galloc( unsigned char size )
 		s_firstFree[1] = 0x1;
 	}
 
-	// by asking for our own pointer (by definition the last in line)
-	// as a side-effect the current 'free' handle is checked for
-	// collision
-	_gtraverse( ret );
+	// get the current pointer, also the side-effect will to ensure
+	// there is no collision of handles in the free list
+	*(unsigned char**)ptr = (unsigned char *)_gtraverse( ret );
 	
 	return ret;
 }

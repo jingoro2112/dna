@@ -34,6 +34,9 @@ $(TARGET).hex: $(OBJS)
 	avr-objcopy -j .text -j .data -O ihex $(TARGET).elf $(TARGET).hex
 	avr-objdump -d $(TARGET).elf > $(TARGET).disassembly
 
+splice: $(TARGET).hex
+	..\..\splice\win32\splice -o oled.hex
+
 objs/main.o: main.c
 	$(CC) -c $< -o $@
 

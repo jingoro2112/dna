@@ -1,7 +1,7 @@
 #ifndef USB_H
 #define USB_H
-/*------------------------------------------------------------------------------*/
-/* Copyright: (c) 2013 by Curt Hartung
+/*------------------------------------------------------------------------------*
+ * Copyright: (c) 2013 by Curt Hartung avr@northarc.com
  * This work is released under the Creating Commons 3.0 license
  * found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
  * and in the LICENCE.txt file included with this distribution
@@ -26,7 +26,7 @@ void dnaUsbQueueData( unsigned char* data, unsigned char len );
 extern volatile unsigned char g_sendQueueLen;
 #define dnaUsbSendQueueBusy() (g_sendQueueLen != 0)
 
-unsigned char dnaUsbInputSetup( unsigned char dataSize, unsigned char *data, unsigned char len );
+unsigned char dnaUsbInputSetup( unsigned char totalSize, unsigned char *data, unsigned char len );
 void dnaUsbInputStream( unsigned char *data, unsigned char len );
 void dnaUsbCommand( unsigned char command, unsigned char data[5] );
 

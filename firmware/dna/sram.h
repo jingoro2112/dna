@@ -1,7 +1,7 @@
 #ifndef SRAM_H
 #define SRAM_H
-/*------------------------------------------------------------------------------*/
-/* Copyright: (c) 2013 by Curt Hartung
+/*------------------------------------------------------------------------------*
+ * Copyright: (c) 2013 by Curt Hartung avr@northarc.com
  * This work is released under the Creating Commons 3.0 license
  * found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
  * and in the LICENCE.txt file included with this distribution
@@ -52,6 +52,6 @@ void sramAtomicWrite( unsigned int address, unsigned char data );
 void sramInit();
 
 #include <util/delay.h>
-#define sramDelay() _delay_us(5)
+#define sramDelay() //_delay_us(5)
 
 #endif

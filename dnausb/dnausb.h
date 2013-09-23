@@ -34,7 +34,7 @@ bool sendCode( const int vid, const int pid, const char* vendor,
 			   const unsigned int size,
 			   void (*status)(const unsigned int percent) /*=0*/ );
 
-bool sendData( DNADEVICE device, const unsigned char* data, const unsigned char size );
+bool sendData( DNADEVICE device, const unsigned char* data, const unsigned int size );
 bool getData( DNADEVICE device, unsigned char* data, unsigned char* size =0, unsigned char sizeExpected =0 );
 
 bool sendCommand( DNADEVICE device, const unsigned char command, const unsigned char data[5] =0 );

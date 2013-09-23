@@ -26,7 +26,6 @@ clean:
 	
 $(TARGET).hex: $(OBJS) Makefile
 	$(CC) -T avr25_custom.x  -Wl,--section-start=.text=$(BOOTLOADER_ENTRY),-gc-sections -o $(TARGET).elf $(OBJS)
-#	$(CC) -Wl,-gc-sections -o $(TARGET).elf $(OBJS)
 	avr-objcopy -j .text -j .data -O ihex $(TARGET).elf $(TARGET).hex
 	avr-objdump -d $(TARGET).elf > $(TARGET).disassembly
 

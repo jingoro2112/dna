@@ -1,7 +1,7 @@
 #ifndef OLED_H
 #define OLED_H
-/*------------------------------------------------------------------------------*/
-/* Copyright: (c) 2013 by Curt Hartung
+/*------------------------------------------------------------------------------*
+ * Copyright: (c) 2013 by Curt Hartung avr@northarc.com
  * This work is released under the Creating Commons 3.0 license
  * found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
  * and in the LICENCE.txt file included with this distribution
@@ -27,10 +27,7 @@
 void oledCommand( unsigned char cmd );
 void oledClear();
 #define oledPowerOff() oledCommand( 0xAE )
-void oledInit();
-
-void oledSetPixel( unsigned char x, unsigned char y );
-void oledClearPixel( unsigned char x, unsigned char y );
+void oledInit( unsigned char invert );
 
 #endif
 

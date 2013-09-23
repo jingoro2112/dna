@@ -12,7 +12,8 @@
 #include "../util/mainargs.hpp"
 #include "../util/architecture.hpp"
 #include "../firmware/dna/dna_defs.h"
-
+#include "../firmware/dna/rna_packet.h"
+#include "../../morlock/firmware/morlock_defs.h"
 #include <stdio.h>
 #include <ctype.h>
 #include <stdlib.h>
@@ -33,6 +34,9 @@ int usage()
 			"\n"
 			"-v\n"
 			"    verbose logging\n"
+			"\n"
+			"-o, --oled <image>\n"
+			"    send OLED boot image through morlock board\n"
 			"\n"
 			"--read_eeprom <loc> <size>\n"
 			"    read 'size' bytes from location 'loc'\n"
@@ -72,7 +76,25 @@ int main( int argc, char *argv[] )
 
 	if ( args.isSet("-t") )
 	{
-		/*
+		unsigned char buffer[256];
+		if ( !DNAUSB::sendCommand(handle, ceCommandGetEEPROM) )
+		{
+			DNAUSB::closeDevice( handle );
+			printf( "command failed\n" );
+			return -1;
+		}
+
+		unsigned char len;
+		if ( !DNAUSB::getData(handle, buffer, &len) )
+		{
+			DNAUSB::closeDevice( handle );
+			printf( "fetch failed\n" );
+			return -1;
+		}
+
+		Arch::asciiDump( buffer, 67 );
+
+/*
 		unsigned char buffer[256];
 		EEPROMConstants *consts = (EEPROMConstants *)buffer;
 
@@ -80,7 +102,7 @@ int main( int argc, char *argv[] )
 		{
 			Arch::sleep(100);
 
-		if ( !DNAUSB::sendCommand( handle, ceCommandGetEEPROMConstants) )
+		if ( !DNAUSB::sendCommand(handle, ceCommandGetEEPROMConstants) )
 		{
 			DNAUSB::closeDevice( handle );
 			printf( "command failed\n" );
@@ -131,9 +153,9 @@ int main( int argc, char *argv[] )
 		printf( "eye[0x%02X] %s\n", (int)consts->eyeLevel, (consts->eyeLevel < consts->eyeDetectLevel) ? "blocked":"clear" );
 
 		}
+*/
 		DNAUSB::closeDevice( handle );
 		return 0;
-		*/
 	}
 
 	unsigned char id;
@@ -144,8 +166,6 @@ int main( int argc, char *argv[] )
 		DNAUSB::closeDevice( handle );
 		return 0;
 	}
-
-	DNAUSB::closeDevice( handle );
 
 	char buf[256];
 	printf( "product[%s] [0x%02X]:%s  version[%d]\n", product, id, Splice::stringFromId(id, buf), version );
@@ -160,8 +180,102 @@ int main( int argc, char *argv[] )
 	Cstr infile;
 	ReadHex::Chunk *chunk = 0;
 	unsigned int percent;
+
+	if ( args.isStringSet("-o", image) || args.isStringSet("--oled", image) )
+	{
+		if ( !infile.fileToBuffer(image) )
+		{
+			printf( "Could not read [%s]\n", image );
+			return -1;
+		}
+
+		if ( !ReadHex::parse( chunklist, infile.c_str(), infile.size() ) )
+		{
+			printf( "Could not parse [%s]\n", image );
+			return -1;
+		}
+
+		if ( chunklist.count() != 1 )
+		{
+			printf( "multiple chunks not supported\n" );
+			return -1;
+		}
+		chunk = chunklist.getFirst();
+
+		buf[0] = ceCommandRNASend;
+		buf[1] = 0x2;
+		buf[2] = 1;
+		buf[3] = RNATypeEnterBootloader; // rna command
+		if ( !DNAUSB::sendData(handle, (unsigned char *)buf, 4) )
+		{
+			printf( "could not send RNA boot command [%d]\n", GetLastError() );
+			return -1;
+		}
+		Arch::sleep( 100 );
+
+		unsigned short address = 64;
+		unsigned short crc = 0;
+		while( address < chunk->size )
+		{
+			buf[0] = ceCommandRNASend;
+			buf[1] = 0x2;
+			buf[2] = 67;
+			buf[3] = RNATypeCodePage; // rna command
+			*(unsigned short *)(buf + 4) = address; // page
+			
+			for( int i=6; i<70; i += 2 ) // the code
+			{
+				if ( address < chunk->size )
+				{
+					*(unsigned short *)(buf + i) = chunk->data[address] | (chunk->data[address+1] << 8);
+					crc += *(unsigned short *)(buf + i);
+				}
+				else
+				{
+					*(unsigned short *)(buf + i) = 0xFAFA;
+				}
+
+				address += 2;
+			}
+
+			if ( !DNAUSB::sendData(handle, (unsigned char *)buf, 70) )
+			{
+				printf( "could not send RNA data [%d]\n", GetLastError() );
+				return -1;
+			}
+
+			if ( address >= chunk->size )
+			{
+				address = 0;
+			}
+
+			Arch::sleep( 50 );
+
+			if ( address == 64 )
+			{
+				buf[0] = ceCommandRNASend;
+				buf[1] = 0x2;
+				buf[2] = 5;
+				buf[3] = RNATypeEnterApp; // rna command
+				*(unsigned short *)(buf + 4) = chunk->size;
+				*(unsigned short *)(buf + 6) = crc;
+				if ( !DNAUSB::sendData(handle, (unsigned char *)buf, 8) )
+				{
+					printf( "could not send RNA boot command [%d]\n", GetLastError() );
+					return -1;
+				}
+
+				break;
+			}
+		}
+
+		DNAUSB::closeDevice( handle );
+	}
+	
 	if ( args.isStringSet("-f", image) || args.isStringSet("-i", image) || args.isStringSet("--flash", image) )
 	{
+		DNAUSB::closeDevice( handle );
+
 		if ( !infile.fileToBuffer(image) )
 		{
 			printf( "Could not read [%s]\n", image );

@@ -1,5 +1,5 @@
-#ifndef SRAM_CONFIG_H
-#define SRAM_CONFIG_H
+#ifndef OLED_CONFIG_H
+#define OLED_CONFIG_H
 /*------------------------------------------------------------------------------*
  * Copyright: (c) 2013 by Curt Hartung avr@northarc.com
  * This work is released under the Creating Commons 3.0 license
@@ -7,21 +7,12 @@
  * and in the LICENCE.txt file included with this distribution
  */
 
-// Chip Select
-#define SRAM_CS_PORT		A
-#define SRAM_CS_PIN			0
+#define OLED_CS_PORT_LETTER		A
+#define OLED_CS_PIN_NUMBER		3
 
-// Serial In (to the chip)
-#define SRAM_SI_PORT		A
-#define SRAM_SI_PIN			0
+#define OLED_RESET_PORT_LETTER	A
+#define OLED_RESET_PIN_NUMBER	7
 
-// Serial Out (of the chip)
-#define SRAM_SO_PORT		A
-#define SRAM_SO_PIN			0
-
-// Serial Clock
-#define SRAM_SCK_PORT		A
-#define SRAM_SCK_PIN		0
-
+#define OLED_ADDRESS		0x78
 
 #endif

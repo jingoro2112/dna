@@ -1,4 +1,5 @@
-/* Copyright: (c) 2013 by Curt Hartung
+/*------------------------------------------------------------------------------*
+ * Copyright: (c) 2013 by Curt Hartung avr@northarc.com
  * This work is released under the Creating Commons 3.0 license
  * found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
  * and in the LICENCE.txt file included with this distribution
@@ -86,36 +87,18 @@ unsigned char usbFunctionWrite( unsigned char *data, unsigned char len )
 			{
 				wdt_enable( WDTO_15MS ); // light the fuse
 			}
-/*
-			if ( data[1] == USBCommandRNACommand )
-			{
-				consumed = 3; // USB, command, address
-				s_status = (data[2] << 4) | Status_DataToRNA;
-			}
 			
-			if ( data[1] == USBCommandWriteData ) // data send?
-			{
-				consumed = dnaUsbInputSetup( data + 2, len - 2 ) + 2;
-			}
-*/
 			return 1; // commands are handled in one go
 		}
-
-		// it was Report_DNA_Data: throw it to the app
+		
+		// it was REPORT_DNA_DATA, throw it to the app
 		s_dataTransferRemaining = REPORT_DNA_DATA_SIZE + 1;
 		consumed = dnaUsbInputSetup( data[1], data + 2, len - 2 ) + 2;
 	}
 
 	if ( consumed < len )
 	{
-//		if ( s_status & Status_DataToRNA )
-//		{
-//			rnaSend( s_status & 0xF, data + consumed, len - consumed );
-//		}
-//		else
-		{
-			dnaUsbInputStream( data + consumed, len - consumed );
-		}
+		dnaUsbInputStream( data + consumed, len - consumed );
 	}
 
 	if ( !(s_dataTransferRemaining -= len) )
@@ -188,6 +171,12 @@ unsigned char usbFunctionRead( unsigned char *data, unsigned char len )
 //------------------------------------------------------------------------------
 void dnaUsbQueueData( unsigned char* data, unsigned char len )
 {
+	// gracefully handle a send that is too large
+	if ( len > MAX_USER_DATA_REPORT_SIZE )
+	{
+		len = MAX_USER_DATA_REPORT_SIZE;
+	}
+	
 	cli();
 	
 #ifdef USB_COPY_DATA_TO_PRIVATE_BUFFER
