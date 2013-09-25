@@ -7,23 +7,10 @@
  * and in the LICENCE.txt file included with this distribution
  */
 
-#define a2dSetChannel( c ) (ADMUX = 0b10000000 | ((c) & 0b00000111))
 #define a2dStartConversion() (ADCSRA |= (1<<ADSC))
-#define a2dConversionComplete() (ADCSRA & (1<<ADSC))
-
-#define A2D_PRESCALE_2 0b000
-#define A2D_PRESCALE_4 0b010
-#define A2D_PRESCALE_8 0b011
-#define A2D_PRESCALE_16 0b100
-#define A2D_PRESCALE_32 0b101
-#define A2D_PRESCALE_64 0b110
-#define A2D_PRESCALE_128 0b111
-#define a2dSetPrescaler( f ) (ADCSRA = (1<<ADEN) | (f))
+#define a2dWaitForConversionComplete() while(ADCSRA & (1<<ADSC));
 #define a2dEnableInterrupt() (ADCSRA |= (1<<ADIE))
-
-unsigned int a2dReadResult();
-unsigned int a2dReadResultNoPoll();
-unsigned int a2dGetTemperature();
+#define a2dReadResult() ((unsigned int)ADCL | ((unsigned int)ADCH << 8))
 
 
 #endif 

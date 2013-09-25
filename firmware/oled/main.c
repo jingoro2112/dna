@@ -18,12 +18,26 @@
 #include <avr/wdt.h>
 #include <avr/interrupt.h>
 
+unsigned char rnaCommand;
+unsigned char rnaDataExpected;
+unsigned char rnaDataReceived;
+
 //------------------------------------------------------------------------------
 unsigned char rnaInputSetup( unsigned char *data, unsigned char dataLen, unsigned char from, unsigned char packetLen )
 {
-	if ( (*data == RNATypeEnterBootloader) && (dataLen == 1) )
+	rnaCommand = *data;
+	rnaDataExpected = packetLen;
+	rnaDataReceived = 0;
+	
+	if ( (rnaCommand == RNATypeEnterBootloader) && (dataLen == 1) )
 	{
 		wdt_enable( WDTO_15MS ); // light the fuse
+		rnaCommand = RNATypeNone;
+	}
+	else if ( rnaCommand == RNATypeEEPROMLoad )
+	{
+		startWrite24c512( 0xA0, *(unsigned int *)(data + 1) );
+		return 3; // the command and the address, leave the data to the input streamer to save code space
 	}
 
 	return 1;
@@ -32,7 +46,20 @@ unsigned char rnaInputSetup( unsigned char *data, unsigned char dataLen, unsigne
 //------------------------------------------------------------------------------
 void rnaInputStream( unsigned char *data, unsigned char bytes )
 {
+	if ( rnaCommand == RNATypeEEPROMLoad )
+	{
+		for( unsigned char i=0; i<bytes; i++ )
+		{
+			i2cWrite( data[i] );
+			rnaDataReceived++;
+		}
 
+		if ( rnaDataReceived >= rnaDataExpected )
+		{
+			i2cStop();
+			rnaCommand = RNATypeNone;
+		}
+	}
 }
 
 //------------------------------------------------------------------------------
@@ -74,11 +101,9 @@ void __attribute__((OS_main)) __init()
 	}
 
 bootloader_jump:
-	asm	volatile ("ijmp" ::"z" (0xD00)); // emergency reboot time
+	asm	volatile ("ijmp" ::"z" (0xEA0)); // emergency reboot time
 }
 
-
-unsigned char salt = 0;
 //------------------------------------------------------------------------------
 void blit()
 {
@@ -100,25 +125,72 @@ void blit()
 		i2cWrite( sramReadByte() );
 	}
 
-	salt++;
-	
 	sramStop();
 	i2cWait();
 	i2cStop();
 }
 
 //------------------------------------------------------------------------------
-void resetPixel( unsigned char x, unsigned char y )
+void resetFramePixel( unsigned char x, unsigned char y )
 {
-	uint address = (y >> 3) + x;
+	uint16 address = ((y >> 3) << 7) + x;
 	sramAtomicWrite( address, sramAtomicRead(address) & ~(1 << (y & 0x07)) );
 }
 
 //------------------------------------------------------------------------------
-void setPixel( unsigned char x, unsigned char y )
+void setFramePixel( unsigned char x, unsigned char y )
 {
-	uint address = (y >> 3) + x;
+	uint16 address = ((y >> 3) << 7) + x;
 	sramAtomicWrite( address, sramAtomicRead(address) | (1 << (y & 0x07)) );
+}
+
+//------------------------------------------------------------------------------
+void setPixelLive( unsigned char x, unsigned char y )
+{
+	uint16 address = ((y >> 3) << 7) + x;
+	uint8 newVal = sramAtomicRead(address) | (1 << (y & 0x07));
+
+	sramAtomicWrite( address, newVal );
+
+	i2cStartWrite( OLED_ADDRESS );
+	i2cWrite( 0x80 ); // command setup
+	i2cWrite( x & 0x0F );
+	i2cWrite( 0x80 ); // command setup
+	i2cWrite( x>>4 | 0x10 );
+	i2cWrite( 0x80 ); // command setup
+	i2cWrite( 0xB0 | y>>3 );
+
+	i2cWrite( 0xC0 );
+	i2cWrite( newVal );
+
+	i2cStop();
+}
+
+//------------------------------------------------------------------------------
+void resetPixelLive( unsigned char x, unsigned char y )
+{
+	uint16 address = ((y >> 3) << 7) + x;
+	uint8 newVal = sramAtomicRead(address) & ~(1 << (y & 0x07));
+	sramAtomicWrite( address, newVal );
+
+	i2cStartWrite( OLED_ADDRESS );
+	i2cWrite( 0x80 ); // command setup
+	i2cWrite( x & 0x0F );
+	i2cWrite( 0x80 ); // command setup
+	i2cWrite( x>>4 | 0x10 );
+	i2cWrite( 0x80 ); // command setup
+	i2cWrite( 0xB0 | y>>3 );
+
+	i2cWrite( 0xC0 );
+	i2cWrite( newVal );
+
+	i2cStop();
+}
+
+//------------------------------------------------------------------------------
+void characterAt( unsigned char x, unsigned char y, char* fontChar )
+{
+	
 }
 
 //------------------------------------------------------------------------------
@@ -161,22 +233,17 @@ int __attribute__((OS_main)) main()
 
 	clearFrameBuffer();
 
-	unsigned char x, y;
-	
 	for(;;)
 	{
-		for( x = 0; x<128; x++ )
+		for( uint8 x = 0; x<128; x += 1 )
 		{
-			setPixel( x, 0 );
-			setPixel( x, 31 );
+			for( uint8 y = 0; y<32; y += 1 )
+			{
+				setPixelLive( x, y );
+				_delay_ms(5);
+//				blit();
+				resetPixelLive( x, y );
+			}
 		}
-
-		for( y = 0; y<32; y++ )
-		{
-			setPixel( 0, y );
-			setPixel( 127, y );
-		}
-
-		blit();
 	}
 }

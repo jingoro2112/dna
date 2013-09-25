@@ -11,7 +11,7 @@ OBJS = \
 TARGET = bootloader
 MCU = attiny84
 CPU_FREQUENCY = 8000000
-BOOTLOADER_ENTRY = 1A00
+BOOTLOADER_ENTRY = 1D40
 
 CC = avr-gcc -std=gnu99 -Wall -I. -I../../dna -MD -Os -fdata-sections -ffunction-sections -funsigned-char -funsigned-bitfields -fno-inline-small-functions -mmcu=$(MCU) -DF_CPU=$(CPU_FREQUENCY)
 

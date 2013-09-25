@@ -9,10 +9,10 @@
 #include "../util/simple_log.hpp"
 #include "../util/architecture.hpp"
 #include "../util/str.hpp"
+#include "../firmware/dna/dna_defs.h"
 
 extern SimpleLog Log;
 
-#include "../firmware/dna/dna_defs.h"
 
 //------------------------------------------------------------------------------
 bool DNAUSB::getProductId( DNADEVICE device, unsigned char *id, unsigned char *version )
@@ -243,7 +243,7 @@ bool DNAUSB::sendCode( const int vid, const int pid, const char* vendor,
 //------------------------------------------------------------------------------
 bool DNAUSB::sendData( DNADEVICE device, const unsigned char* data, const unsigned int size )
 {
-	unsigned char packet[REPORT_DNA_DATA_SIZE + 1] = { REPORT_DNA_DATA };
+	unsigned char packet[8000] = { REPORT_DNA_DATA };
 
 	unsigned int offset = 0;
 	int sz = (int)size;
@@ -251,9 +251,8 @@ bool DNAUSB::sendData( DNADEVICE device, const unsigned char* data, const unsign
 	{
 		packet[1] = (sz > MAX_USER_DATA_REPORT_SIZE) ? (MAX_USER_DATA_REPORT_SIZE) : sz;
 		memcpy( packet + 2, data + offset, packet[1]);
-		packet[packet[1] + 2] = 0xCC;
 
-		Arch::asciiDump( packet, REPORT_DNA_DATA_SIZE + 1 );
+//		Arch::asciiDump( packet, REPORT_DNA_DATA_SIZE + 1 );
 
 		if ( !HID_SetFeature(device, packet, REPORT_DNA_DATA_SIZE + 1) )
 		{

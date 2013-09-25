@@ -1,4 +1,4 @@
-CPP = g++ -O3 -Wall -Werror -MD -c
+CPP = g++ -ggdb -O0 -Wall -Werror -MD -c
 
 all: fonttable reduce stringtable
 

@@ -113,5 +113,3 @@ void oledInit( unsigned char invert )
 
 	oledClear();
 }
-
-

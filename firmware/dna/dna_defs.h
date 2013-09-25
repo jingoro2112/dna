@@ -46,10 +46,8 @@ enum RNABusDevices
 //------------------------------------------------------------------------------
 enum DNAUSBCommands
 {
-	USBCommandGetID = 1,
+	USBCommandUser = 1,
 	USBCommandEnterBootloader,
-	USBCommandRNACommand,
-	USBCommandUser,
 };
 
 //------------------------------------------------------------------------------
@@ -57,16 +55,6 @@ enum DNARNACommands
 {
 	RNACommandAppJump = 1,
 	RNACommandCodePageWrite,
-};
-
-//------------------------------------------------------------------------------
-enum StatusBits
-{
-	Status_RNAAddressBit0 = 1<<0,
-	Status_RNAAddressBit1 = 1<<1,
-	Status_RNAAddressBit2 = 1<<2,
-	Status_RNAAddressBit4 = 1<<3,
-	Status_DataToRNA = 1<<4,
 };
 
 #endif

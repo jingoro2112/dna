@@ -82,7 +82,7 @@ enum RNASystemCommands
 extern unsigned int rnaHeapStart; // initialized after rnaInit to be __heap_start
 
 void rnaInit();
-unsigned char rnaShiftOutByte( unsigned char data, unsigned char high );
+unsigned char rnaShiftOutByte( unsigned char data );
 unsigned char rnaShiftInByte( unsigned char high );
 
 unsigned char rnaSendEx( unsigned char address, unsigned char fromAddress, unsigned char *data, unsigned char len );

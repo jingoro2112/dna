@@ -7,15 +7,6 @@
  * and in the LICENCE.txt file included with this distribution
  */
 
-// not using typedef sine C-ish libraris #DEFINE this and that collides
-// when include-order matters
-#ifndef uchar
-#define uchar unsigned char
-#endif
-#ifndef uint
-#define uint unsigned int
-#endif
-
 #include "dna_defs.h" // is included in c++ projects as well so need sto remain generic
 
 #endif

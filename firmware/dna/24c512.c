@@ -9,16 +9,22 @@
 #include "i2c_interface.h"
 
 //------------------------------------------------------------------------------
+void startWrite24c512( unsigned char i2cAddress, int address )
+{
+	while ( !i2cStartWrite(i2cAddress) );
+	i2cWrite( address >> 8 );
+	i2cWrite( address );
+}
+
+//------------------------------------------------------------------------------
 void read24c512( unsigned char i2cAddress, int address, unsigned char* bytes, unsigned char len )
 {
 	// 'index' the EEPROM by setting up a fake write, this loads the
 	// address register with where we want to read, then it's just a
 	// matter of shifting out as many bytes as we want (the address
 	// auto-increments after each read)
-	while ( !i2cStartWrite(i2cAddress) );
-	i2cWrite( address >> 8 );
-	i2cWrite( address );
-
+	startWrite24c512( i2cAddress, address );
+			
 	// now perform a 'normal' i2c read
 	while ( !i2cStartRead(i2cAddress) );
 
@@ -37,16 +43,13 @@ void read24c512( unsigned char i2cAddress, int address, unsigned char* bytes, un
 	i2cStop();
 }
 
+
 //------------------------------------------------------------------------------
 void write24c512( unsigned char i2cAddress, int address, unsigned char* bytes, unsigned char len )
 {
 	// 'index' the eeprom, then stream out as many bytes as were
 	// requested, be sure not to exceed 128, that is the size of the intenral write buffer
-
-	while( !i2cStartWrite(i2cAddress) );
-
-	i2cWrite( address >> 8 );
-	i2cWrite( address & 0xFF );
+	startWrite24c512( i2cAddress, address );
 
 	unsigned char pos = 0;
 	for( ; pos < len; pos++ )

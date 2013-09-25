@@ -15,9 +15,11 @@
 #include <avr/eeprom.h>
 #include <rna_packet.h>
 
-uchar packet[128];
-uchar packetExpectedLength;
-uchar packetPos;
+#include "../../dna/dna_types.h"
+
+uint8 packet[128];
+uint8 packetExpectedLength;
+uint8 packetPos;
 
 //------------------------------------------------------------------------------
 void commitPage( unsigned int page )
@@ -103,8 +105,8 @@ void ResetVector (void)
 const PROGMEM int isrJump[] =
 {
 	// trampoline to bootloader
-	0xE0E0, // e0 e0  ldi r30, 0x00       ; 0
-	0xE0FD, // fd e0  ldi r31, 0x0D       ; 13
+	0xEAE0, // e0 ea  ldi r30, 0xA0       ; 160
+	0xE0FE, // fe e0  ldi r31, 0x0E       ; 14
 	0x9409, // 09 94  ijmp
 };
 

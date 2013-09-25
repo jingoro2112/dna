@@ -1,4 +1,5 @@
-/* Copyright: (c) 2013 by Curt Hartung avr@northarc.com
+/*------------------------------------------------------------------------------*
+ * Copyright: (c) 2013 by Curt Hartung avr@northarc.com
  * This work is released under the Creating Commons 3.0 license
  * found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
  * and in the LICENCE.txt file included with this distribution
@@ -13,7 +14,7 @@
 #include "../util/architecture.hpp"
 #include "../firmware/dna/dna_defs.h"
 #include "../firmware/dna/rna_packet.h"
-#include "../../morlock/firmware/morlock_defs.h"
+#include "../morlock/firmware/morlock_defs.h"
 #include <stdio.h>
 #include <ctype.h>
 #include <stdlib.h>
@@ -38,12 +39,8 @@ int usage()
 			"-o, --oled <image>\n"
 			"    send OLED boot image through morlock board\n"
 			"\n"
-			"--read_eeprom <loc> <size>\n"
-			"    read 'size' bytes from location 'loc'\n"
-			"\n"
-			"--write_eeprom <loc> <data>\n"
-			"    write data to the eeprom location <loc>. <data> is in byte-hex format:\n"
-			"    0102030405060708090A0B0C0D0E0F101112 ... \n"
+			"-e, --load_eeprom <binfile>\n"
+			"    Load the OLED EEPROM with the binary data found in binfile\n"
 		  );
 	
 	return 0;
@@ -176,6 +173,31 @@ int main( int argc, char *argv[] )
 	}
 
 	char image[256] = "application.hex";
+
+	if ( args.isStringSet("-e", image) || args.isStringSet("--load_eeprom", image) )
+	{
+		Cstr bin;
+		if ( !bin.fileToBuffer(image) )
+		{
+			printf( "could not read [%s] for EEPROM push\n", image );
+			return usage();
+		}
+
+		unsigned int position = 0;
+		PacketEEPROMLoad load;
+		load.offset = 0;
+		while( position < bin.size() )
+		{
+			for( int i=0; position < bin.size() && i<sizeof(load.data); position++, i++ )
+			{
+				load.data[i] = bin[position];
+			}
+
+			Splice::proxyRNA( handle, ceCommandRNASend, RNADeviceOLED, RNATypeEEPROMLoad, &load, sizeof(PacketEEPROMLoad) );
+			Arch::sleep( 15 ); // give hardware a break to finish the write cycle
+		}
+	}
+	
 	CLinkList<ReadHex::Chunk> chunklist;
 	Cstr infile;
 	ReadHex::Chunk *chunk = 0;
@@ -202,70 +224,54 @@ int main( int argc, char *argv[] )
 		}
 		chunk = chunklist.getFirst();
 
-		buf[0] = ceCommandRNASend;
-		buf[1] = 0x2;
-		buf[2] = 1;
-		buf[3] = RNATypeEnterBootloader; // rna command
-		if ( !DNAUSB::sendData(handle, (unsigned char *)buf, 4) )
-		{
-			printf( "could not send RNA boot command [%d]\n", GetLastError() );
-			return -1;
-		}
+		Splice::proxyRNA( handle, ceCommandRNASend, RNADeviceOLED, RNATypeEnterBootloader );
+		
 		Arch::sleep( 100 );
 
 		unsigned short address = 64;
-		unsigned short crc = 0;
+
+		PacketEnterApp enter;
+		enter.lastAddress = chunk->size;
+		enter.checksum = 0;
+
 		while( address < chunk->size )
 		{
-			buf[0] = ceCommandRNASend;
-			buf[1] = 0x2;
-			buf[2] = 67;
-			buf[3] = RNATypeCodePage; // rna command
-			*(unsigned short *)(buf + 4) = address; // page
-			
-			for( int i=6; i<70; i += 2 ) // the code
+			PacketCodePage code;
+			code.page = address;
+			for( int i=0; i<64; i += 2 ) // the code
 			{
 				if ( address < chunk->size )
 				{
-					*(unsigned short *)(buf + i) = chunk->data[address] | (chunk->data[address+1] << 8);
-					crc += *(unsigned short *)(buf + i);
+					code.code[i/2] = chunk->data[address] | (chunk->data[address+1] << 8);
+					enter.checksum += code.code[i/2];
 				}
 				else
 				{
-					*(unsigned short *)(buf + i) = 0xFAFA;
+					code.code[i/2] = 0x0;
 				}
 
 				address += 2;
 			}
-
-			if ( !DNAUSB::sendData(handle, (unsigned char *)buf, 70) )
-			{
-				printf( "could not send RNA data [%d]\n", GetLastError() );
-				return -1;
-			}
-
-			if ( address >= chunk->size )
-			{
-				address = 0;
-			}
-
+			Splice::proxyRNA( handle, ceCommandRNASend, RNADeviceOLED, RNATypeCodePage, &code, sizeof(PacketCodePage) );
+			
 			Arch::sleep( 50 );
 
 			if ( address == 64 )
 			{
-				buf[0] = ceCommandRNASend;
-				buf[1] = 0x2;
-				buf[2] = 5;
-				buf[3] = RNATypeEnterApp; // rna command
-				*(unsigned short *)(buf + 4) = chunk->size;
-				*(unsigned short *)(buf + 6) = crc;
-				if ( !DNAUSB::sendData(handle, (unsigned char *)buf, 8) )
-				{
-					printf( "could not send RNA boot command [%d]\n", GetLastError() );
-					return -1;
-				}
-
+				Log( "[%d/%d]", chunk->size / 64, chunk->size / 64 );
+				Splice::proxyRNA( handle,
+								  ceCommandRNASend,
+								  RNADeviceOLED,
+								  RNATypeEnterApp,
+								  &enter, sizeof(PacketEnterApp) );
 				break;
+			}
+
+			Log( "[%d/%d]", (address / 64) - 1, chunk->size / 64 );
+
+			if ( address >= chunk->size )
+			{
+				address = 0;
 			}
 		}
 

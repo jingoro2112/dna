@@ -7,6 +7,7 @@
  * and in the LICENCE.txt file included with this distribution
  */
 
+void startWrite24c512( unsigned char i2cAddress, int address );
 void read24c512( unsigned char i2cAddress, int address, unsigned char* bytes, unsigned char len );
 void write24c512( unsigned char i2cAddress, int address, unsigned char* bytes, unsigned char len );
 

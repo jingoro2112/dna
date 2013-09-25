@@ -136,5 +136,27 @@ char* stringFromId( const unsigned char id, char* buf )
 	return buf;
 }
 
+//------------------------------------------------------------------------------
+bool proxyRNA( DNADEVICE device, const unsigned char header, const unsigned char target, const unsigned char command, const void* data, const int size )
+{
+	unsigned char packet[8000];
+	packet[0] = header;
+	packet[1] = target;
+	packet[2] = 1 + size;
+	packet[3] = command;
+	if ( data && size )
+	{
+		memcpy( (char *)(packet + 4), (char *)data, size );
+	}
+
+	if ( !DNAUSB::sendData(device, packet, 4 + size) )
+	{
+		printf( "could not send RNA proxy packet\n" );
+		return false;
+	}
+
+	return true;
+}
+
 
 }

@@ -3,22 +3,21 @@
 #* found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
 #* and in the LICENCE.txt file included with this distribution
 
-TARGET = oled
+TARGET = morlock
 
 OBJS = \
-	objs/rna.o \
+	objs/usbdrvasm.o \
+	objs/dna.o \
+	objs/usb.o \
 	objs/main.o \
-	objs/i2c_brute.o \
-	objs/oled.o \
-	objs/24c512.o \
-	objs/sram.o \
 	objs/galloc.o \
+	objs/rna.o \
 
 MCU = attiny84
-CPU_FREQUENCY = 8000000
-PLATFORM = OLED
+CPU_FREQUENCY = 12000000
+PLATFORM = DNA
 
-CC = avr-gcc -Wall -I. -I../dna -MD -Os -std=gnu99 -fdata-sections -ffunction-sections -funsigned-char -funsigned-bitfields -fno-inline-small-functions -D$(PLATFORM)=1 -mmcu=$(MCU) -DF_CPU=$(CPU_FREQUENCY)
+CC = avr-gcc -Wall -I. -I../../firmware/dna -MD -Os -std=gnu99 -fdata-sections -ffunction-sections -funsigned-char -funsigned-bitfields -fno-inline-small-functions -mmcu=$(MCU) -D$(PLATFORM)=1 -DF_CPU=$(CPU_FREQUENCY)
 
 all: $(TARGET).hex
 
@@ -28,35 +27,35 @@ clean:
 	@-rm -rf objs
 	@-mkdir objs
 	@-rm -f $(OBJS) $(TARGET).hex $(TARGET).elf $(TARGET).disassembly
+
+splice: $(TARGET).hex
+	../../splice/win32/splice -f $(TARGET).hex
 	
 $(TARGET).hex: $(OBJS)
 	$(CC) -o $(TARGET).elf -Wl,-gc-sections $(OBJS) 
 	avr-objcopy -j .text -j .data -O ihex $(TARGET).elf $(TARGET).hex
 	avr-objdump -d $(TARGET).elf > $(TARGET).disassembly
 
-splice: $(TARGET).hex
-	..\..\splice\win32\splice -o oled.hex
+objs/usbdrvasm.o: ../..//usbdrv/usbdrvasm.S
+	$(CC) -c -x assembler-with-cpp $< -o $@
+
+objs/dna.o: ../../firmware/dna/dna.c
+	$(CC) -c $< -o $@
+
+objs/usb.o: ../../firmware/dna/usb.c
+	$(CC) -c $< -o $@
 
 objs/main.o: main.c
 	$(CC) -c $< -o $@
 
-objs/i2c_brute.o: ../dna/i2c_brute.c
+objs/rna.o: ../../firmware/dna/rna.c
 	$(CC) -c $< -o $@
 
-objs/usb.o: ../dna/usb.c
+objs/a2d.o: ../../firmware/dna/a2d.c
 	$(CC) -c $< -o $@
 
-objs/oled.o: ../dna/oled.c
+objs/i2c.o: ../../firmware/dna/i2c.c
 	$(CC) -c $< -o $@
 
-objs/24c512.o: ../dna/24c512.c
-	$(CC) -c $< -o $@
-
-objs/sram.o: ../dna/sram.c
-	$(CC) -c $< -o $@
-
-objs/rna.o: ../dna/rna.c
-	$(CC) -c $< -o $@
-
-objs/galloc.o: ../dna/galloc.c
+objs/galloc.o: ../../firmware/dna/galloc.c
 	$(CC) -c $< -o $@

@@ -1,21 +1,38 @@
 #ifndef RNA_CONFIG_H
 #define RNA_CONFIG_H
-/*------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------------*
+ * Copyright: (c) 2013 by Curt Hartung avr@northarc.com
+ * This work is released under the Creating Commons 3.0 license
+ * found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
+ * and in the LICENCE.txt file included with this distribution
+ */
 
+// if the RNA implementation is never going to talk back on its own
+// incoming ISR, quite a bit of code can be saved in terms of dynamic
+// allocation and busy-check. In other words if a packet is being
+// delivered from the isr (or rnaPoll) it is an error (silently
+// ignored) to attempt to queue data, with this set
+#define WILL_NEVER_TALK_BACK_ON_OWN_ISR
+
+// define this in if you intend to run the RNA bus by calling rnaPoll()
+// instead of interrupt driven
+//#define RNA_POLL_DRIVEN
+
+// port and number the RNA communicates over. the protocol will take
+// this port over and set its direciton appropriately upon Init
 #define RNA_PORT_LETTTER	B
 #define RNA_PIN_NUMBER		2
 
-#define RNA_MY_ADDRESS		0x3
+// the address of this node, range is 0x1 - 0xF
+#define RNA_MY_ADDRESS		0x3 // RNADeviceBUTTON
 
-#define RNA_BOOTLOADER_ENTRY 0x0
-
-//------------------------------------------------------------------------------
-const PROGMEM int rnaTrampoline[] =
-{
-	0xE6E0, // e0 e7  ldi r30, 0x60	-- ijmp to the bootloader
-	0xE0FC, // fc e0  ldi r31, 0x0C
-	0x9409, // 09 94  ijmp
-};
-
+// define the macros below to the appropriate hardware registers for
+// the target platform
+#define rnaEnableINT() (GIMSK |= (1 << INT0))
+#define rnaClearINT() (GIFR |= (1<<INTF0))
+#define rnaDisableINT() (GIMSK &= ~(1<<INT0))
+#define rnaINTArm() (MCUCR |= (1<<ISC01)); (MCUCR &= ~(1<<ISC00))
+#define RNA_ISR INT0_vect
 
 #endif
+

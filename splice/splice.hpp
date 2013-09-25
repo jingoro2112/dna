@@ -20,6 +20,11 @@ namespace Splice
 // reutrns % the image will fill, 0 for error
 unsigned int checkDNAImage( const unsigned char* image, const unsigned int len, char* err =0 );
 char* stringFromId( const unsigned char id, char* buf );
+bool proxyRNA( DNADEVICE device,
+			   const unsigned char header, // first 8 bits of USB data, to alert end-app what is coming
+			   const unsigned char target, // RNA target
+			   const unsigned char command, // RNA Command
+			   const void* data =0, const int size = 0 ); // optional data payload
 
 }
    

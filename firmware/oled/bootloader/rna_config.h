@@ -7,6 +7,13 @@
  * and in the LICENCE.txt file included with this distribution
  */
 
+// if the RNA implementation is never going to talk back on its own
+// incoming ISR, quite a bit of code can be saved in terms of dynamic
+// allocation and busy-check. In other words if a packet is being
+// delivered from the isr (or rnaPoll) it is an error (silently
+// ignored) to attempt to queue data, with this set
+#define WILL_NEVER_TALK_BACK_ON_OWN_ISR
+
 // define this in if you intend to run the RNA bus by calling rnaPoll()
 // instead of interrupt driven
 #define RNA_POLL_DRIVEN
