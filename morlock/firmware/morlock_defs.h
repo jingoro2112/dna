@@ -67,8 +67,7 @@ enum USBCommands
 	ceCommandSetEEPROMConstants,
 	ceCommandGetEEPROMConstants,
 	ceCommandRNASend,
-
-	ceCommandGetEEPROM,
+	ceCommandGetUtilityString,
 };
 
 #ifdef __AVR_ARCH__

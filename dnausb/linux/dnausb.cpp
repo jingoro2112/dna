@@ -15,6 +15,8 @@ extern SimpleLog Log;
 //------------------------------------------------------------------------------
 hid_device* DNAUSB::openDevice( int vid, int pid, const char* vendor, char* product )
 {
+	hid_exit(); // force a re-enumeration, seems to bre required to properly re-connect to a device we have restarted
+
 	hid_init();
 
 	hid_device* device = hid_open( vid, pid, NULL);
@@ -40,13 +42,12 @@ hid_device* DNAUSB::openDevice( int vid, int pid, const char* vendor, char* prod
 		return 0;
 	}
 
-	if ( hid_get_product_string( device, product, 64) )
+	if ( product && hid_get_product_string( device, product, 64) )
 	{
 		Log( "could not fetch product string" );
 		hid_close( device );
 		return 0;
 	}
-
 
 	return device;
 }
@@ -60,11 +61,11 @@ void DNAUSB::closeDevice( hid_device* device )
 //------------------------------------------------------------------------------
 bool DNAUSB::HID_GetFeature( DNADEVICE device, unsigned char* buf, unsigned int len )
 {
-	return !hid_get_feature_report( device, buf, len );
+	return hid_get_feature_report( device, buf, len );
 }
 
 //------------------------------------------------------------------------------
 bool DNAUSB::HID_SetFeature( DNADEVICE device, unsigned char* buf, unsigned int len )
 {
-	return !hid_send_feature_report( device, buf, len );
+	return hid_send_feature_report( device, buf, len );
 }

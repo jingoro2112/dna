@@ -50,11 +50,4 @@ enum DNAUSBCommands
 	USBCommandEnterBootloader,
 };
 
-//------------------------------------------------------------------------------
-enum DNARNACommands
-{
-	RNACommandAppJump = 1,
-	RNACommandCodePageWrite,
-};
-
 #endif

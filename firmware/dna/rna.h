@@ -13,6 +13,15 @@
 
 #include <rna_config.h>
 
+//------------------------------------------------------------------------------
+enum DNARNACommands
+{
+	RNACommandIdle = 0,
+	RNACommandAppJump,
+	RNACommandCodePageWrite,
+	RNACommandUtilityString,
+};
+
 #define RNA_CONCAT(x, y)  x##y
 #define RNA_D_PORT(port)  RNA_CONCAT( PORT, port )
 #define RNA_D_PIN(port)  RNA_CONCAT( PIN, port )
@@ -28,73 +37,19 @@
 #define rnaSetIdle()  do { RNA_DDR &= ~(1<<RNA_PIN_NUMBER); RNA_PORT |= (1<<RNA_PIN_NUMBER); } while(0);
 #define rnaSetActive()  do { RNA_DDR &= ~(1<<RNA_PIN_NUMBER); RNA_PORT &= ~(1<<RNA_PIN_NUMBER); } while(0);
 
-/*
-#if defined (PROTO88)
-#elif defined (DNA)
-	#define rnaOn()  (PORTA |= 0b10000000)
-	#define rnaOff() (PORTA &= 0b01111111)
-	#define rnaEnableINT() (GIMSK |= (1<<PCIE1))
-	#define rnaClearINT() (GIFR |= (1<<PCIF1))
-	#define rnaDisableINT() (GIMSK &= ~(1<<PCIE1)
-	#define rnaINTArm()  (PCMSK1 |= (1<<PCINT11))
-	#define RNA_ISR PCINT1_vect
-#elif defined (DNAPROTO)
-	#define rnaOn()  (PORTA |= 0b10000000)
-	#define rnaOff() (PORTA &= 0b01111111)
-	#define rnaEnableINT() (GIMSK |= (1<<PCIE0))
-	#define rnaClearINT() (GIFR |= (1<<PCIF0))
-	#define rnaDisableINT() (GIMSK &= ~(1<<PCIE0))
-	#define rnaINTArm() (PCMSK0 |= (1<<PCINT2))
-	#define RNA_ISR PCINT0_vect
-#elif defined (BUTTON)
-	#define rnaOn()  (PORTB |= 0b00000001)
-	#define rnaOff() (PORTB &= 0b11111110)
-	#define rnaEnableINT() (GIMSK |= (1<<INT0))
-	#define rnaClearINT() (GIFR |= (1<<INTF0))
-	#define rnaDisableINT() (GIMSK &= ~(1<<INT0))
-	#define rnaINTArm() (MCUCR |= (1<<ISC01)); (MCUCR &= ~(1<<ISC00))
-	#define RNA_ISR INT0_vect
-#elif defined (OLED)
-	#define rnaOn()  (PORTD |= 0b01000000)
-	#define rnaOff() (PORTD &= 0b10111111)
-	#define rnaEnableINT() (GIMSK |= (1 << INT0))
-	#define rnaClearINT() (GIFR |= (1<<INTF0))
-	#define rnaDisableINT() (GIMSK &= ~(1<<INT0))
-	#define rnaINTArm() (MCUCR |= (1<<ISC01)); (MCUCR &= ~(1<<ISC00))
-	#define RNA_ISR INT0_vect
-#else
-	#error Unsupported hardware platform for RNA bus
-#endif
-#else
-	#define rnaEnableINT()
-	#define rnaClearINT()
-	#define rnaDisableINT()
-	#define rnaINTArm()
-#endif
-*/
-
-//------------------------------------------------------------------------------
-enum RNASystemCommands
-{
-	RNACommandBootloaderJump = 1, // expects the 4-byte address to follow
-};
-
-extern unsigned int rnaHeapStart; // initialized after rnaInit to be __heap_start
-
 void rnaInit();
 unsigned char rnaShiftOutByte( unsigned char data );
 unsigned char rnaShiftInByte( unsigned char high );
 
+// utility function to do all flavors of send, use macro helper functions
 unsigned char rnaSendEx( unsigned char address, unsigned char fromAddress, unsigned char *data, unsigned char len );
-
 #define rnaSend( address, data, len ) rnaSendEx((address), RNA_MY_ADDRESS, (data), (len))
 #define rnaSendSystem( address, data, len ) rnaSendEx((address), 0, (data), (len))
 #define rnaProbe( address ) rnaSendEx((address), RNA_MY_ADDRESS, 0, 0)
+void rnaPrint( char* string );
 void rnaPoll();
 
 unsigned char rnaInputSetup( unsigned char *data, unsigned char dataLen, unsigned char from, unsigned char totalLen );
 void rnaInputStream( unsigned char *data, unsigned char dataLen );
-
-void rnaDebugMessage( char* message );
 
 #endif

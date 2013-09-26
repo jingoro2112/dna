@@ -1,5 +1,6 @@
 OBJS = \
 	objs/dnausb.o \
+	objs/dnausb_common.o \
 	objs/hid.o \
 
 CPP = g++ -m32 -Ihidapi -O3 -Wall -Werror -MD -c
@@ -18,6 +19,9 @@ libdnausb.a: $(OBJS)
 	ranlib libdnausb.a
 
 objs/dnausb.o: ../linux/dnausb.cpp
+	$(CPP) -c $< -o $@
+
+objs/dnausb_common.o: ../dnausb_common.cpp
 	$(CPP) -c $< -o $@
 
 objs/hid.o: hidapi/hid.c

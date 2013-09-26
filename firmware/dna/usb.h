@@ -22,6 +22,7 @@
 	usbDeviceConnect(); \
 
 void dnaUsbQueueData( unsigned char* data, unsigned char len );
+void dnaUsbQueueHandle( unsigned char handle, unsigned char len );
 
 extern volatile unsigned char g_sendQueueLen;
 #define dnaUsbSendQueueBusy() (g_sendQueueLen != 0)

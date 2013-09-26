@@ -74,22 +74,23 @@ bool DNAUSB::sendCode( const int vid, const int pid, const char* vendor,
 	{
 		Arch::sleep( 100 );
 
+		char product[256];
 		for( ; tries < 10; tries++ )
 		{
-			if ( (device = DNAUSB::openDevice(vid, pid, vendor)) != INVALID_DNADEVICE_VALUE )
+			if ( (device = DNAUSB::openDevice(vid, pid, vendor, product)) != INVALID_DNADEVICE_VALUE )
 			{
 				break;
 			}
 
 			Arch::sleep( 2000 );
 		}
-		
+
 		if ( tries >= 10 )
 		{
 			Log( "Could not open device" );
 			return false;
 		}
-		
+
 		unsigned char id = 0;
 		if ( !DNAUSB::getProductId(device, &id) )
 		{
@@ -154,7 +155,7 @@ bool DNAUSB::sendCode( const int vid, const int pid, const char* vendor,
 						return false;
 					}
 
-					Arch::sleep( 10 ); // nmust give the chip time to commit the page or bad things happen
+					Arch::sleep( 15 ); // nmust give the chip time to commit the page or bad things happen
 				}
 
 				// now load page zero
@@ -217,9 +218,13 @@ bool DNAUSB::sendCode( const int vid, const int pid, const char* vendor,
 						status( 100 );
 					}
 
+					printf( "Flashed to: product[%s] id[0x%02X]\n", product, id );
+
 					DNAUSB::closeDevice( device );
 					return true;
 				}
+
+				Log( "found something other than the bootloader, trying to command it to enter the bootloader" );
 
 				if ( status )
 				{
@@ -228,11 +233,15 @@ bool DNAUSB::sendCode( const int vid, const int pid, const char* vendor,
 				
 				if ( !DNAUSB::sendEnterBootloader(device) )
 				{
+					Log( "failed to send bootloader enter" );
 					DNAUSB::closeDevice( device );
 					return false;
 				}
 
 				DNAUSB::closeDevice( device );
+
+				Arch::sleep( 1000 );
+				
 				device = INVALID_DNADEVICE_VALUE;
 				break;
 			}
@@ -291,42 +300,22 @@ bool DNAUSB::sendCommand( DNADEVICE device, const unsigned char command, const u
 }
 
 //------------------------------------------------------------------------------
-bool DNAUSB::getData( DNADEVICE device, unsigned char* data, unsigned char* size /*=0*/, unsigned char sizeExpected /*=0*/ )
+bool DNAUSB::getData( DNADEVICE device, unsigned char* data, unsigned char* size )
 {
 	unsigned char message[REPORT_DNA_DATA_SIZE + 1] = { REPORT_DNA_DATA };
 	memset( message + 1, 0xFE, REPORT_DNA_DATA_SIZE );
 	
-	for(;;)
+	if ( !DNAUSB::HID_GetFeature(device, message, REPORT_DNA_DATA_SIZE + 1) )
 	{
-		if ( !DNAUSB::HID_GetFeature(device, message, REPORT_DNA_DATA_SIZE + 1) )
-		{
-			printf( "failed to poll for available data" );
-			return false;
-		}
-
-		if ( message[1] ) // [1] is the outgoing queue length
-		{
-			break;
-		}
-
-		// zero size, poll until the data is available I guess
-		Arch::sleep( 100 );
-	}
-
-
-	// this is defined as fatal!
-	if ( sizeExpected && (message[1] != sizeExpected) )
-	{
+		printf( "failed to poll for available data" );
 		return false;
 	}
-	
-	if ( size )
+
+	if ( (*size = message[1]) )
 	{
-		*size = message[1];
+		memcpy( data, message + 2, *size );
 	}
-
-	memcpy( data, message + 2, sizeExpected ? sizeExpected :  message[1] );
-
+	
 	return true;
 }
 

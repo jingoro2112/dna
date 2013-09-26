@@ -42,9 +42,10 @@ unsigned char rnaShiftOutByte( unsigned char data )
 	{
 		RNA_DDR ^= 1<<RNA_PIN_NUMBER; // reverse pin sense for clock pulse
 		
-		_delay_us( 1 );
+		_delay_us( 1 ); // allow clock pulse to set up and be heard
 
-		if ( data & bit )
+		// assert data onto the wire
+		if ( data & bit ) 
 		{
 			rnaSetHigh();
 		}
@@ -53,9 +54,9 @@ unsigned char rnaShiftOutByte( unsigned char data )
 			rnaSetLow();
 		}
 
-		bit >>= 1;
+		bit >>= 1; // prepare for next
 
-		_delay_us( 2 );
+		_delay_us( 2 ); // target will be sampling at us #2, or halfway into this wait
 
 		// if the pin is set to be high, but reading low, there is a collision
 		if ( !((RNA_DDR & 1<<RNA_PIN_NUMBER) | (RNA_PIN & 1<<RNA_PIN_NUMBER)) )
@@ -71,9 +72,10 @@ unsigned char rnaShiftOutByte( unsigned char data )
 	if ( rnaIsLow() ) // was there an ack?
 	{
 		while( rnaIsLow() ); // ack heard! remote peer can extend bus indefinitely, so we wait
+		return 1;
 	}
 
-	return 1;
+	return 0;
 }
 
 //------------------------------------------------------------------------------
@@ -81,13 +83,13 @@ unsigned char rnaShiftInByte( unsigned char high )
 {
 	unsigned char byte = 0;
 	unsigned char limit = 0;
-	unsigned char i;
 	unsigned char bit = 0x80;
 
-	for( i=8; i; i-- )
+	for( unsigned char i=8; i; i-- )
 	{
 		if ( high )
 		{
+			limit = 0;
 			while( rnaIsHigh() && --limit ); // wait for start (with breakout, high level might be idle bus)
 		}
 		else
@@ -101,7 +103,6 @@ unsigned char rnaShiftInByte( unsigned char high )
 		{
 			byte |= bit;
 			high = 1; // bus is high, next clock pulse will be a falling edge
-			limit = 0;
 		}
 		else
 		{
@@ -220,6 +221,20 @@ unsigned char rnaSendEx( unsigned char address, unsigned char fromAddress, unsig
 }
 
 //------------------------------------------------------------------------------
+void rnaPrint( char* string )
+{
+	char buf[64];
+	buf[0] = RNACommandUtilityString;
+	unsigned char len;
+	for( len=0; string[len]; len++ )
+	{
+		buf[len + 1] = string[len];
+	}
+
+	rnaSend( 0x1, (unsigned char *)buf, len );
+}
+
+//------------------------------------------------------------------------------
 #ifdef RNA_POLL_DRIVEN
 void rnaPoll()
 #else
@@ -295,8 +310,8 @@ ISR( RNA_ISR )
 						// processing section (thus it would make sense to
 						// put this delay AFTER the following if check)
 						// but the timing is tight enough that a few extra
-						// cycles would need to be added if the callbacks
-						// were trivially implemented. So just eat the extra few cycles
+						// cycles would need to be added if the
+						// callback is trivially implemented. So just eat the extra few cycles
 						// every 8 bytes as a compromise for stability and
 						// code size
 						_delay_us( 3 );
@@ -324,9 +339,10 @@ ISR( RNA_ISR )
 				} while( pos < len );
 			}
 
-			rnaSetHigh(); // bus idle
+			rnaSetHigh(); // set bus to idle while waiting to transmit
 
 #ifndef WILL_NEVER_TALK_BACK_ON_OWN_ISR
+
 			s_busBusy = 0;
 
 			// now that we are not busy, see if any requests were queued up
@@ -341,7 +357,7 @@ ISR( RNA_ISR )
 			s_sendUnitTail = 0;
 #endif
 		}
-
+		
 		rnaSetIdle();
 
 #ifdef RNA_POLL_DRIVEN

@@ -54,14 +54,14 @@
 #define NUMBER_OF_BIT_ENTRIES 2
 struct Bits
 {
-	volatile uchar b0:1;
-	volatile uchar b1:1;
-	volatile uchar b2:1;
-	volatile uchar b3:1;
-	volatile uchar b4:1;
-	volatile uchar b5:1;
-	volatile uchar b6:1;
-	volatile uchar b7:1;
+	volatile uint8 b0:1;
+	volatile uint8 b1:1;
+	volatile uint8 b2:1;
+	volatile uint8 b3:1;
+	volatile uint8 b4:1;
+	volatile uint8 b5:1;
+	volatile uint8 b6:1;
+	volatile uint8 b7:1;
 } volatile bits[NUMBER_OF_BIT_ENTRIES];
 
 // I can't think of a pre-compiler way to properly manage this
@@ -86,47 +86,49 @@ struct Bits
 #define sampleEye				(bits[1].b7) // should the eye be sampled at all?
 
 
-volatile uint enhancedTriggerTimeout;
-volatile uchar shotsInString;
-volatile uchar millisecondCountBox;
-volatile uchar millisecondCountBox2;
-volatile uchar millisecondCountBox3;
-volatile uint millisecondCountBoxLong;
+volatile uint16 enhancedTriggerTimeout;
+volatile uint8 shotsInString;
+volatile uint8 millisecondCountBox;
+volatile uint8 millisecondCountBox2;
+volatile uint8 millisecondCountBox3;
+volatile uint16 millisecondCountBoxLong;
 
-uchar accessoryRunTime;
-uint antiBoltstickTimeout;
+uint8 accessoryRunTime;
+uint16 antiBoltstickTimeout;
 
-uchar timesToBlinkLight;
-uint blinkBox;
-uchar dimmerBox;
-uchar debounceBox;
-uint triggerWavelength;
-uint triggerWavelengthBox;
-volatile uchar burstCount;
+uint8 timesToBlinkLight;
+uint16 blinkBox;
+uint8 dimmerBox;
+uint8 debounceBox;
+uint16 triggerWavelength;
+uint16 triggerWavelengthBox;
+volatile uint8 burstCount;
 
-uchar usbCommand;
+uint8 usbCommand;
 
-uchar usbRNATo;
-uchar usbRNAPacket[68];
-uchar usbRNAPacketPos;
-uchar usbRNAPacketExpected;
+uint8 usbRNATo;
+uint8 usbRNAPacket[68];
+uint8 usbRNAPacketPos;
+uint8 usbRNAPacketExpected;
+uint8 usbUtilityStringHandle;
+uint8 usbUtilityStringSize;
 
-uchar eepromLoadPointer;
+uint8 eepromLoadPointer;
 volatile struct EEPROMConstants consts;
 
 // program mode
-uchar programSelectState;
-uchar currentEntry;
-uchar selectedRegister;
-uchar plusMinusDelta;
-uchar selectedValue;
+uint8 programSelectState;
+uint8 currentEntry;
+uint8 selectedRegister;
+uint8 plusMinusDelta;
+uint8 selectedValue;
 
-volatile uint rampTimeoutBox;
-volatile uint rampLevel;
-volatile uchar triggerTimer;
-volatile uchar currentFireMode;
-volatile uint scheduleShotRate;
-volatile uint scheduleShotBox;
+volatile uint16 rampTimeoutBox;
+volatile uint16 rampLevel;
+volatile uint8 triggerTimer;
+volatile uint8 currentFireMode;
+volatile uint16 scheduleShotRate;
+volatile uint16 scheduleShotBox;
 
 //------------------------------------------------------------------------------
 void digitizeEye()
@@ -172,13 +174,13 @@ void loadEEPROMConstants()
 {
 	for( unsigned int i=0; i<sizeof(consts); i++ )
 	{
-		((uchar*)&consts)[i] = eeprom_read_byte( (uchar*)i );
+		((uint8*)&consts)[i] = eeprom_read_byte( (uint8*)i );
 	}
 
 	// do a one-time 32-bit calculation to extract the exact timer
 	// count for refire. this is good enough in 16-bit but as long as
 	// we have the space what the heck
-	uint refireRegister = ((unsigned long)ROF_TIMER_NUMERATOR_X10 / consts.ballsPerSecondX10) - 1;
+	uint16 refireRegister = ((unsigned long)ROF_TIMER_NUMERATOR_X10 / consts.ballsPerSecondX10) - 1;
 	OCR1AH = refireRegister >> 8;
 	OCR1AL = refireRegister;
 	currentFireMode = consts.fireMode;
@@ -202,7 +204,7 @@ void saveEEPROMConstants()
 {
 	for( unsigned int i=0; i<sizeof(consts); i++ )
 	{
-		eeprom_write_byte( (uchar*)i, *(((uchar*)&consts) + i) );
+		eeprom_write_byte( (uint8*)i, *(((uint8*)&consts) + i) );
 		eeprom_busy_wait();
 	}
 	loadEEPROMConstants(); // be sure to do any translations that occur on load
@@ -231,6 +233,12 @@ void dnaUsbCommand( unsigned char command, unsigned char data[5] )
 		digitizeEye();
 		consts.version = MORLOCK_CODE_VERSION;
 		dnaUsbQueueData( (unsigned char *)&consts, sizeof(consts) );
+	}
+	else if ( command == ceCommandGetUtilityString && usbUtilityStringSize )
+	{
+		dnaUsbQueueHandle( usbUtilityStringHandle, usbUtilityStringSize );
+		usbUtilityStringHandle = 0;
+		usbUtilityStringSize = 0;
 	}
 
 	usbCommand = ceCommandIdle;
@@ -454,14 +462,38 @@ void cycleDoubleSolenoid()
 //------------------------------------------------------------------------------
 unsigned char rnaInputSetup( unsigned char *data, unsigned char dataLen, unsigned char from, unsigned char packetLen )
 {
-	isLedOn = *data;
+	usbRNAPacketPos = 0;
+	usbRNAPacketExpected = packetLen;
 	return 0;
 }
 
 //------------------------------------------------------------------------------
 void rnaInputStream( unsigned char *data, unsigned char dataLen )
 {
+	for( unsigned char i=0; i<dataLen; i++ )
+	{
+		usbRNAPacket[usbRNAPacketPos++] = data[i];
+	}
 
+	if ( usbRNAPacketPos < usbRNAPacketExpected )
+	{
+		return;
+	}
+
+	if ( *usbRNAPacket == RNACommandUtilityString )
+	{
+		usbRNAPacket[usbRNAPacketPos] = 0;
+
+		gfree( usbUtilityStringHandle );
+		usbUtilityStringSize = usbRNAPacketExpected;
+
+		char *ptr;
+		usbUtilityStringHandle = galloc( usbUtilityStringSize, (void**)&ptr );
+		for( unsigned char i=0; i<usbUtilityStringSize; i++ )
+		{
+			ptr[i] = usbRNAPacket[i];
+		}
+	}
 }
 
 //------------------------------------------------------------------------------
@@ -510,38 +542,6 @@ int __attribute__((OS_main)) main(void)
 	rnaInit();
 
 	sei();
-
-
-
-
-
-
-
-
-	isLedOn = false;
-	
-	for(;;)
-	{
-		if ( rnaPacketAvail )
-		{
-			rnaPacketAvail = false;
-			_delay_ms( 50 );
-			rnaSend( usbRNATo, usbRNAPacket, usbRNAPacketExpected );
-		}
-	}
-
-
-
-
-
-
-
-
-
-
-
-
-
 	
 	_delay_ms(2); // let state settle, and make sure housekeeping ISR runs
 
@@ -573,6 +573,13 @@ int __attribute__((OS_main)) main(void)
 				eepromConstantsDirty = false;
 				saveEEPROMConstants();
 				isLedOn = false;
+			}
+
+			if ( rnaPacketAvail )
+			{
+				rnaPacketAvail = false;
+				_delay_ms( 50 );
+				rnaSend( usbRNATo, usbRNAPacket, usbRNAPacketExpected );
 			}
 		}
 
@@ -633,8 +640,7 @@ int __attribute__((OS_main)) main(void)
 // entered 1994.7 times per second
 ISR( TIM0_COMPA_vect, ISR_NOBLOCK )
 {
-	/*
-	static uchar s_ms;
+	static uint8 s_ms;
 
 	if ( scheduleShotBox )
 	{
@@ -953,7 +959,6 @@ ISR( TIM0_COMPA_vect, ISR_NOBLOCK )
 	{
 		digitizeEye();
 	}
-	*/
 
 	usbPoll();
 }

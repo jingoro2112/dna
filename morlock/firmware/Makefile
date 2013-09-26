@@ -29,7 +29,7 @@ clean:
 	@-rm -f $(OBJS) $(TARGET).hex $(TARGET).elf $(TARGET).disassembly
 
 splice: $(TARGET).hex
-	../../splice/win32/splice -f $(TARGET).hex
+	../../splice/mac/splice -f $(TARGET).hex
 	
 $(TARGET).hex: $(OBJS)
 	$(CC) -o $(TARGET).elf -Wl,-gc-sections $(OBJS) 

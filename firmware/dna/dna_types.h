@@ -10,14 +10,18 @@
 #if defined(_WIN32)
 typedef unsigned short uint16;
 typedef short int16;
-typedef unsigned short uint;
 typedef unsigned char uint8;
 typedef char int8;
 
 #elif defined(AVR)
 typedef unsigned int uint16;
 typedef int int16;
-typedef unsigned int uint;
+typedef unsigned char uint8;
+typedef char int8;
+
+#elif defined(__MACH__)
+typedef unsigned short uint16;
+typedef short int16;
 typedef unsigned char uint8;
 typedef char int8;
 

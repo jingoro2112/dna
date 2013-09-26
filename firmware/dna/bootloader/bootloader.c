@@ -165,7 +165,6 @@ const PROGMEM int isrJump[] =
 	0x9508, // 08 95  ret
 
 	// RESET trampoline to bootloader
-
 	0xEAE0, // e0 ea  ldi r30, 0xA0       ; 160
 	0xE0FC, // fc e0  ldi r31, 0x0C
 	0x9409, // 09 94  ijmp
@@ -208,3 +207,4 @@ int __attribute__((OS_main)) main(void)
 		}
 	}
 }
+

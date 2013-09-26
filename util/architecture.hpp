@@ -12,6 +12,12 @@
  #include <windows.h>
  #include <process.h>
 #else
+
+ #ifdef __MACH__
+  #include <mach/clock.h>
+  #include <mach/mach.h>
+ #endif
+
  #include <time.h>
  #include <unistd.h>
  #include <sys/time.h>
@@ -127,8 +133,21 @@ inline long long millisecondTick()
 	ftui.HighPart = ft.dwHighDateTime;
 	return ftui.QuadPart / 10000;
 #else
+
 	struct timespec ts;
+
+#ifdef __MACH__ 
+	clock_serv_t cclock;
+	mach_timespec_t mts;
+	host_get_clock_service(mach_host_self(), CALENDAR_CLOCK, &cclock);
+	clock_get_time(cclock, &mts);
+	mach_port_deallocate(mach_task_self(), cclock);
+	ts.tv_sec = mts.tv_sec;
+	ts.tv_nsec = mts.tv_nsec;
+#else
 	clock_gettime( CLOCK_REALTIME, &ts );
+#endif
+	
 	return (long long)(ts.tv_nsec/1000000) + (ts.tv_sec * 1000);
 #endif
 }
@@ -142,8 +161,21 @@ inline long long nanosecondTick()
 	QueryPerformanceCounter( &out );
 	return (out.QuadPart * 1000000000) / freq.QuadPart;
 #else
+	
 	struct timespec ts;
+
+#ifdef __MACH__ // OS X does not have clock_gettime, use clock_get_time
+	clock_serv_t cclock;
+	mach_timespec_t mts;
+	host_get_clock_service(mach_host_self(), CALENDAR_CLOCK, &cclock);
+	clock_get_time(cclock, &mts);
+	mach_port_deallocate(mach_task_self(), cclock);
+	ts.tv_sec = mts.tv_sec;
+	ts.tv_nsec = mts.tv_nsec;
+#else
 	clock_gettime( CLOCK_REALTIME, &ts );
+#endif
+
 	return (long long)ts.tv_nsec + ((long long)ts.tv_sec * 1000000000);
 #endif
 }

@@ -18,6 +18,8 @@
 #include <avr/wdt.h>
 #include <avr/interrupt.h>
 
+#include "../../oled/font_loader.h"
+
 unsigned char rnaCommand;
 unsigned char rnaDataExpected;
 unsigned char rnaDataReceived;
@@ -63,8 +65,7 @@ void rnaInputStream( unsigned char *data, unsigned char bytes )
 }
 
 //------------------------------------------------------------------------------
-// for software entry of bootloader, this is triggered with a watchdog
-// reset
+// for software entry of bootloader, this is triggered with a watchdog reset
 void __attribute__((OS_main)) __init()
 {
 	asm volatile ( "clr __zero_reg__" );
@@ -131,33 +132,39 @@ void blit()
 }
 
 //------------------------------------------------------------------------------
+static uint16 computeAddress( unsigned char x, unsigned char y )
+{
+	return ((y & 0xF8) << 4) + x;
+}
+
+//------------------------------------------------------------------------------
 void resetFramePixel( unsigned char x, unsigned char y )
 {
-	uint16 address = ((y >> 3) << 7) + x;
+	uint16 address = computeAddress( x, y );
 	sramAtomicWrite( address, sramAtomicRead(address) & ~(1 << (y & 0x07)) );
 }
 
 //------------------------------------------------------------------------------
 void setFramePixel( unsigned char x, unsigned char y )
 {
-	uint16 address = ((y >> 3) << 7) + x;
+	uint16 address = computeAddress( x, y );
 	sramAtomicWrite( address, sramAtomicRead(address) | (1 << (y & 0x07)) );
 }
 
 //------------------------------------------------------------------------------
 void setPixelLive( unsigned char x, unsigned char y )
 {
-	uint16 address = ((y >> 3) << 7) + x;
+	uint16 address = computeAddress( x, y );
 	uint8 newVal = sramAtomicRead(address) | (1 << (y & 0x07));
 
 	sramAtomicWrite( address, newVal );
 
 	i2cStartWrite( OLED_ADDRESS );
-	i2cWrite( 0x80 ); // command setup
+	i2cWrite( 0x80 );
 	i2cWrite( x & 0x0F );
-	i2cWrite( 0x80 ); // command setup
+	i2cWrite( 0x80 );
 	i2cWrite( x>>4 | 0x10 );
-	i2cWrite( 0x80 ); // command setup
+	i2cWrite( 0x80 );
 	i2cWrite( 0xB0 | y>>3 );
 
 	i2cWrite( 0xC0 );
@@ -169,16 +176,16 @@ void setPixelLive( unsigned char x, unsigned char y )
 //------------------------------------------------------------------------------
 void resetPixelLive( unsigned char x, unsigned char y )
 {
-	uint16 address = ((y >> 3) << 7) + x;
+	uint16 address = computeAddress( x, y );
 	uint8 newVal = sramAtomicRead(address) & ~(1 << (y & 0x07));
 	sramAtomicWrite( address, newVal );
 
 	i2cStartWrite( OLED_ADDRESS );
-	i2cWrite( 0x80 ); // command setup
+	i2cWrite( 0x80 );
 	i2cWrite( x & 0x0F );
-	i2cWrite( 0x80 ); // command setup
+	i2cWrite( 0x80 );
 	i2cWrite( x>>4 | 0x10 );
-	i2cWrite( 0x80 ); // command setup
+	i2cWrite( 0x80 );
 	i2cWrite( 0xB0 | y>>3 );
 
 	i2cWrite( 0xC0 );
@@ -244,6 +251,8 @@ int __attribute__((OS_main)) main()
 //				blit();
 				resetPixelLive( x, y );
 			}
+
+			rnaPrint( "                                           " );
 		}
 	}
 }

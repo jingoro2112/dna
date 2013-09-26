@@ -13,8 +13,11 @@ clean:
 	@-rm -rf objs splice
 	@-mkdir objs
 
-splice: objs/loader.o
-	g++ -m32 objs/splice.o ../../dnausb/mac/libdnausb.a -o splice -framework IOKit -framework CoreFoundation -framework CoreServices
+splice: objs/splice.o objs/main.o
+	g++ -m32 objs/splice.o objs/main.o ../../dnausb/mac/libdnausb.a -o splice -framework IOKit -framework CoreFoundation -framework CoreServices
 
 objs/splice.o: ../splice.cpp
+	$(CPP) -c $< -o $@
+
+objs/main.o: ../main.cpp
 	$(CPP) -c $< -o $@

@@ -41,6 +41,13 @@ int usage()
 			"\n"
 			"-e, --load_eeprom <binfile>\n"
 			"    Load the OLED EEPROM with the binary data found in binfile\n"
+			"\n"
+			"-m, --monitor\n"
+			"    Monitor target for debug messages\n"
+			"\n"
+			"--format\n"
+			"    Kick the DNA into it's bootloader and exit"
+
 		  );
 	
 	return 0;
@@ -51,7 +58,7 @@ int main( int argc, char *argv[] )
 {
 	MainArgs args( argc, argv );
 
-	if ( args.isSet("-?") || args.isSet("-help") || args.isSet("--help") )
+	if ( (argc == 1) || args.isSet("-?") || args.isSet("-help") || args.isSet("--help") )
 	{
 		return usage();
 	}
@@ -62,10 +69,10 @@ int main( int argc, char *argv[] )
 	}
 
 	char product[256];
-	DNADEVICE handle;
+	DNADEVICE device;
 	
-	handle = DNAUSB::openDevice( 0x16C0, 0x05DF, "p@northarc.com", product );
-	if ( handle == INVALID_DNADEVICE_VALUE )
+	device = DNAUSB::openDevice( 0x16C0, 0x05DF, "p@northarc.com", product );
+	if ( device == INVALID_DNADEVICE_VALUE )
 	{
 		printf( "Could not open DNA device\n" );
 		return -1;
@@ -74,42 +81,23 @@ int main( int argc, char *argv[] )
 	if ( args.isSet("-t") )
 	{
 		unsigned char buffer[256];
-		if ( !DNAUSB::sendCommand(handle, ceCommandGetEEPROM) )
-		{
-			DNAUSB::closeDevice( handle );
-			printf( "command failed\n" );
-			return -1;
-		}
-
-		unsigned char len;
-		if ( !DNAUSB::getData(handle, buffer, &len) )
-		{
-			DNAUSB::closeDevice( handle );
-			printf( "fetch failed\n" );
-			return -1;
-		}
-
-		Arch::asciiDump( buffer, 67 );
-
-/*
-		unsigned char buffer[256];
 		EEPROMConstants *consts = (EEPROMConstants *)buffer;
 
 		for(;;)
 		{
-			Arch::sleep(100);
+			Arch::sleep(1000);
 
-		if ( !DNAUSB::sendCommand(handle, ceCommandGetEEPROMConstants) )
+		if ( !DNAUSB::sendCommand(device, ceCommandGetEEPROMConstants) )
 		{
-			DNAUSB::closeDevice( handle );
+			DNAUSB::closeDevice( device );
 			printf( "command failed\n" );
 			return -1;
 		}
 
 		unsigned char len;
-		if ( !DNAUSB::getData(handle, buffer, &len) )
+		if ( !DNAUSB::getData(device, buffer, &len) )
 		{
-			DNAUSB::closeDevice( handle );
+			DNAUSB::closeDevice( device );
 			printf( "fetch failed\n" );
 			return -1;
 		}
@@ -146,32 +134,76 @@ int main( int argc, char *argv[] )
 		printf( "shortCyclePreventionInterval[%08X][%d]\n", (unsigned int)consts->shortCyclePreventionInterval, (unsigned int)consts->shortCyclePreventionInterval );
 		printf( "eyeLevel[%08X][%d]\n", (unsigned int)consts->eyeLevel, (unsigned int)consts->eyeLevel );
 
-		
+		printf( "---\n" );
 		printf( "eye[0x%02X] %s\n", (int)consts->eyeLevel, (consts->eyeLevel < consts->eyeDetectLevel) ? "blocked":"clear" );
+		printf( "version[%d]\n", (int)consts->version );
 
 		}
-*/
-		DNAUSB::closeDevice( handle );
+		DNAUSB::closeDevice( device );
 		return 0;
 	}
 
 	unsigned char id;
 	unsigned char version;
-	if ( !DNAUSB::getProductId( handle, &id, &version ) )
+	if ( !DNAUSB::getProductId( device, &id, &version ) )
 	{
 		printf( "failed to get product id\n" );
-		DNAUSB::closeDevice( handle );
+		DNAUSB::closeDevice( device );
 		return 0;
 	}
-
 	char buf[256];
-	printf( "product[%s] [0x%02X]:%s  version[%d]\n", product, id, Splice::stringFromId(id, buf), version );
-
+	printf( "product[%s] [0x%02X:%s] version[%d]\n", product, id, Splice::stringFromId(id, buf), version );
+	
 	if (args.isSet("-r") || args.isSet("--report") ) // report only
 	{
 		return 0;
 	}
 
+	if ( args.isSet("--format") )
+	{
+		if ( !DNAUSB::sendEnterBootloader(device) )
+		{
+			Log( "failed to send bootloader entery request" );
+			DNAUSB::closeDevice( device );
+			return -1;
+		}
+
+		printf( "sent bootloader entry request\n" );
+		return 0;
+	}
+
+	if ( args.isSet("-m") || args.isSet("--monitor") )
+	{
+		Arch::sleep( 10 );
+
+		unsigned char buffer[256];
+		for(;;)
+		{
+			if ( !DNAUSB::sendCommand(device, ceCommandGetUtilityString) )
+			{
+				DNAUSB::closeDevice( device );
+				printf( "command failed\n" );
+				return -1;
+			}
+
+			unsigned char len;
+			memset( buffer, 0, 256 );
+			if ( !DNAUSB::getData(device, buffer, &len) )
+			{
+				DNAUSB::closeDevice( device );
+				printf( "fetch failed\n" );
+				return -1;
+			}
+
+			if ( buffer[0] )
+			{
+				printf( "> %s\n", buffer );
+			}
+			
+			Arch::sleep(250);
+		}
+	}
+	
 	char image[256] = "application.hex";
 
 	if ( args.isStringSet("-e", image) || args.isStringSet("--load_eeprom", image) )
@@ -188,12 +220,12 @@ int main( int argc, char *argv[] )
 		load.offset = 0;
 		while( position < bin.size() )
 		{
-			for( int i=0; position < bin.size() && i<sizeof(load.data); position++, i++ )
+			for( unsigned int i=0; position < bin.size() && i<sizeof(load.data); position++, i++ )
 			{
 				load.data[i] = bin[position];
 			}
 
-			Splice::proxyRNA( handle, ceCommandRNASend, RNADeviceOLED, RNATypeEEPROMLoad, &load, sizeof(PacketEEPROMLoad) );
+			Splice::proxyRNA( device, ceCommandRNASend, RNADeviceOLED, RNATypeEEPROMLoad, &load, sizeof(PacketEEPROMLoad) );
 			Arch::sleep( 15 ); // give hardware a break to finish the write cycle
 		}
 	}
@@ -224,7 +256,7 @@ int main( int argc, char *argv[] )
 		}
 		chunk = chunklist.getFirst();
 
-		Splice::proxyRNA( handle, ceCommandRNASend, RNADeviceOLED, RNATypeEnterBootloader );
+		Splice::proxyRNA( device, ceCommandRNASend, RNADeviceOLED, RNATypeEnterBootloader );
 		
 		Arch::sleep( 100 );
 
@@ -252,14 +284,14 @@ int main( int argc, char *argv[] )
 
 				address += 2;
 			}
-			Splice::proxyRNA( handle, ceCommandRNASend, RNADeviceOLED, RNATypeCodePage, &code, sizeof(PacketCodePage) );
+			Splice::proxyRNA( device, ceCommandRNASend, RNADeviceOLED, RNATypeCodePage, &code, sizeof(PacketCodePage) );
 			
 			Arch::sleep( 50 );
 
 			if ( address == 64 )
 			{
 				Log( "[%d/%d]", chunk->size / 64, chunk->size / 64 );
-				Splice::proxyRNA( handle,
+				Splice::proxyRNA( device,
 								  ceCommandRNASend,
 								  RNADeviceOLED,
 								  RNATypeEnterApp,
@@ -275,12 +307,12 @@ int main( int argc, char *argv[] )
 			}
 		}
 
-		DNAUSB::closeDevice( handle );
+		DNAUSB::closeDevice( device );
 	}
 	
 	if ( args.isStringSet("-f", image) || args.isStringSet("-i", image) || args.isStringSet("--flash", image) )
 	{
-		DNAUSB::closeDevice( handle );
+		DNAUSB::closeDevice( device );
 
 		if ( !infile.fileToBuffer(image) )
 		{
@@ -301,11 +333,11 @@ int main( int argc, char *argv[] )
 		}
 		chunk = chunklist.getFirst();
 
-		// double-secret 'do not valide' flag, please do not publicize,
+		// double-secret 'Do Not Validate' flag, please do not publicize,
 		// this is used by people who REALLY know what they are doing
 		// and want to override the boot-jumper check protection. THERE
-		// IS NO GOOD REASON TO DO THIS unless you have a programmer
-		// hooked up to the board and are prepared to reflash manually.
+		// IS NO GOOD REASON TO DO THIS UNLESS YOU HAVE A PROGRAMMER, A
+		// SOLDERING IRON AND TOO MUCH TIME ON YOUR HANDS
 		if ( !args.isSet("-dnv") ) 
 		{
 			char err[256];
@@ -322,5 +354,3 @@ int main( int argc, char *argv[] )
 
 	return 0;
 }
-
-

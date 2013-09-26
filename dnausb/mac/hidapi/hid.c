@@ -799,7 +799,7 @@ static int set_report(hid_device *dev, IOHIDReportType type, const unsigned char
 
 	/* Return if the device has been disconnected. */
    	if (dev->disconnected)
-   		return -1;
+   		return 0;
 
 	if (data[0] == 0x0) {
 		/* Not using numbered Reports.
@@ -824,10 +824,19 @@ static int set_report(hid_device *dev, IOHIDReportType type, const unsigned char
 			return length;
 		}
 		else
-			return -1;
+		{
+			if ( errno == 60 )
+			{
+				// timeout is okay, this is just the board writing to
+				// its flash
+				return length;
+			}
+
+			return 0;
+		}
 	}
 	
-	return -1;
+	return 0;
 }
 
 int HID_API_EXPORT hid_write(hid_device *dev, const unsigned char *data, size_t length)
@@ -989,7 +998,7 @@ int HID_API_EXPORT hid_get_feature_report(hid_device *dev, unsigned char *data, 
 
 	/* Return if the device has been unplugged. */
 	if (dev->disconnected)
-		return -1;
+		return 0;
 
 	res = IOHIDDeviceGetReport(dev->device_handle,
 	                           kIOHIDReportTypeFeature,
@@ -998,14 +1007,16 @@ int HID_API_EXPORT hid_get_feature_report(hid_device *dev, unsigned char *data, 
 	if (res == kIOReturnSuccess)
 		return len;
 	else
-		return -1;
+		return 0;
 }
 
 
 void HID_API_EXPORT hid_close(hid_device *dev)
 {
-	if (!dev)
+	if ( !dev )
+	{
 		return;
+	}
 
 	/* Disconnect the report callback before close. */
 	if (!dev->disconnected) {
