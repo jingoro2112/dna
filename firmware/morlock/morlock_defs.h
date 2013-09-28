@@ -13,7 +13,7 @@
 #include "../../sdk/firmware/dna/dna_types.h"
 #pragma pack(push, 1)
 
-#else
+#elif !defined(AVR)
 #include <arpa/inet.h>
 #endif
 

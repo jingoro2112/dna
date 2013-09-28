@@ -14,7 +14,7 @@
 #include "comm_thread.hpp"
 
 #include "../firmware/dna/dna_defs.h"
-#include "firmware/morlock_defs.h"
+#include "../firmware/morlock/morlock_defs.h"
 #include "../util/hash.hpp"
 #include "../util/json_parser.hpp"
 #include "../util/simple_log.hpp"
@@ -666,13 +666,13 @@ void CMorlockDlg::load( Cstr& buf )
 
 	g_morlockConstants.singleSolenoid = (uint8)getJsonValue( "SingleSolenoid", stream );
 	g_morlockConstants.fireMode = (uint8)getJsonValue( "fireMode", stream );
-	g_morlockConstants.ballsPerSecondX10 = (uint)getJsonValue( "ballsPerSecondX10", stream );
+	g_morlockConstants.ballsPerSecondX10 = (uint16)getJsonValue( "ballsPerSecondX10", stream );
 	g_morlockConstants.burstCount = (uint8)getJsonValue( "burstCount", stream );
-	g_morlockConstants.enhancedTriggerTimeout = (uint)getJsonValue( "enhancedTriggerTimeout", stream );
+	g_morlockConstants.enhancedTriggerTimeout = (uint16)getJsonValue( "enhancedTriggerTimeout", stream );
 	g_morlockConstants.boltHoldoff = (uint8)getJsonValue( "boltHoldoff", stream );
 	g_morlockConstants.accessoryRunTime = (uint8)getJsonValue( "accessoryRunTime", stream );
 	g_morlockConstants.dimmer = (uint8)getJsonValue( "dimmer", stream );
-	g_morlockConstants.ABSTimeout = (uint)getJsonValue( "ABSTimeout", stream );
+	g_morlockConstants.ABSTimeout = (uint16)getJsonValue( "ABSTimeout", stream );
 	g_morlockConstants.ABSAddition = (uint8)getJsonValue( "ABSAddition", stream );
 	g_morlockConstants.rebounce = (uint8)getJsonValue( "rebounce", stream );
 	g_morlockConstants.debounce = (uint8)getJsonValue( "debounce", stream );
@@ -686,7 +686,7 @@ void CMorlockDlg::load( Cstr& buf )
 	g_morlockConstants.rampEnableCount = (uint8)getJsonValue( "rampEnableCount", stream );
 	g_morlockConstants.rampClimb = (uint8)getJsonValue( "rampClimb", stream );
 	g_morlockConstants.rampTopMode = (uint8)getJsonValue( "rampTopMode", stream );
-	g_morlockConstants.rampTimeout = (uint)getJsonValue( "rampTimeout", stream );
+	g_morlockConstants.rampTimeout = (uint16)getJsonValue( "rampTimeout", stream );
 	g_morlockConstants.eyeEnabled = (uint8)getJsonValue( "eyeEnabled", stream );
 	g_morlockConstants.eyeDetectLevel = (uint8)getJsonValue( "eyeDetectLevel", stream );
 	g_morlockConstants.shortCyclePreventionInterval = (uint8)getJsonValue( "shortCyclePreventionInterval", stream );
