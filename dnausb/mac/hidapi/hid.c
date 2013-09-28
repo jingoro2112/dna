@@ -456,7 +456,7 @@ struct hid_device_info  HID_API_EXPORT *hid_enumerate(unsigned short vendor_id, 
 	for (i = 0; i < num_devices; i++) {
 		unsigned short dev_vid;
 		unsigned short dev_pid;
-		#define BUF_LEN 256
+		#define BUF_LEN 256 //-- seriously? -Curt
 		wchar_t buf[BUF_LEN];
 		char cbuf[BUF_LEN];
 

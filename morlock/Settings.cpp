@@ -18,7 +18,7 @@
 
 #include "../splice/splice.hpp"
 
-#include "firmware/morlock_defs.h"
+#include "../firmware/morlock/morlock_defs.h"
 
 
 IMPLEMENT_DYNAMIC(CSettings, CDialogEx)

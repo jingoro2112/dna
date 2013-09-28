@@ -13,7 +13,7 @@
 #endif
 
 #include <stdio.h>
-#include "../firmware/dna/dna_defs.h"
+#include "../firmware/dna/dna.h"
 #include "../util/str.hpp"
 #include "../util/architecture.hpp"
 

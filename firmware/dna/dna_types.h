@@ -25,6 +25,12 @@ typedef short int16;
 typedef unsigned char uint8;
 typedef char int8;
 
+#elif defined(linux)
+typedef unsigned short uint16;
+typedef short int16;
+typedef unsigned char uint8;
+typedef char int8;
+
 #endif
 
 #endif

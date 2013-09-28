@@ -1,4 +1,5 @@
-/* Copyright: (c) 2013 by Curt Hartung avr@northarc.com
+/*------------------------------------------------------------------------------*
+ * Copyright: (c) 2013 by Curt Hartung avr@northarc.com
  * This work is released under the Creating Commons 3.0 license
  * found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
  * and in the LICENCE.txt file included with this distribution
@@ -26,6 +27,7 @@
 #define annunciatorOn() (PORTA |= 0b00000100)  // A2
 #define annunciatorOff() (PORTA &= 0b11111011)  // A2
 #define annunciatorToggle() (PORTA ^= 0b00000100)  // A2
+#define isAnnunciatorOn() (PINA & 0b00000100) // A2
 #define strongEyeEnable() (PORTA &= 0b10111111)  // A6
 #define strongEyeDisable() (PORTA |= 0b01000000)  // A6
 #define weakEyeEnable() (PORTA &= 0b11011111)  // A5
@@ -37,8 +39,6 @@
 #define fet1Off() (PORTA &= 0b1111110)  // A0
 #define fet2On() (PORTA |= 0b0001000)  // A3
 #define fet2Off() (PORTA &= 0b1110111)  // A3
-#define setLedOn() (PORTA &= 0b01111111)  // A7
-#define setLedOff() (PORTA |= 0b10000000)  // A7
 
 #define setupA() (DDRA = 0b10001101); (PORTA = 0b00010100);
 #define setupB() (DDRB = 0b00000000); (PORTB = 0b00000000);
@@ -133,8 +133,6 @@ volatile uint16 scheduleShotBox;
 //------------------------------------------------------------------------------
 void digitizeEye()
 {
-	annunciatorOn();
-
 	if ( consts.eyeStrong )
 	{
 		strongEyeEnable();
@@ -165,8 +163,6 @@ void digitizeEye()
 
 	weakEyeDisable();
 	strongEyeDisable();
-	
-	annunciatorOff();
 }
 
 //------------------------------------------------------------------------------
@@ -542,10 +538,10 @@ int __attribute__((OS_main)) main(void)
 	rnaInit();
 
 	sei();
-	
+
 	_delay_ms(2); // let state settle, and make sure housekeeping ISR runs
 
-	if( !readTrigger() && !consts.locked )
+	if( !triggerState && !consts.locked )
 	{
 		timesToBlinkLight = 1;
 		inProgramMode = true;
@@ -572,6 +568,7 @@ int __attribute__((OS_main)) main(void)
 				isLedOn = true;
 				eepromConstantsDirty = false;
 				saveEEPROMConstants();
+//				loadEEPROMConstants();
 				isLedOn = false;
 			}
 
@@ -589,8 +586,6 @@ int __attribute__((OS_main)) main(void)
 		PRR &= ~(1<<PRTIM1); // timer back on
 		TCNT1 = 0; // reset the timer
 		TIFR1 |= 1<<OCF1A; // reset compare match
-
-		isLedOn = true;
 
 		if ( shotsInString < consts.rampEnableCount )
 		{
@@ -623,7 +618,7 @@ int __attribute__((OS_main)) main(void)
 		millisecondCountBox = consts.shortCyclePreventionInterval;
 		while( millisecondCountBox );
 
-		while( !(TIFR1 | 1<<OCF1A) ); // wait for end of fire cycle
+		while( !(TIFR1 & 1<<OCF1A) ); // wait for end of fire cycle
 
 		if ( currentFireMode == ceRamp && startFireCycle && (consts.rampTopMode != ceSemi) ) // officially hit top rate, blow guts out
 		{
@@ -651,87 +646,86 @@ ISR( TIM0_COMPA_vect, ISR_NOBLOCK )
 		}
 	}
 
-	if ( debounceBox ) // programmable debounce, sample every X milliseconds
+	if ( isAnnunciatorOn() )
 	{
-		debounceBox--;
-	}
-	else if ( (triggerState && !readTrigger()) || (!triggerState && readTrigger()) )
-	{
-		annunciatorOn();
-		
-		// rebounce check part 2, make sure the state change lasts long enough
-		if ( !triggerStateChangeValid && consts.rebounce )
+		if ( debounceBox ) // programmable debounce, sample every X milliseconds
 		{
-			debounceBox = consts.rebounce;
-			triggerStateChangeValid = true; // next time around it counts
+			debounceBox--;
+		}
+		else if ( (triggerState && !readTrigger()) || (!triggerState && readTrigger()) )
+		{
+			// rebounce check part 2, make sure the state change lasts long enough
+			if ( !triggerStateChangeValid && consts.rebounce )
+			{
+				debounceBox = consts.rebounce;
+				triggerStateChangeValid = true; // next time around it counts
+			}
+			else
+			{
+				debounceBox = consts.debounce;
+
+				triggerState = readTrigger() ? true : false;
+
+				if ( !triggerState ) // been pressed
+				{
+					triggerWavelength = triggerWavelengthBox;
+					triggerWavelengthBox = 0;
+
+					if ( inProgramMode )
+					{
+						millisecondCountBoxLong = MS_UNTIL_ENTRY_VALID;
+						currentEntry++;
+					}
+					else
+					{
+						// ramping and in a qualified-long-enough string?
+						if ( (currentFireMode == ceRamp) && (shotsInString >= consts.rampEnableCount) )
+						{
+							// RAMPING
+
+							// get the current rate and schedule a shot for
+							// 50% faster in the future base, increasing
+							// per ramp climb
+							scheduleShotRate = triggerWavelength - (triggerWavelength / rampLevel);
+							rampLevel += consts.rampClimb;
+
+							if ( !scheduleShotBox || (scheduleShotBox > scheduleShotRate) )
+							{
+								scheduleShotBox = scheduleShotRate;
+							}
+						}
+
+						startFireCycle = true;
+
+						// trigger has been depressed, reset the "do what you're doing" timeout
+						rampTimeoutBox = consts.rampTimeout; 
+
+						// after this many milliseconds Enhanced will not fire
+						enhancedTriggerTimeout = consts.enhancedTriggerTimeout;
+
+						if ( currentFireMode == ceBurst )
+						{
+							burstCount = consts.burstCount;
+						}
+					}
+				}
+				else if ( !inProgramMode ) // been released 
+				{
+					if ( (currentFireMode == ceAutoresponse) && enhancedTriggerTimeout )
+					{
+						startFireCycle = true;
+					}
+					else
+					{
+						startFireCycle = false;
+					}
+				}
+			}
 		}
 		else
 		{
-			debounceBox = consts.debounce;
-
-			triggerState = readTrigger() ? true : false;
-			
-			if ( !triggerState ) // been pressed
-			{
-				triggerWavelength = triggerWavelengthBox;
-				triggerWavelengthBox = 0;
-				
-				if ( inProgramMode )
-				{
-					millisecondCountBoxLong = MS_UNTIL_ENTRY_VALID;
-					currentEntry++;
-				}
-				else
-				{
-					// ramping and in a qualified-long-enough string?
-					if ( (currentFireMode == ceRamp) && (shotsInString >= consts.rampEnableCount) )
-					{
-						// RAMPING
-						
-						// get the current rate and schedule a shot for
-						// 50% faster in the future base, increasing
-						// per ramp climb
-						scheduleShotRate = triggerWavelength - (triggerWavelength / rampLevel);
-						rampLevel += consts.rampClimb;
-						
-						if ( !scheduleShotBox || (scheduleShotBox > scheduleShotRate) )
-						{
-							scheduleShotBox = scheduleShotRate;
-						}
-					}
-
-					startFireCycle = true;
-
-					// trigger has been depressed, reset the "do what you're doing" timeout
-					rampTimeoutBox = consts.rampTimeout; 
-					
-					// after this many milliseconds Enhanced will not fire
-					enhancedTriggerTimeout = consts.enhancedTriggerTimeout;
-
-					if ( currentFireMode == ceBurst )
-					{
-						burstCount = consts.burstCount;
-					}
-				}
-			}
-			else if ( !inProgramMode ) // been released 
-			{
-				if ( (currentFireMode == ceAutoresponse) && enhancedTriggerTimeout )
-				{
-					startFireCycle = true;
-				}
-				else
-				{
-					startFireCycle = false;
-				}
-			}
+			triggerStateChangeValid = false;
 		}
-		
-		annunciatorOff();
-	}
-	else
-	{
-		triggerStateChangeValid = false;
 	}
 
 	// duty cycle for LED, effecting a dimmer
@@ -763,6 +757,8 @@ ISR( TIM0_COMPA_vect, ISR_NOBLOCK )
 		return;
 	}
 
+	annunciatorToggle();
+	
 	if ( triggerWavelengthBox < 1000 )
 	{
 		triggerWavelengthBox++;

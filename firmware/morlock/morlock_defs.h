@@ -14,9 +14,7 @@
 #pragma pack(push, 1)
 
 #else
-//#include <arpa/inet.h>
-//#define uin8 unsigned char
-//#define uint unsigned short
+#include <arpa/inet.h>
 #endif
 
 // this calculation is a single constant which will give us the number

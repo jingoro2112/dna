@@ -163,8 +163,6 @@ unsigned char usbFunctionRead( unsigned char *data, unsigned char len )
 void dnaUsbQueueData( unsigned char* data, unsigned char len )
 {
 	cli();
-	gfree( s_sendQueueBufferHandle );
-	s_sendQueueBufferHandle = 0;
 	s_sendQueueBuffer = data;
 	s_sendQueuePosition = 0;
 	g_sendQueueLen = len;

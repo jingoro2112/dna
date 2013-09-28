@@ -7,6 +7,11 @@
  * and in the LICENCE.txt file included with this distribution
  */
 
+#include "dna_types.h"
 #include "dna_defs.h" // is included in c++ projects as well so need sto remain generic
+
+#define setLedOn() (PORTA &= 0b01111111) // A7
+#define setLedOff() (PORTA |= 0b10000000) // A7
+#define enableLed() (PORTA |= 0b10000000) // A7
 
 #endif

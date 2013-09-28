@@ -12,9 +12,9 @@
 #include "../util/simple_log.hpp"
 #include "../util/mainargs.hpp"
 #include "../util/architecture.hpp"
-#include "../firmware/dna/dna_defs.h"
+#include "../firmware/dna/dna.h"
 #include "../firmware/dna/rna_packet.h"
-#include "../morlock/firmware/morlock_defs.h"
+#include "../firmware/morlock/morlock_defs.h"
 #include <stdio.h>
 #include <ctype.h>
 #include <stdlib.h>

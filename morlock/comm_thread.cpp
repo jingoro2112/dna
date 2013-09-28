@@ -20,7 +20,7 @@
 #include "../util/architecture.hpp"
 #include "../util/http_comm.hpp"
 
-#include "firmware/morlock_defs.h"
+#include "../firmware/morlock/morlock_defs.h"
 
 extern EEPROMConstants g_morlockConstants;
 
@@ -102,7 +102,8 @@ void morlockCommThread( void* arg )
 
 				Arch::sleep(10);
 
-				if ( !DNAUSB::getData(device, buffer) )
+				unsigned char size;
+				if ( !DNAUSB::getData(device, buffer, &size) )
 				{
 					goto disconnected;
 				}
@@ -220,7 +221,7 @@ void morlockCommThread( void* arg )
 				Arch::sleep(10);
 
 				EEPROMConstants constants;
-				if ( !DNAUSB::getData(device, (unsigned char*)&constants, 0, sizeof(EEPROMConstants)) )
+				if ( !DNAUSB::getData(device, (unsigned char*)&constants, 0) )
 				{
 					goto disconnected;
 				}
