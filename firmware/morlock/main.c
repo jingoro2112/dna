@@ -539,6 +539,7 @@ int __attribute__((OS_main)) main(void)
 
 	sei();
 
+
 	_delay_ms(2); // let state settle, and make sure housekeeping ISR runs
 
 	if( !triggerState && !consts.locked )
@@ -955,6 +956,4 @@ ISR( TIM0_COMPA_vect, ISR_NOBLOCK )
 	{
 		digitizeEye();
 	}
-
-	usbPoll();
 }

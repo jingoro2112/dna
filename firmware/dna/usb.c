@@ -5,7 +5,7 @@
  * and in the LICENCE.txt file included with this distribution
  */
 
-#include "../../usbdrv/usbdrv.c" // including the source code saves space
+#include <usbdrv.c> // including the source code saves space
 
 #include "dna.h"
 #include "usb.h"

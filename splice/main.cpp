@@ -46,8 +46,8 @@ int usage()
 			"    Monitor target for debug messages\n"
 			"\n"
 			"--format\n"
-			"    Kick the DNA into it's bootloader and exit"
-
+			"    Kick the DNA into it's bootloader and exit\n"
+			"\n"
 		  );
 	
 	return 0;

@@ -102,18 +102,6 @@ char* stringFromId( const unsigned char id, char* buf )
 {
 	switch( id )
 	{
-		case OLED_AM88:
-		{
-			strcpy( buf, "ATMega88 OLED" );
-			break;
-		}
-
-		case BOOTLOADER_OLED_AM88:
-		{
-			strcpy( buf, "BootSplice ATMega88 OLED" );
-			break;
-		}
-
 		case DNA_AT84:
 		{
 			strcpy( buf, "ATTiny84a DNA" );

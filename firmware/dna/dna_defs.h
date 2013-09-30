@@ -7,8 +7,8 @@
  * and in the LICENCE.txt file included with this distribution
  */
 
-#define OLED_AM88					0x01
-#define BOOTLOADER_OLED_AM88		0x02
+//#define							0x01
+//#define							0x02
 #define DNA_AT84					0x03
 #define BOOTLOADER_DNA_AT84			0x04
 

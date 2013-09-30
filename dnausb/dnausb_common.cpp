@@ -100,7 +100,6 @@ bool DNAUSB::sendCode( const int vid, const int pid, const char* vendor,
 
 		switch( id )
 		{
-			case BOOTLOADER_OLED_AM88:
 			case BOOTLOADER_DNA_AT84:
 			{
 				unsigned char codePage[REPORT_DNA_SIZE + 1] = { REPORT_DNA };

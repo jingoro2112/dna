@@ -15,6 +15,7 @@ OBJS = \
 INCLUDES = \
 	-I. \
 	-I../../dna \
+	-I../../../usbdrv \
 
 MCU = attiny84
 CPU_FREQUENCY = 12000000

@@ -7,7 +7,7 @@
  * and in the LICENCE.txt file included with this distribution
  */
 
-#include "../../usbdrv/usbdrv.h"
+#include <usbdrv.h>
 
 // The DNA USB interface provides standard calls and libraries used for
 // communicating over USB with the provided loader library
