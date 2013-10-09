@@ -318,3 +318,40 @@ bool DNAUSB::getData( DNADEVICE device, unsigned char* data, unsigned char* size
 	return true;
 }
 
+//------------------------------------------------------------------------------
+bool DNAUSB::getPrintMessage( DNADEVICE device, char* buf, unsigned int* len /*=0*/ )
+{
+	unsigned char packet[256] = { REPORT_DNA };
+	packet[1] = USBCommandGetPrintMessage;
+
+	if ( !HID_SetFeature(device, packet, REPORT_DNA_SIZE + 1) )
+	{
+		Log( "failed to send print message command" );
+		return false;
+	}
+
+	Arch::sleep( 10 );
+
+	packet[0] = REPORT_DNA_DATA;
+	if ( !DNAUSB::HID_GetFeature(device, packet, REPORT_DNA_DATA_SIZE + 1) )
+	{
+		printf( "failed to get print message data" );
+		return false;
+	}
+
+	if ( len )
+	{
+		*len = packet[1];
+	}
+
+	if ( packet[1] )
+	{
+		memcpy( buf, packet + 2, packet[1] );
+	}
+	else
+	{
+		buf[0] = 0;
+	}
+
+	return true;
+}

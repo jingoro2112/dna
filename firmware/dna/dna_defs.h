@@ -13,7 +13,8 @@
 #define BOOTLOADER_DNA_AT84			0x04
 
 #define BOOTLOADER_ENTRY			0xCA0
-#define OLED_BOOTLOADER_ENTRY		0xD00
+#define OLED_BOOTLOADER_ENTRY		0xEA0
+#define BUTTON_BOOTLOADER_ENTRY		0x2B0
 
 #define DNA_PRODUCT_MASK			0x7F
 #define DNA_RTS						0x80
@@ -48,6 +49,7 @@ enum DNAUSBCommands
 {
 	USBCommandUser = 1,
 	USBCommandEnterBootloader,
+	USBCommandGetPrintMessage,
 };
 
 #endif

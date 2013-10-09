@@ -8,6 +8,8 @@
  */
 
 void startWrite24c512( unsigned char i2cAddress, int address );
+#define streamWrite24c512( b ) do { i2cWrite(b); } while(0)
+#define stop24c512() do { i2cStop(); } while(0)
 void read24c512( unsigned char i2cAddress, int address, unsigned char* bytes, unsigned char len );
 void write24c512( unsigned char i2cAddress, int address, unsigned char* bytes, unsigned char len );
 

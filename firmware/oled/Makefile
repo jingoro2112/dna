@@ -29,7 +29,7 @@ clean:
 	@-rm -f $(OBJS) $(TARGET).hex $(TARGET).elf $(TARGET).disassembly
 	
 $(TARGET).hex: $(OBJS)
-	$(CC) -o $(TARGET).elf -Wl,-gc-sections $(OBJS) 
+	$(CC) -o $(TARGET).elf -Wl,-gc-sections,-u,vfprintf -lprintf_min $(OBJS) 
 	avr-objcopy -j .text -j .data -O ihex $(TARGET).elf $(TARGET).hex
 	avr-objdump -d $(TARGET).elf > $(TARGET).disassembly
 

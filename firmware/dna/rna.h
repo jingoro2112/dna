@@ -12,15 +12,7 @@
 #include <util/delay.h>
 
 #include <rna_config.h>
-
-//------------------------------------------------------------------------------
-enum DNARNACommands
-{
-	RNACommandIdle = 0,
-	RNACommandAppJump,
-	RNACommandCodePageWrite,
-	RNACommandUtilityString,
-};
+#include <dna_defs.h>
 
 #define RNA_CONCAT(x, y)  x##y
 #define RNA_D_PORT(port)  RNA_CONCAT( PORT, port )
@@ -46,10 +38,13 @@ unsigned char rnaSendEx( unsigned char address, unsigned char fromAddress, unsig
 #define rnaSend( address, data, len ) rnaSendEx((address), RNA_MY_ADDRESS, (data), (len))
 #define rnaSendSystem( address, data, len ) rnaSendEx((address), 0, (data), (len))
 #define rnaProbe( address ) rnaSendEx((address), RNA_MY_ADDRESS, 0, 0)
-void rnaPrint( char* string );
 void rnaPoll();
 
 unsigned char rnaInputSetup( unsigned char *data, unsigned char dataLen, unsigned char from, unsigned char totalLen );
 void rnaInputStream( unsigned char *data, unsigned char dataLen );
+
+void rprint( char* string, unsigned char targetDevice );
+#define rprint_oled( string ) rprint( string, RNADeviceOLED )
+#define rprint_dna( string ) rprint( string, RNADeviceDNA )
 
 #endif

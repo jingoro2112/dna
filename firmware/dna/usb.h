@@ -8,6 +8,7 @@
  */
 
 #include <usbdrv.h>
+#include <util/delay.h>
 
 // The DNA USB interface provides standard calls and libraries used for
 // communicating over USB with the provided loader library
@@ -31,4 +32,7 @@ unsigned char dnaUsbInputSetup( unsigned char totalSize, unsigned char *data, un
 void dnaUsbInputStream( unsigned char *data, unsigned char len );
 void dnaUsbCommand( unsigned char command, unsigned char data[5] );
 
+#define MAX_OUTSTANDING_PRINT_STRING_BYTES 200
+void dprint( char* string, unsigned char len );
+			  
 #endif

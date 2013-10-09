@@ -107,11 +107,9 @@ volatile uint8 burstCount;
 uint8 usbCommand;
 
 uint8 usbRNATo;
-uint8 usbRNAPacket[68];
+uint8 usbRNAPacket[132];
 uint8 usbRNAPacketPos;
 uint8 usbRNAPacketExpected;
-uint8 usbUtilityStringHandle;
-uint8 usbUtilityStringSize;
 
 uint8 eepromLoadPointer;
 volatile struct EEPROMConstants consts;
@@ -207,21 +205,6 @@ void saveEEPROMConstants()
 }
 
 //------------------------------------------------------------------------------
-void handleCommandRNASend( unsigned char *data, unsigned char len )
-{
-	for( unsigned int i=0; i<len && (usbRNAPacketPos < usbRNAPacketExpected) ; i++ )
-	{
-		usbRNAPacket[usbRNAPacketPos++] = data[i];
-	}
-
-	if ( usbRNAPacketPos >= usbRNAPacketExpected )
-	{
-		usbCommand = ceCommandIdle;
-		rnaPacketAvail = true;
-	}
-}
-
-//------------------------------------------------------------------------------
 void dnaUsbCommand( unsigned char command, unsigned char data[5] )
 {
 	if ( command == ceCommandGetEEPROMConstants )
@@ -229,12 +212,6 @@ void dnaUsbCommand( unsigned char command, unsigned char data[5] )
 		digitizeEye();
 		consts.version = MORLOCK_CODE_VERSION;
 		dnaUsbQueueData( (unsigned char *)&consts, sizeof(consts) );
-	}
-	else if ( command == ceCommandGetUtilityString && usbUtilityStringSize )
-	{
-		dnaUsbQueueHandle( usbUtilityStringHandle, usbUtilityStringSize );
-		usbUtilityStringHandle = 0;
-		usbUtilityStringSize = 0;
 	}
 
 	usbCommand = ceCommandIdle;
@@ -270,8 +247,7 @@ void dnaUsbInputStream( unsigned char *data, unsigned char len )
 	{
 		return;
 	}
-	
-	if ( usbCommand == ceCommandSetEEPROMConstants )
+	else if ( usbCommand == ceCommandSetEEPROMConstants )
 	{
 		unsigned char i;
 		for( i=0; i<len; i++ )
@@ -288,7 +264,16 @@ void dnaUsbInputStream( unsigned char *data, unsigned char len )
 	}
 	else if ( usbCommand == ceCommandRNASend )
 	{
-		handleCommandRNASend( data, len );
+		for( unsigned int i=0; i<len && (usbRNAPacketPos < usbRNAPacketExpected) ; i++ )
+		{
+			usbRNAPacket[usbRNAPacketPos++] = data[i];
+		}
+
+		if ( usbRNAPacketPos >= usbRNAPacketExpected )
+		{
+			usbCommand = ceCommandIdle;
+			rnaPacketAvail = true;
+		}
 	}
 	else
 	{
@@ -476,19 +461,9 @@ void rnaInputStream( unsigned char *data, unsigned char dataLen )
 		return;
 	}
 
-	if ( *usbRNAPacket == RNACommandUtilityString )
+	if ( *usbRNAPacket == RNATypeDebugString )
 	{
-		usbRNAPacket[usbRNAPacketPos] = 0;
-
-		gfree( usbUtilityStringHandle );
-		usbUtilityStringSize = usbRNAPacketExpected;
-
-		char *ptr;
-		usbUtilityStringHandle = galloc( usbUtilityStringSize, (void**)&ptr );
-		for( unsigned char i=0; i<usbUtilityStringSize; i++ )
-		{
-			ptr[i] = usbRNAPacket[i];
-		}
+		dprint( (char *)usbRNAPacket + 1, usbRNAPacketExpected - 1  );
 	}
 }
 
@@ -563,21 +538,24 @@ int __attribute__((OS_main)) main(void)
 				digitizeEye();
 				isLedOn = eyeBlocked ? true : false;
 			}
-
+			
 			if ( eepromConstantsDirty )
 			{
 				isLedOn = true;
+				setLedOn();
 				eepromConstantsDirty = false;
 				saveEEPROMConstants();
-//				loadEEPROMConstants();
 				isLedOn = false;
 			}
 
 			if ( rnaPacketAvail )
 			{
+				isLedOn = true;
+				setLedOn();
 				rnaPacketAvail = false;
 				_delay_ms( 50 );
 				rnaSend( usbRNATo, usbRNAPacket, usbRNAPacketExpected );
+				isLedOn = false;
 			}
 		}
 
@@ -647,7 +625,7 @@ ISR( TIM0_COMPA_vect, ISR_NOBLOCK )
 		}
 	}
 
-	if ( isAnnunciatorOn() )
+	if ( !isAnnunciatorOn() )
 	{
 		if ( debounceBox ) // programmable debounce, sample every X milliseconds
 		{

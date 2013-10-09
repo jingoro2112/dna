@@ -24,30 +24,44 @@ SimpleLog Log;
 //------------------------------------------------------------------------------
 int usage()
 {
-	printf( "Usage: splice <options>\n"
+	printf( "splice version: %d.%02d\n"
+			"Usage: splice <options>\n"
 			"\n"
+			"-c, --command <byte1[,byte2,byte3,...]>\n"
+			"    send up to 6 command bytes to the DNA board. They must be comma-delimted\n"
+			"    but can be in any format understood by atoi\n"
+			"    The first of these bytes will be interpreted as the command header, the\n"
+			"    remaining 5 will be passed as data\n\n"
+			
+			"-e, --load_eeprom <binfile>\n"
+			"    Load the OLED EEPROM with the binary data found in binfile\n\n"
+
 			"-f, --flash <image>\n"
 			"    flash firmware <image>\n"
-			"    This image is checked to make sure the bootjumper code is intact\n"
-			"\n"
-			"-r, --report\n"
-			"    Report status\n"
-			"\n"
-			"-v\n"
-			"    verbose logging\n"
-			"\n"
-			"-o, --oled <image>\n"
-			"    send OLED boot image through morlock board\n"
-			"\n"
-			"-e, --load_eeprom <binfile>\n"
-			"    Load the OLED EEPROM with the binary data found in binfile\n"
-			"\n"
-			"-m, --monitor\n"
-			"    Monitor target for debug messages\n"
-			"\n"
+			"    This image is checked to make sure the bootjumper code is intact\n\n"
+
 			"--format\n"
-			"    Kick the DNA into it's bootloader and exit\n"
-			"\n"
+			"    Kick the DNA into it's bootloader and exit\n\n"
+			
+			"-m, --monitor\n"
+			"    Monitor target for debug messages\n\n"
+
+			"-o, --oled <image>\n"
+			"    send OLED boot image through morlock board\n\n"
+
+			"-b, --button <image>\n"
+			"    send Button board boot image through morlock board\n\n"
+
+			"-r, --report\n"
+			"    Report status\n\n"
+
+			"-v\n"
+			"    verbose logging\n\n"
+
+			"--version, --help, -help, -?\n"
+			"    print this message and exit\n\n"
+			,c_majorVersion,
+			c_minorVersion
 		  );
 	
 	return 0;
@@ -58,7 +72,7 @@ int main( int argc, char *argv[] )
 {
 	MainArgs args( argc, argv );
 
-	if ( (argc == 1) || args.isSet("-?") || args.isSet("-help") || args.isSet("--help") )
+	if ( (argc == 1) || args.isSet("-?") || args.isSet("-help") || args.isSet("--help") || args.isSet("--version") )
 	{
 		return usage();
 	}
@@ -159,6 +173,41 @@ int main( int argc, char *argv[] )
 		return 0;
 	}
 
+	if ( args.isStringSet("-c", buf) || args.isStringSet("--command", buf) )
+	{
+		unsigned char command[6] = { 0, 0, 0, 0, 0 };
+
+		unsigned int pos = 0;
+		Cstr token;
+		for( unsigned int i=0; i<6; i++ )
+		{
+			token.clear();
+			for( ; buf[pos] && buf[pos] != ','; pos++ )
+			{
+				token += buf[pos];
+			}
+			pos++;
+			command[i] = (unsigned char)strtol( token, 0, 0 );
+		}
+
+		if ( !DNAUSB::sendCommand(device, command[0], command + 1) )
+		{
+			DNAUSB::closeDevice( device );
+			printf( "sending command failed\n" );
+			return -1;
+		}
+
+		printf( "Send command 0x%02X : 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
+				command[0], 
+				command[1], 
+				command[2], 
+				command[3], 
+				command[4], 
+				command[5] );
+
+		return 0;
+	}
+
 	if ( args.isSet("--format") )
 	{
 		if ( !DNAUSB::sendEnterBootloader(device) )
@@ -174,24 +223,15 @@ int main( int argc, char *argv[] )
 
 	if ( args.isSet("-m") || args.isSet("--monitor") )
 	{
-		Arch::sleep( 10 );
+		Arch::sleep( 100 );
 
 		unsigned char buffer[256];
 		for(;;)
 		{
-			if ( !DNAUSB::sendCommand(device, ceCommandGetUtilityString) )
+			if ( !DNAUSB::getPrintMessage(device, (char*)buffer) )
 			{
 				DNAUSB::closeDevice( device );
-				printf( "command failed\n" );
-				return -1;
-			}
-
-			unsigned char len;
-			memset( buffer, 0, 256 );
-			if ( !DNAUSB::getData(device, buffer, &len) )
-			{
-				DNAUSB::closeDevice( device );
-				printf( "fetch failed\n" );
+				printf( "get print message failed\n" );
 				return -1;
 			}
 
@@ -200,7 +240,7 @@ int main( int argc, char *argv[] )
 				printf( "> %s\n", buffer );
 			}
 			
-			Arch::sleep(250);
+			Arch::sleep(50);
 		}
 	}
 	
@@ -226,8 +266,11 @@ int main( int argc, char *argv[] )
 			}
 
 			Splice::proxyRNA( device, ceCommandRNASend, RNADeviceOLED, RNATypeEEPROMLoad, &load, sizeof(PacketEEPROMLoad) );
-			Arch::sleep( 15 ); // give hardware a break to finish the write cycle
+			load.offset += 128;
+			Arch::sleep( 1000 ); // give hardware a break to finish the write cycle
 		}
+
+		return 0;
 	}
 	
 	CLinkList<ReadHex::Chunk> chunklist;
@@ -257,7 +300,8 @@ int main( int argc, char *argv[] )
 		chunk = chunklist.getFirst();
 
 		Splice::proxyRNA( device, ceCommandRNASend, RNADeviceOLED, RNATypeEnterBootloader );
-		
+		Arch::sleep( 100 );
+		Splice::proxyRNA( device, ceCommandRNASend, RNADeviceOLED, RNATypeEnterBootloader );
 		Arch::sleep( 100 );
 
 		unsigned short address = 64;
@@ -286,7 +330,7 @@ int main( int argc, char *argv[] )
 			}
 			Splice::proxyRNA( device, ceCommandRNASend, RNADeviceOLED, RNATypeCodePage, &code, sizeof(PacketCodePage) );
 			
-			Arch::sleep( 50 );
+			Arch::sleep( 75 );
 
 			if ( address == 64 )
 			{
@@ -309,6 +353,87 @@ int main( int argc, char *argv[] )
 
 		DNAUSB::closeDevice( device );
 	}
+
+	if ( args.isStringSet("-b", image) || args.isStringSet("--button", image) )
+	{
+		if ( !infile.fileToBuffer(image) )
+		{
+			printf( "Could not read [%s]\n", image );
+			return -1;
+		}
+
+		if ( !ReadHex::parse( chunklist, infile.c_str(), infile.size() ) )
+		{
+			printf( "Could not parse [%s]\n", image );
+			return -1;
+		}
+
+		if ( chunklist.count() != 1 )
+		{
+			printf( "multiple chunks not supported\n" );
+			return -1;
+		}
+		chunk = chunklist.getFirst();
+
+		Splice::proxyRNA( device, ceCommandRNASend, RNADeviceBUTTON, RNATypeEnterBootloader );
+		Arch::sleep( 100 );
+		Splice::proxyRNA( device, ceCommandRNASend, RNADeviceBUTTON, RNATypeEnterBootloader );
+		Arch::sleep( 100 );
+
+		unsigned short address = 32;
+
+		PacketEnterApp enter;
+		enter.lastAddress = chunk->size;
+		enter.checksum = 0;
+
+		while( address < chunk->size )
+		{
+			PacketButtonCodePage code;
+			code.page = address;
+			for( int i=0; i<32; i += 2 ) // the code
+			{
+				if ( address < chunk->size )
+				{
+					code.code[i/2] = chunk->data[address] | (chunk->data[address+1] << 8);
+					enter.checksum += code.code[i/2];
+				}
+				else
+				{
+					code.code[i/2] = 0x0;
+				}
+
+				address += 2;
+			}
+			Splice::proxyRNA( device,
+							  ceCommandRNASend,
+							  RNADeviceBUTTON,
+							  RNATypeCodePage,
+							  &code, sizeof(PacketButtonCodePage) );
+
+			Arch::sleep( 75 );
+
+			if ( address == 32 )
+			{
+				Log( "[%d/%d]", chunk->size / 32, chunk->size / 32 );
+				Splice::proxyRNA( device,
+								  ceCommandRNASend,
+								  RNADeviceBUTTON,
+								  RNATypeEnterApp,
+								  &enter, sizeof(PacketEnterApp) );
+				break;
+			}
+
+			Log( "[%d/%d]", (address / 32) - 1, chunk->size / 32 );
+
+			if ( address >= chunk->size )
+			{
+				address = 0;
+			}
+		}
+
+		DNAUSB::closeDevice( device );
+	}
+
 	
 	if ( args.isStringSet("-f", image) || args.isStringSet("-i", image) || args.isStringSet("--flash", image) )
 	{

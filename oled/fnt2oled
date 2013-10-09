@@ -1,0 +1,2 @@
+convert $1.png  -background black -flatten +matte -depth 8 $1.gray
+

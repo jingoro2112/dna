@@ -13,10 +13,12 @@
 enum RNAPacketTypes
 {
 	RNATypeNone = 0,
-	RNATypeEnterBootloader,
+	RNATypeEnterBootloader = 1,
 	RNATypeCodePage,
 	RNATypeEnterApp,
 	RNATypeEEPROMLoad,
+	RNATypeDebugString,
+	RNATypeButtonStatus, // single byte bitvector of the buttons status, 0xFF means power off request
 };
 
 //------------------------------------------------------------------------------
@@ -24,6 +26,13 @@ struct PacketCodePage
 {
 	uint16 page;
 	uint16 code[32];
+};
+
+//------------------------------------------------------------------------------
+struct PacketButtonCodePage
+{
+	uint16 page;
+	uint16 code[16];
 };
 
 //------------------------------------------------------------------------------

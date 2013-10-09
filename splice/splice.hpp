@@ -13,6 +13,10 @@
 
 #include "../dnausb/dnausb.h"
 
+const int c_majorVersion = 1;
+const int c_minorVersion = 1;
+
+
 //------------------------------------------------------------------------------
 namespace Splice
 {

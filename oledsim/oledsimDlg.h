@@ -19,7 +19,7 @@ public:
 	void clearCanvas();
 	void setPixel( int x, int y, bool pixel =true );
 	void redraw();
-	void oledToCanvas( unsigned char map[4096] );
+	void oledToCanvas( Oled& oled );
 	void checkMouse( CPoint& point );
 	void save();
 	

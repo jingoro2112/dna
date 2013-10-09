@@ -12,6 +12,7 @@
 
 #define setLedOn() (PORTA &= 0b01111111) // A7
 #define setLedOff() (PORTA |= 0b10000000) // A7
-#define enableLed() (PORTA |= 0b10000000) // A7
+#define toggleLed() (PORTA ^= 0b10000000) // A7
+#define enableLed() (DDRA |= 0b10000000) // A7
 
 #endif

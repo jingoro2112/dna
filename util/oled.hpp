@@ -10,27 +10,32 @@
 // This class exists only as a testbed for the Morlock OLED module from
 // CrystalFontz: http://www.crystalfontz.com/product/CFAL12832DB
 
+#include <memory.h>
+
 //------------------------------------------------------------------------------
 class Oled
 {
 public:
 
-	void clear();
-
+	void characterAt( char c, unsigned char x, unsigned char y, unsigned char font );
+	void stringAt( char *string, unsigned char x, unsigned char y, unsigned char font );
+	
+	void clear() { memset( m_screen, 0, 512); }
+	int computeAddress( unsigned char x, unsigned char y ) { return ((y & 0xF8) << 4) + x; }
 	void setPixel( const unsigned char x, const unsigned char y, const bool pixel =true );
+	void setRaster( const unsigned char column, const unsigned char row, const unsigned char raster ) { m_screen[(int)row*128 + (int)column] = raster; }
 
 	// return the data as it would need to be loaded into the OLED from
 	// the microcontroller (upper left to lower right)
-	void getPageDump( unsigned char map[512] );
+	const unsigned char* getScreen() const { return m_screen; }
 
 	// get data it 8-bit monochrome bitmap form, data is 128x32
-	void getBitmap( unsigned char map[4096] ); 
 
 	Oled() { clear(); }
 
 private:
 
-	unsigned char m_pages[ 4 ][ 128 ];
+	unsigned char m_screen[ 512 ];
 };
 
 #endif

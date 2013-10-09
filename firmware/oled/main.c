@@ -12,55 +12,71 @@
 #include <rna.h>
 #include <rna_packet.h>
 #include <sram.h>
+#include <galloc.h>
 
 #include <util/delay.h>
 #include <avr/io.h>
 #include <avr/wdt.h>
 #include <avr/interrupt.h>
+#include <avr/pgmspace.h>
+
+#include <stdio.h>
 
 #include "../../oled/font_loader.h"
+#include "frame.h"
 
 unsigned char rnaCommand;
+unsigned char rnaFrom;
 unsigned char rnaDataExpected;
 unsigned char rnaDataReceived;
+unsigned char rnaPacket[132];
+
+unsigned char numberOfFonts;
+unsigned int dataBlockOrigin;
+
+#define NUMBER_OF_BIT_ENTRIES 2
+struct Bits
+{
+	volatile uint8 b0:1;
+	volatile uint8 b1:1;
+	volatile uint8 b2:1;
+	volatile uint8 b3:1;
+	volatile uint8 b4:1;
+	volatile uint8 b5:1;
+	volatile uint8 b6:1;
+	volatile uint8 b7:1;
+} volatile bits[NUMBER_OF_BIT_ENTRIES];
+
+#define displayDirty		(bits[0].b0)
+
+#define SRAM_DEBUG_LINE_BUFFER_START 512
+#define SRAM_DEBUG_LINE_BUFFER_WIDTH 30
+#define SRAM_DEBUG_LINE_BUFFER_LINES 4
+#define SRAM_DEBUG_LINE_FONT 0
+#define SRAM_DEBUG_LINE_SPACING 8
 
 //------------------------------------------------------------------------------
 unsigned char rnaInputSetup( unsigned char *data, unsigned char dataLen, unsigned char from, unsigned char packetLen )
 {
 	rnaCommand = *data;
-	rnaDataExpected = packetLen;
+	rnaDataExpected = packetLen - 1;
 	rnaDataReceived = 0;
+	rnaFrom = from;
 	
 	if ( (rnaCommand == RNATypeEnterBootloader) && (dataLen == 1) )
 	{
 		wdt_enable( WDTO_15MS ); // light the fuse
-		rnaCommand = RNATypeNone;
 	}
-	else if ( rnaCommand == RNATypeEEPROMLoad )
-	{
-		startWrite24c512( 0xA0, *(unsigned int *)(data + 1) );
-		return 3; // the command and the address, leave the data to the input streamer to save code space
-	}
-
+	
 	return 1;
 }
 
 //------------------------------------------------------------------------------
 void rnaInputStream( unsigned char *data, unsigned char bytes )
 {
-	if ( rnaCommand == RNATypeEEPROMLoad )
+	for( unsigned char i=0; i<bytes; i++ )
 	{
-		for( unsigned char i=0; i<bytes; i++ )
-		{
-			i2cWrite( data[i] );
-			rnaDataReceived++;
-		}
-
-		if ( rnaDataReceived >= rnaDataExpected )
-		{
-			i2cStop();
-			rnaCommand = RNATypeNone;
-		}
+		rnaPacket[rnaDataReceived++] = *data++;
 	}
 }
 
@@ -102,7 +118,7 @@ void __attribute__((OS_main)) __init()
 	}
 
 bootloader_jump:
-	asm	volatile ("ijmp" ::"z" (0xEA0)); // emergency reboot time
+	asm	volatile ("ijmp" ::"z" (OLED_BOOTLOADER_ENTRY)); // emergency reboot time
 }
 
 //------------------------------------------------------------------------------
@@ -138,66 +154,199 @@ static uint16 computeAddress( unsigned char x, unsigned char y )
 }
 
 //------------------------------------------------------------------------------
-void resetFramePixel( unsigned char x, unsigned char y )
+void resetPixelFrame( unsigned char x, unsigned char y )
 {
-	uint16 address = computeAddress( x, y );
-	sramAtomicWrite( address, sramAtomicRead(address) & ~(1 << (y & 0x07)) );
+	if ( x < 128 && y < 32 )
+	{
+		uint16 address = computeAddress( x, y );
+		sramAtomicWrite( address, sramAtomicRead(address) & ~(1 << (y & 0x07)) );
+	}
 }
 
 //------------------------------------------------------------------------------
-void setFramePixel( unsigned char x, unsigned char y )
+void setPixelFrame( unsigned char x, unsigned char y )
 {
-	uint16 address = computeAddress( x, y );
-	sramAtomicWrite( address, sramAtomicRead(address) | (1 << (y & 0x07)) );
+	if ( x < 128 && y < 32 )
+	{
+		uint16 address = computeAddress( x, y );
+		sramAtomicWrite( address, sramAtomicRead(address) | (1 << (y & 0x07)) );
+	}
 }
 
 //------------------------------------------------------------------------------
 void setPixelLive( unsigned char x, unsigned char y )
 {
-	uint16 address = computeAddress( x, y );
-	uint8 newVal = sramAtomicRead(address) | (1 << (y & 0x07));
+	if ( x < 128 && y < 32 )
+	{
+		uint16 address = computeAddress( x, y );
+		uint8 newVal = sramAtomicRead(address) | (1 << (y & 0x07));
 
-	sramAtomicWrite( address, newVal );
+		sramAtomicWrite( address, newVal );
 
-	i2cStartWrite( OLED_ADDRESS );
-	i2cWrite( 0x80 );
-	i2cWrite( x & 0x0F );
-	i2cWrite( 0x80 );
-	i2cWrite( x>>4 | 0x10 );
-	i2cWrite( 0x80 );
-	i2cWrite( 0xB0 | y>>3 );
+		i2cStartWrite( OLED_ADDRESS );
+		i2cWrite( 0x80 );
+		i2cWrite( x & 0x0F );
+		i2cWrite( 0x80 );
+		i2cWrite( x>>4 | 0x10 );
+		i2cWrite( 0x80 );
+		i2cWrite( 0xB0 | y>>3 );
 
-	i2cWrite( 0xC0 );
-	i2cWrite( newVal );
+		i2cWrite( 0xC0 );
+		i2cWrite( newVal );
 
-	i2cStop();
+		i2cStop();
+	}
 }
 
 //------------------------------------------------------------------------------
 void resetPixelLive( unsigned char x, unsigned char y )
 {
-	uint16 address = computeAddress( x, y );
-	uint8 newVal = sramAtomicRead(address) & ~(1 << (y & 0x07));
-	sramAtomicWrite( address, newVal );
+	if ( x < 128 && y < 32 )
+	{
+		uint16 address = computeAddress( x, y );
+		uint8 newVal = sramAtomicRead(address) & ~(1 << (y & 0x07));
+		sramAtomicWrite( address, newVal );
 
-	i2cStartWrite( OLED_ADDRESS );
-	i2cWrite( 0x80 );
-	i2cWrite( x & 0x0F );
-	i2cWrite( 0x80 );
-	i2cWrite( x>>4 | 0x10 );
-	i2cWrite( 0x80 );
-	i2cWrite( 0xB0 | y>>3 );
+		i2cStartWrite( OLED_ADDRESS );
+		i2cWrite( 0x80 );
+		i2cWrite( x & 0x0F );
+		i2cWrite( 0x80 );
+		i2cWrite( x>>4 | 0x10 );
+		i2cWrite( 0x80 );
+		i2cWrite( 0xB0 | y>>3 );
 
-	i2cWrite( 0xC0 );
-	i2cWrite( newVal );
+		i2cWrite( 0xC0 );
+		i2cWrite( newVal );
 
-	i2cStop();
+		i2cStop();
+	}
 }
 
 //------------------------------------------------------------------------------
-void characterAt( unsigned char x, unsigned char y, char* fontChar )
+void debugPrint( char *string )
 {
-	
+	unsigned char i;
+	unsigned int address = SRAM_DEBUG_LINE_BUFFER_START;
+
+	for( unsigned char c=1; c<SRAM_DEBUG_LINE_BUFFER_LINES; c++ )
+	{
+		for( i=0; i<SRAM_DEBUG_LINE_BUFFER_WIDTH; i++ )
+		{
+			sramAtomicWrite( address, sramAtomicRead(address + SRAM_DEBUG_LINE_BUFFER_WIDTH) );
+			address++;
+		}
+	}
+
+	sramStartWrite( address );
+	for( i=0; i<SRAM_DEBUG_LINE_BUFFER_WIDTH - 1; i++ )
+	{
+		sramWriteByte( string[i] );
+		if ( !string[i] )
+		{
+			break;
+		}
+	}
+
+	for(; i<SRAM_DEBUG_LINE_BUFFER_WIDTH; i++ )
+	{
+		sramWriteByte( 0 );
+	}
+	address += SRAM_DEBUG_LINE_BUFFER_WIDTH;
+	sramStop();
+
+	displayDirty = 1;
+}
+
+//------------------------------------------------------------------------------
+void stringAtEmbedded( char *string, unsigned char x, unsigned char y, unsigned char font )
+{
+	for( ;*string ;string++ )
+	{
+		unsigned int offset = *string - 32;
+		offset *= sizeof(struct FontCharEntry) * NUMBER_OF_FONTS;
+		offset += sizeof(struct FontCharEntry) * (unsigned int)font;
+
+		struct FontCharEntry entry;
+		for( unsigned int i=0; i<sizeof(struct FontCharEntry); i++ )
+		{
+			((unsigned char*)&entry)[i] = pgm_read_byte( c_lookupTable + offset + i );
+		}
+
+		x += entry.pre;
+
+		const unsigned char* pos = c_dataBlock + entry.dataOffset;
+		unsigned char byte = 0;
+		unsigned char bit = 1;
+		for( unsigned char h=0; h<entry.h; h++ )
+		{
+			if ( bit )
+			{
+				byte = pgm_read_byte( pos++ );
+				bit = 0;
+			}
+
+			for( unsigned char w = 0; w<entry.w; w++ )
+			{
+				if ( 1<<bit & byte )
+				{
+					setPixelFrame( x + w, y + h );
+				}
+
+				if ( ++bit == 8 )
+				{
+					byte = pgm_read_byte( pos++ );
+					bit = 0;
+				}
+			}
+		}
+		
+		x += entry.post + entry.w;
+	}
+}
+
+//------------------------------------------------------------------------------
+void stringAt( char* string, unsigned char x, unsigned char y, unsigned char font )
+{
+	for( ;*string ;string++ )
+	{
+		unsigned int offset = ((unsigned int)(*string - 32) * (sizeof(struct FontCharEntry) * (unsigned int)numberOfFonts)) // which character
+							  + (sizeof(struct FontCharEntry) * (unsigned int)font) // which font we want
+							  + 1; // numberof fonts location
+		
+		struct FontCharEntry entry;
+		read24c512( 0xA0, offset, (unsigned char*)&entry, sizeof(struct FontCharEntry) );
+
+		x += entry.pre;
+
+		unsigned char glyph[64];
+		unsigned char *byte = glyph;
+		read24c512( 0xA0, entry.dataOffset + dataBlockOrigin, glyph, 64 );
+
+		for( unsigned char h=0; h<entry.h; h++ )
+		{
+			unsigned char bit = 0;
+			for( unsigned char w = 0; w<entry.w; w++ )
+			{
+				if ( 1<<bit & *byte )
+				{
+					setPixelFrame( x + w, y + h );
+				}
+
+				if ( ++bit == 8 )
+				{
+					byte++;
+					bit = 0;
+				}
+			}
+
+			if ( bit )
+			{
+				byte++;
+			}
+		}
+
+		x += entry.post + entry.w;
+	}
 }
 
 //------------------------------------------------------------------------------
@@ -227,32 +376,188 @@ void clearFrameBuffer()
 }
 
 //------------------------------------------------------------------------------
+void programEEPROM()
+{
+	stringAtEmbedded( "EEPROM Update", 0, 0, 0 );
+	blit();
+	unsigned int address = 1;
+
+	startWrite24c512( 0xA0, 0 );
+	streamWrite24c512( NUMBER_OF_FONTS );
+
+	unsigned int i;
+	for( i=0; i<FONT_BLOCK_SIZE; i++ )
+	{
+		if ( !(address%128) )
+		{
+			stop24c512();
+			startWrite24c512( 0xA0, address );
+		}
+
+		streamWrite24c512( pgm_read_byte(c_lookupTable + i) );
+		address++;
+	}
+
+	for( i=0; i<DATA_BLOCK_SIZE; i++ )
+	{
+		if ( !(address%128) )
+		{
+			stop24c512();
+			startWrite24c512( 0xA0, address );
+		}
+
+		streamWrite24c512( pgm_read_byte(c_dataBlock + i) );
+		address++;
+	}
+	stop24c512();
+	clearFrameBuffer();
+	stringAtEmbedded( "complete", 20, 0, 0 );
+	blit();
+	_delay_ms(500);
+	clearFrameBuffer();
+	blit();
+}
+
+//------------------------------------------------------------------------------
+void setupVariables()
+{
+	// clear bits
+	for( unsigned char c = 0; c<NUMBER_OF_BIT_ENTRIES; c++ )
+	{
+		*(((unsigned char*)&bits) + c) = 0;
+	}
+
+	// clear SRAM
+	sramStartWrite( 0 );
+	for( unsigned int a=0; a<8192; a++ )
+	{
+		sramWriteByte( 0 );
+	}
+	sramStop();
+
+	rnaDataExpected = 1; // make sure nothing triggers
+}
+
+//------------------------------------------------------------------------------
 int __attribute__((OS_main)) main()
 {
 	sramInit();
 	i2cInit();
-	oledInit( 0 );
+	oledInit( 1 );
 	rnaInit();
+	clearFrameBuffer();
+	blit();
+
+	setupVariables();
+
+//	programEEPROM();
+
+	read24c512( 0xA0, 0, &numberOfFonts, 1 );
+	dataBlockOrigin = ((unsigned int)numberOfFonts * sizeof(struct FontCharEntry) * 95) + 1;
+
+
+
+	debugPrint( "0:DNA ready" );
+//	debugPrint( "0:<1>DNA ready" );
+//	debugPrint( "0:<2>DNA ready" );
+//	debugPrint( "0:<3>DNA ready" );
+//	debugPrint( "0:<4>DNA ready" );
+//	debugPrint( "0:<5>DNA ready" );
+
+//	stringAt( "1 DNA ready", 0, 0, 0 );
+//	stringAt( "2 DNA ready", 0, 8, 0 );
+//	stringAt( "3 DNA ready", 0, 16, 0 );
+//	stringAt( "4 DNA ready", 0, 24, 0 );
+
 	
-//	oledPowerOff();
+	
+	blit();
 
 	sei();
 
-	clearFrameBuffer();
+	unsigned int packetNum = 0;
+	
+	unsigned char frameMode = displayDebug;
+
+	displayDirty = 1;
 
 	for(;;)
 	{
-		for( uint8 x = 0; x<128; x += 1 )
+		if ( displayDirty )
 		{
-			for( uint8 y = 0; y<32; y += 1 )
+			displayDirty = 0;
+			clearFrameBuffer();
+			
+			if ( frameMode == displayDebug )
 			{
-				setPixelLive( x, y );
-				_delay_ms(5);
-//				blit();
-				resetPixelLive( x, y );
+				unsigned int address = SRAM_DEBUG_LINE_BUFFER_START;
+				unsigned char vertical = 0;
+				unsigned char cursor = 0;
+				char string[SRAM_DEBUG_LINE_BUFFER_WIDTH + 1];
+				
+				for ( unsigned char line = 0; line < SRAM_DEBUG_LINE_BUFFER_LINES; line++ )
+				{
+					for ( cursor = 0; cursor < SRAM_DEBUG_LINE_BUFFER_WIDTH; cursor++ )
+					{
+						string[cursor] = sramAtomicRead( address++ );
+					}
+
+					string[cursor] = 0;
+					stringAt( string, 0, vertical, SRAM_DEBUG_LINE_FONT );
+					vertical += SRAM_DEBUG_LINE_SPACING;
+				}	
 			}
 
-			rnaPrint( "                                           " );
+			blit();
+		}
+
+		if ( rnaDataReceived >= rnaDataExpected )
+		{
+			rnaDataReceived = 0;
+			char buf[32];
+			
+			if ( rnaCommand == RNATypeEEPROMLoad )
+			{
+				struct PacketEEPROMLoad *load = (struct PacketEEPROMLoad *)rnaPacket;
+
+				sprintf( buf, "%04X:%d", (unsigned int)load->offset, packetNum++ );
+				debugPrint( buf );
+
+				startWrite24c512( 0xA0, load->offset );
+				for ( unsigned int i=0; i<128; i++ )
+				{
+					i2cWrite( load->data[i] );
+				}
+				i2cStop();
+
+				if ( load->offset == 0 )
+				{
+					numberOfFonts = load->data[0];
+					dataBlockOrigin = ((unsigned int)numberOfFonts * sizeof(struct FontCharEntry) * 95) + 1;
+				}
+			}
+			else if ( rnaCommand == RNATypeDebugString )
+			{
+				rnaPacket[31] = 0; // force termination
+				sprintf( buf, "%d:%s", rnaFrom, rnaPacket );
+
+				debugPrint( buf );
+			}
+			else if ( rnaCommand == RNATypeButtonStatus )
+			{
+				sprintf( buf, "%d: %s %s %s",
+						 rnaFrom,
+						 rnaPacket[0] & 0x1 ? "on " : "off",
+						 rnaPacket[0] & 0x2 ? "on " : "off",
+						 rnaPacket[0] & 0x4 ? "on " : "off" );
+
+				if ( rnaPacket[0] == 0xFF )
+				{
+					sprintf( buf, "3: POWER OFF!!!" );
+				}
+
+				debugPrint( buf );
+			}
 		}
 	}
 }

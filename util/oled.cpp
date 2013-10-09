@@ -6,63 +6,94 @@
  * and in the LICENCE.txt file included with this distribution
  */
 
-
-// algorithm testing for the OLED
+#include "..\firmware\dna\dna_types.h"
+#include "..\oled\font_loader.h"
 
 //------------------------------------------------------------------------------
-void Oled::clear()
+void Oled::characterAt( char c, unsigned char x, unsigned char y, unsigned char font )
 {
-	for( int i=0; i<4; i++ )
+	unsigned int offset = ((c - 32) * (sizeof(FontCharEntry) * NUMBER_OF_FONTS)) + (sizeof(FontCharEntry) * font);
+	
+	FontCharEntry* entry = (FontCharEntry *)(c_lookupTable + offset);
+
+	const unsigned char *byte = c_dataBlock + entry->dataOffset;
+	
+	for( unsigned char h=0; h<entry->h; h++ )
 	{
-		for( int j=0; j<128; j++ )
+		unsigned char bit = 0;
+		for( unsigned char w = 0; w<entry->w; w++ )
 		{
-			m_pages[i][j] = 0;
+			if ( 1<<bit & *byte )
+			{
+				setPixel( x + w, y + h, true );
+			}
+			
+			if ( ++bit == 8 )
+			{
+				byte++;
+				bit = 0;
+			}
 		}
+
+		if ( bit )
+		{
+			byte++;
+		}
+	}
+}
+
+//------------------------------------------------------------------------------
+void Oled::stringAt( char *string, unsigned char x, unsigned char y, unsigned char font )
+{
+	for( ;*string ;string++ )
+	{
+		unsigned int offset = ((*string - 32) * (sizeof(FontCharEntry) * NUMBER_OF_FONTS)) + (sizeof(FontCharEntry) * font);
+		FontCharEntry* entry = (FontCharEntry *)(c_lookupTable + offset);
+
+		x += entry->pre;
+		
+		const unsigned char *byte = c_dataBlock + entry->dataOffset;
+
+		for( unsigned char h=0; h<entry->h; h++ )
+		{
+			unsigned char bit = 0;
+			for( unsigned char w = 0; w<entry->w; w++ )
+			{
+				if ( 1<<bit & *byte )
+				{
+					setPixel( x + w, y + h, true );
+				}
+
+				if ( ++bit == 8 )
+				{
+					byte++;
+					bit = 0;
+				}
+			}
+
+			if ( bit )
+			{
+				byte++;
+			}
+		}
+
+		x += entry->post + entry->w;
 	}
 }
 
 //------------------------------------------------------------------------------
 void Oled::setPixel( const unsigned char x, const unsigned char y, const bool pixel /*=true*/ )
 {
-	if ( x >= 128 || y >= 32 )
+	if ( x < 128 && y < 32 )
 	{
-		return;
-	}
-		
-	int page = y >> 3;
-	if ( pixel )
-	{
-		m_pages[ y>>3 ][ x ] |= (1 << (y & 0x07));
-	}
-	else
-	{
-		m_pages[ y>>3 ][ x ] &= ~(1 << (y & 0x07));
-	}
-}
-
-
-//------------------------------------------------------------------------------
-void Oled::getPageDump( unsigned char map[512] )
-{
-	int index = 0;
-	for( int i=0; i<4; i++ )
-	{
-		for( int j=0; j<128; j++ )
+		if ( pixel )
 		{
-			map[index++] = m_pages[i][j];
+			m_screen[computeAddress( x, y )] |= (1 << (y & 0x07));
+		}
+		else
+		{
+			m_screen[computeAddress( x, y )] &= ~(1 << (y & 0x07));
 		}
 	}
 }
 
-//------------------------------------------------------------------------------
-void Oled::getBitmap( unsigned char map[4096] )
-{
-	int index = 0;
-	for( int y=0; y<32; y++ )
-	{
-		for( int x=0; x<128; x++ )
-		{
-			map[index++] = (m_pages[y>>3][x] & (1 << (y & 0x07))) ? 0xFF : 0;
-		}
-	}
-}

@@ -3,14 +3,18 @@
 #* found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
 #* and in the LICENCE.txt file included with this distribution
 
-TARGET = button
+TARGET = ohost
 
 OBJS = \
+	objs/usbdrvasm.o \
+	objs/dna.o \
+	objs/usb.o \
 	objs/main.o \
+	objs/galloc.o \
 	objs/rna.o \
 
-MCU = attiny25
-CPU_FREQUENCY = 8000000
+MCU = attiny84
+CPU_FREQUENCY = 12000000
 
 CC = avr-gcc -Wall -I. -I../dna -I../../usbdrv -MD -Os -std=gnu99 -fdata-sections -ffunction-sections -funsigned-char -funsigned-bitfields -fno-inline-small-functions -mmcu=$(MCU) -DF_CPU=$(CPU_FREQUENCY)
 
@@ -18,22 +22,33 @@ all: $(TARGET).hex
 
 -include objs/*.d
 
-splice: $(TARGET).hex
-	..\..\splice\win32\splice -b button.hex
-
 clean:
 	@-rm -rf objs
 	@-mkdir objs
 	@-rm -f $(OBJS) $(TARGET).hex $(TARGET).elf $(TARGET).disassembly
+
+splice: $(TARGET).hex
+	../../splice/win32/splice -f $(TARGET).hex
 	
 $(TARGET).hex: $(OBJS)
 	$(CC) -o $(TARGET).elf -Wl,-gc-sections $(OBJS) 
 	avr-objcopy -j .text -j .data -O ihex $(TARGET).elf $(TARGET).hex
 	avr-objdump -d $(TARGET).elf > $(TARGET).disassembly
-#	..\..\loader\loader -i $(TARGET).hex
+
+objs/usbdrvasm.o: ../../usbdrv/usbdrvasm.S
+	$(CC) -c -x assembler-with-cpp $< -o $@
+
+objs/dna.o: ../dna/dna.c
+	$(CC) -c $< -o $@
+
+objs/usb.o: ../dna/usb.c
+	$(CC) -c $< -o $@
 
 objs/main.o: main.c
 	$(CC) -c $< -o $@
 
 objs/rna.o: ../dna/rna.c
+	$(CC) -c $< -o $@
+
+objs/galloc.o: ../dna/galloc.c
 	$(CC) -c $< -o $@

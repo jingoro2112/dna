@@ -46,6 +46,8 @@ static unsigned char s_sendQueueBufferHandle;
 static unsigned char *s_sendQueueBuffer;
 static unsigned char s_dataTransferRemaining;
 static unsigned char s_transferType;
+static unsigned char s_printQueue;
+static unsigned char s_printQueueSize;
 
 //------------------------------------------------------------------------------
 unsigned char usbFunctionSetup( unsigned char data[8] )
@@ -79,6 +81,17 @@ unsigned char usbFunctionWrite( unsigned char *data, unsigned char len )
 			else if ( data[1] == USBCommandEnterBootloader ) // soft entry to bootloader?
 			{
 				wdt_enable( WDTO_15MS ); // light the fuse
+			}
+			else if ( data[1] == USBCommandGetPrintMessage )
+			{
+				unsigned char* ptr = (unsigned char *)gpointer( s_printQueue );
+				if ( ptr )
+				{
+					s_printQueueSize -= ptr[1];
+					dnaUsbQueueHandle( s_printQueue, ptr[1] );
+					s_printQueue = *ptr;
+					s_sendQueuePosition = 2; // fake transmission of the first two bytes
+				}
 			}
 			
 			return 1; // commands are handled in one go
@@ -179,3 +192,45 @@ void dnaUsbQueueHandle( unsigned char handle, unsigned char len )
 	s_sendQueuePosition = 0;
 	sei();
 }
+
+//------------------------------------------------------------------------------
+void dprint( char* string, unsigned char len )
+{
+	if ( s_printQueueSize >= MAX_OUTSTANDING_PRINT_STRING_BYTES )
+	{
+		return;
+	}
+
+	unsigned char* ptr;
+
+	len += 2;
+	s_printQueueSize += len;
+
+	unsigned char handle = galloc( len, (void**)&ptr );
+
+	// prepend length and 'next'
+	*ptr++ = 0;
+	*ptr++ = len;
+
+	for( unsigned char i=2; i<len; i++ )
+	{
+		*ptr++ = *string++;
+	}
+
+	if ( s_printQueue )
+	{
+		unsigned char iter = s_printQueue;
+		do
+		{
+			ptr = (unsigned char *)gpointer( iter );
+			iter = *ptr; // 'next' is the first item
+		} while( iter );
+				
+		*ptr = handle;
+	}
+	else
+	{
+		s_printQueue = handle; 
+	}
+}
+

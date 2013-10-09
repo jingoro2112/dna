@@ -5,6 +5,7 @@
  */
 
 #include "rna.h"
+#include "rna_packet.h"
 #include "galloc.h"
 
 #include <util/atomic.h>
@@ -142,6 +143,11 @@ void rnaInit()
 //------------------------------------------------------------------------------
 unsigned char rnaSendEx( unsigned char address, unsigned char fromAddress, unsigned char *data, unsigned char len )
 {
+	if ( address == RNA_MY_ADDRESS )
+	{
+		return 0; // sorta kinda undefined..
+	}
+	
 	rnaSetActive(); // turn off pullup and assume the bus is implemented
 
 #ifndef WILL_NEVER_TALK_BACK_ON_OWN_ISR
@@ -186,10 +192,16 @@ unsigned char rnaSendEx( unsigned char address, unsigned char fromAddress, unsig
 				if ( rnaShiftOutByte(address | (fromAddress<<4)) == 1 )
 				{
 					// header was placed on the wire and acked
-					
+
 					if ( rnaShiftOutByte(len) != 1 ) // length..
 					{
 						len = 0;
+						break;
+					}
+
+					if ( len == 0 ) // was just a probe, since we just succeeded go ahead and bug out with a positive response
+					{
+						len = 1;
 						break;
 					}
 
@@ -206,7 +218,7 @@ unsigned char rnaSendEx( unsigned char address, unsigned char fromAddress, unsig
 				}
 
 				// no one home or collision, back off and try again
-				_delay_us( RNA_MY_ADDRESS << 3 );
+				_delay_us( RNA_MY_ADDRESS << 4 );
 			}
 
 #ifndef RNA_POLL_DRIVEN
@@ -221,17 +233,19 @@ unsigned char rnaSendEx( unsigned char address, unsigned char fromAddress, unsig
 }
 
 //------------------------------------------------------------------------------
-void rnaPrint( char* string )
+void rprint( char* string, unsigned char targetDevice )
 {
 	char buf[64];
-	buf[0] = RNACommandUtilityString;
+	unsigned char pos = 0;
+	buf[pos++] = RNATypeDebugString;
 	unsigned char len;
 	for( len=0; string[len]; len++ )
 	{
-		buf[len + 1] = string[len];
+		buf[pos++] = string[len];
 	}
+	buf[pos++] = 0;
 
-	rnaSend( 0x1, (unsigned char *)buf, len );
+	rnaSend( targetDevice, (unsigned char *)buf, pos );
 }
 
 //------------------------------------------------------------------------------

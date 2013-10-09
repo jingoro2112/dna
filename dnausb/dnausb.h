@@ -37,6 +37,8 @@ bool sendCode( const int vid, const int pid, const char* vendor,
 bool sendData( DNADEVICE device, const unsigned char* data, const unsigned int size );
 bool getData( DNADEVICE device, unsigned char* data, unsigned char* size );
 
+bool getPrintMessage( DNADEVICE device, char* buf, unsigned int* len =0 );
+
 bool sendCommand( DNADEVICE device, const unsigned char command, const unsigned char data[5] =0 );
 
 bool HID_GetFeature( DNADEVICE device, unsigned char* buf, unsigned int len );

@@ -21,6 +21,7 @@ void COledSimDlg::DoDataExchange(CDataExchange* pDX)
 	CDialogEx::DoDataExchange(pDX);
 }
 
+//------------------------------------------------------------------------------
 BEGIN_MESSAGE_MAP(COledSimDlg, CDialogEx)
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
@@ -40,15 +41,11 @@ BEGIN_MESSAGE_MAP(COledSimDlg, CDialogEx)
 	ON_WM_RBUTTONUP()
 END_MESSAGE_MAP()
 
-
-// COledSimDlg message handlers
-
 //------------------------------------------------------------------------------
 void COledSimDlg::clearCanvas()
 {
 	m_canvasBig.clear();
 	m_canvasSmall.clear();
-	m_oled.clear();
 }
 	
 //------------------------------------------------------------------------------
@@ -79,13 +76,19 @@ void COledSimDlg::redraw()
 }
 
 //------------------------------------------------------------------------------
-void COledSimDlg::oledToCanvas( unsigned char map[4096] )
+void COledSimDlg::oledToCanvas( Oled& oled )
 {
-	for( int y=0; y<32; y++ )
+	clearCanvas();
+	
+	for( int y=0; y<4; y++ )
 	{
 		for( int x=0; x<128; x++ )
 		{
-			setPixel( x, y, map[ (y*128) + x ] ? true : false );
+			unsigned char byte = oled.getScreen()[y*128 + x];
+			for( int b=0; b<8; b++ )
+			{
+				setPixel( x, y*8 + b, (byte & 1<<b) ? true : false );
+			}
 		}
 	}
 
@@ -217,7 +220,10 @@ void COledSimDlg::OnBnClickedButton1()
 //------------------------------------------------------------------------------
 void COledSimDlg::OnBnClickedTest1()
 {
-	
+	m_oled.clear();
+	m_oled.stringAt( "DNA OLED (*&*&^)", 0, 0, 0 );
+	m_oled.stringAt( "DNA OLED 123!@#$%^", 0, 16, 1 );
+	oledToCanvas( m_oled );
 }
 
 //------------------------------------------------------------------------------

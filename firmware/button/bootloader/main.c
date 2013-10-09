@@ -17,7 +17,7 @@
 
 #include "../../dna/dna_types.h"
 
-uint8 packet[128];
+uint8 packet[36];
 uint8 packetExpectedLength;
 uint8 packetPos;
 
@@ -31,7 +31,15 @@ void commitPage( unsigned int page )
 }
 
 //------------------------------------------------------------------------------
-void processRnaPacket( unsigned char *data, unsigned char dataLen )
+unsigned char rnaInputSetup( unsigned char *data, unsigned char dataLen, unsigned char from, unsigned char packetLen )
+{
+	packetPos = 0;
+	packetExpectedLength = packetLen;
+	return 0;
+}
+
+//------------------------------------------------------------------------------
+void rnaInputStream( unsigned char *data, unsigned char dataLen )
 {
 	for( unsigned char i=0; i<dataLen; i++ )
 	{
@@ -44,10 +52,10 @@ void processRnaPacket( unsigned char *data, unsigned char dataLen )
 		{
 			struct PacketCodePage *page = (struct PacketCodePage *)(packet + 1);
 
-			if ( page->page < (OLED_BOOTLOADER_ENTRY*2) )  // silently ignore any command to overwrite myself
+			if ( page->page < (BUTTON_BOOTLOADER_ENTRY*2) )  // silently ignore any command to overwrite myself
 			{
 				unsigned char pos = 0;
-				for( unsigned char c=0; c<64; c += 2 )
+				for( unsigned char c=0; c<32; c += 2 )
 				{
 					boot_page_fill( c, page->code[pos++] );
 				}
@@ -55,7 +63,7 @@ void processRnaPacket( unsigned char *data, unsigned char dataLen )
 				commitPage( page->page );
 			}
 		}
-		else if ( packet[0] == RNATypeEnterApp )
+		else// if ( packet[0] == RNATypeEnterApp )
 		{
 			struct PacketEnterApp *enter = (struct PacketEnterApp *)(packet + 1);
 
@@ -72,23 +80,9 @@ void processRnaPacket( unsigned char *data, unsigned char dataLen )
 
 			// the crc did NOT MATCH! get back to the bootloader and let it
 			// re-write the RESET vector!
-			asm	volatile ("ijmp" ::"z" (OLED_BOOTLOADER_ENTRY)); // emergency reboot time
+			asm	volatile ("ijmp" ::"z" (BUTTON_BOOTLOADER_ENTRY)); // emergency reboot time
 		}
 	}
-}
-
-//------------------------------------------------------------------------------
-unsigned char rnaInputSetup( unsigned char *data, unsigned char dataLen, unsigned char from, unsigned char packetLen )
-{
-	packetPos = 0;
-	packetExpectedLength = packetLen;
-	return 0;
-}
-
-//------------------------------------------------------------------------------
-void rnaInputStream( unsigned char *data, unsigned char dataLen )
-{
-	processRnaPacket( data, dataLen );
 }
 
 // manually locate the reset vector, since we took out the automatic
@@ -109,8 +103,8 @@ void ResetVector (void)
 const PROGMEM int isrJump[] =
 {
 	// trampoline to bootloader
-	0xEAE0, // e0 ea  ldi r30, 0xA0       ; 160
-	0xE0FE, // fe e0  ldi r31, 0x0E       ; 14
+	0xEBE0, // e0 eb  ldi     r30, 0xB0       ; 176
+	0xE0F2, // f2 e0  ldi     r31, 0x02       ; 2
 	0x9409, // 09 94  ijmp
 };
 

@@ -3,8 +3,10 @@ OBJS = \
 	objs/dnausb_common.o \
 	objs/hid.o \
 
-CPP = g++ -m32 -Ihidapi -O3 -Wall -Werror -MD -c
-CC = cc -m32 -Ihidapi -O3 -MD -c
+#CPP = g++ -m32 -Ihidapi -O3 -Wall -Werror -MD -c
+#CC = cc -m32 -Ihidapi -O3 -MD -c
+CPP = g++ -Ihidapi -O3 -Wall -Werror -MD -c
+CC = cc -Ihidapi -O3 -MD -c
 
 all: libdnausb.a
 

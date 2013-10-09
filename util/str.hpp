@@ -135,7 +135,7 @@ public:
 
 	//	Note this allocates a 64k temporary buffer to format the string
 	//	into. The resulting	string cannot be longer than this.
-	inline const char*	format( const char* format, ... );
+	inline const char* format( const char* format, ... );
 	inline const char* format( const char* format, va_list arg );
 
 	// appends use a growth algorithm so they are pretty effecient,
