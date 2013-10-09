@@ -3,7 +3,7 @@
 #* found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
 #* and in the LICENCE.txt file included with this distribution
 
-TARGET = ohost
+TARGET = rhost
 
 OBJS = \
 	objs/usbdrvasm.o \

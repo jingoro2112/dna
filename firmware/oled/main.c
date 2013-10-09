@@ -445,6 +445,7 @@ int __attribute__((OS_main)) main()
 	i2cInit();
 	oledInit( 1 );
 	rnaInit();
+
 	clearFrameBuffer();
 	blit();
 
@@ -452,34 +453,23 @@ int __attribute__((OS_main)) main()
 
 //	programEEPROM();
 
+	// read in font table
 	read24c512( 0xA0, 0, &numberOfFonts, 1 );
 	dataBlockOrigin = ((unsigned int)numberOfFonts * sizeof(struct FontCharEntry) * 95) + 1;
 
-
-
-	debugPrint( "0:DNA ready" );
+	debugPrint( "0 DNA ready" );
 //	debugPrint( "0:<1>DNA ready" );
 //	debugPrint( "0:<2>DNA ready" );
 //	debugPrint( "0:<3>DNA ready" );
 //	debugPrint( "0:<4>DNA ready" );
 //	debugPrint( "0:<5>DNA ready" );
 
-//	stringAt( "1 DNA ready", 0, 0, 0 );
-//	stringAt( "2 DNA ready", 0, 8, 0 );
-//	stringAt( "3 DNA ready", 0, 16, 0 );
-//	stringAt( "4 DNA ready", 0, 24, 0 );
-
-	
-	
-	blit();
 
 	sei();
 
 	unsigned int packetNum = 0;
 	
 	unsigned char frameMode = displayDebug;
-
-	displayDirty = 1;
 
 	for(;;)
 	{
@@ -538,14 +528,14 @@ int __attribute__((OS_main)) main()
 			}
 			else if ( rnaCommand == RNATypeDebugString )
 			{
-				rnaPacket[31] = 0; // force termination
-				sprintf( buf, "%d:%s", rnaFrom, rnaPacket );
+				rnaPacket[31] = 0; // enforce termination
+				sprintf( buf, "%d %s", rnaFrom, rnaPacket );
 
 				debugPrint( buf );
 			}
 			else if ( rnaCommand == RNATypeButtonStatus )
 			{
-				sprintf( buf, "%d: %s %s %s",
+				sprintf( buf, "%d %s %s %s",
 						 rnaFrom,
 						 rnaPacket[0] & 0x1 ? "on " : "off",
 						 rnaPacket[0] & 0x2 ? "on " : "off",

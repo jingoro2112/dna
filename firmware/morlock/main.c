@@ -531,14 +531,14 @@ int __attribute__((OS_main)) main(void)
 		while( !startFireCycle )
 		{
 			sampleEye = false;
-			
+
 			if ( !millisecondCountBox && consts.eyeEnabled )
 			{
 				millisecondCountBox--;
 				digitizeEye();
 				isLedOn = eyeBlocked ? true : false;
 			}
-			
+
 			if ( eepromConstantsDirty )
 			{
 				isLedOn = true;
@@ -614,8 +614,6 @@ int __attribute__((OS_main)) main(void)
 // entered 1994.7 times per second
 ISR( TIM0_COMPA_vect, ISR_NOBLOCK )
 {
-	static uint8 s_ms;
-
 	if ( scheduleShotBox )
 	{
 		if ( !--scheduleShotBox  && (currentFireMode == ceRamp) && enhancedTriggerTimeout )
@@ -731,6 +729,7 @@ ISR( TIM0_COMPA_vect, ISR_NOBLOCK )
 
 	//--------------------------------------------------------------------------------
 	// everything below here has a ~1ms resulotion
+	static uint8 s_ms;
 	if ( ++s_ms & 0x01 )
 	{
 		return;

@@ -16,25 +16,12 @@
 
 #include <stdio.h>
 
-#include "button.h"
-
-#define topButton() (PINB & 0x1)
-#define middleButton() middleButton
-#define bottomButton() (PINB & 0x2)
-
-#define powerOn() (PORTB |= 0b00010000)
-#define powerOff() (PORTB &= 0b11101111)
-
 unsigned char buttonRequest;
 
 //------------------------------------------------------------------------------
 unsigned char rnaInputSetup( unsigned char *data, unsigned char dataLen, unsigned char from, unsigned char totalLen )
 {
-	if ( *data == ButtonRequestPowerOff )
-	{
-		powerOff(); // turn off the power pin
-	}
-	else if ( (*data == RNATypeEnterBootloader) && (dataLen == 1) )
+	if ( (*data == RNATypeEnterBootloader) && (dataLen == 1) )
 	{
 		wdt_enable( WDTO_15MS ); // light the fuse
 	}
@@ -116,7 +103,7 @@ int __attribute__((OS_main)) main()
 
 	sei();
 
-	unsigned int cyclesOn = 0;
+	unsigned char cyclesOn = 0;
 	unsigned char pos = 0;
 	unsigned int deltaTargets[0xE]; // when a button is pressed, everyone gets a notice
 
@@ -139,27 +126,26 @@ int __attribute__((OS_main)) main()
 	for(;;)
 	{
 		a2dStartConversion();
-		_delay_us( 250 );
-		a2dWaitForConversionComplete();
-		if ( ADCH > 0xE0 )
+		_delay_ms( 25 ); // wait for conversion plus debounce
+
+		rnaPacket[1] = (PINB & 0x1) | ((PINB & 0x2) << 1);
+		
+		if ( ADCH < 0xE0 )
 		{
-			rnaPacket[1] = (PINB & 0x1) | ((PINB & 0x2) << 1); // power pressed
-		}
-		else
-		{
+			// power button not pressed, reset 'power off' logic and set state
 			cyclesOn = 0;
-			rnaPacket[1] = (PINB & 0x1) | ((PINB & 0x2) << 1) | 0x2; // power not pressed
+			rnaPacket[1] = (PINB & 0x1) | ((PINB & 0x2) << 1) | 0x2;
 		}
 
-		// the buttons are 'active low' but lets keep things
+		// the buttons are 'active low' but keep things
 		// straightforward with a '1' meaning the button has been
 		// pressed
 		rnaPacket[1] ^= 0x7; 
 
-		if ( cyclesOn++ > 12000 ) // more than 3 seconds held? power OFF
+		if ( cyclesOn++ > 90 ) // more than 3 seconds held? power OFF
 		{
 			rnaPacket[1] = 0xFF;
-			powerOff(); // turn off the power pin (power won't actually die until the power button is released)
+			PORTB &= 0b11101111; // turn off the power pin (power won't actually die until the power button is released)
 		}
 
 		if ( rnaPacket[1] != oldStatus )
@@ -171,6 +157,12 @@ int __attribute__((OS_main)) main()
 			}
 		}
 
+		// board has asked status, go ahead and answer
+		if ( buttonRequest )
+		{
+			rnaSend( buttonRequest, rnaPacket, 2 );
+		}
+		
 		if ( rnaPacket[1] == 0xFF )
 		{
 			for(;;); // go quietly into the night
