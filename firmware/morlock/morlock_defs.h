@@ -1,20 +1,26 @@
-/* Copyright: (c) 2013 by Curt Hartung avr@northarc.com
+#ifndef MORLOCK_DEFS_H
+#define MORLOCK_DEFS_H
+/*------------------------------------------------------------------------------
+ * Copyright: (c) 2013 by Curt Hartung avr@northarc.com
  * This work is released under the Creating Commons 3.0 license
  * found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
  * and in the LICENCE.txt file included with this distribution
  */
-#ifndef MORLOCK_DEFS_H
-#define MORLOCK_DEFS_H
 
 // must define this for whatever OS it's running on
 #ifdef _WIN32
 #include <winsock2.h>
 #include <windows.h>
-#include "../../sdk/firmware/dna/dna_types.h"
+#include "../dna/dna_types.h"
 #pragma pack(push, 1)
 
 #elif !defined(AVR)
 #include <arpa/inet.h>
+#endif
+
+#ifndef AVR
+#include "../../util/str.hpp"
+#include <stddef.h>
 #endif
 
 // this calculation is a single constant which will give us the number
@@ -152,7 +158,8 @@ struct EEPROMConstants
 	uint8 eyeLevel;
 	uint8 version;
 
-#ifndef __AVR_ARCH__
+#ifndef AVR
+
 	void installDefaults()
 	{
 		INSTALL_MORLOCK_DEFAULTS;
@@ -178,6 +185,44 @@ struct EEPROMConstants
 		swap( &enhancedTriggerTimeout );
 		swap( &ABSTimeout );
 		swap( &rampTimeout );
+	}
+
+	//------------------------------------------------------------------------------
+	static int offsetOf( const char* memberName )
+	{
+		Cstr compare( memberName );
+		
+		if ( compare == "singleSolenoid" ) return offsetof( EEPROMConstants, singleSolenoid );
+		else if ( compare == "fireMode" ) return offsetof( EEPROMConstants, fireMode );
+		else if ( compare == "ballsPerSecondX10" ) return offsetof( EEPROMConstants, ballsPerSecondX10 );
+		else if ( compare == "burstCount" ) return offsetof( EEPROMConstants, burstCount );
+		else if ( compare == "enhancedTriggerTimeout" ) return offsetof( EEPROMConstants, enhancedTriggerTimeout );
+		else if ( compare == "boltHoldoff" ) return offsetof( EEPROMConstants, boltHoldoff );
+		else if ( compare == "accessoryRunTime" ) return offsetof( EEPROMConstants, accessoryRunTime );
+		else if ( compare == "dimmer" ) return offsetof( EEPROMConstants, dimmer );
+		else if ( compare == "ABSTimeout" ) return offsetof( EEPROMConstants, ABSTimeout );
+		else if ( compare == "ABSAddition" ) return offsetof( EEPROMConstants, ABSAddition );
+		else if ( compare == "rebounce" ) return offsetof( EEPROMConstants, rebounce );
+		else if ( compare == "debounce" ) return offsetof( EEPROMConstants, debounce );
+		else if ( compare == "dwell1" ) return offsetof( EEPROMConstants, dwell1 );
+		else if ( compare == "dwell2Holdoff" ) return offsetof( EEPROMConstants, dwell2Holdoff );
+		else if ( compare == "dwell2" ) return offsetof( EEPROMConstants, dwell2 );
+		else if ( compare == "maxDwell2" ) return offsetof( EEPROMConstants, maxDwell2 );
+		else if ( compare == "eyeEnabled" ) return offsetof( EEPROMConstants, eyeEnabled );
+		else if ( compare == "eyeHoldoff" ) return offsetof( EEPROMConstants, eyeHoldoff );
+		else if ( compare == "eyeHighBlocked" ) return offsetof( EEPROMConstants, eyeHighBlocked );
+		else if ( compare == "eyeDetectLevel" ) return offsetof( EEPROMConstants, eyeDetectLevel );
+		else if ( compare == "eyeDetectHoldoff" ) return offsetof( EEPROMConstants, eyeDetectHoldoff );
+		else if ( compare == "eyeStrong" ) return offsetof( EEPROMConstants, eyeStrong );
+		else if ( compare == "locked" ) return offsetof( EEPROMConstants, locked );
+		else if ( compare == "rampEnableCount" ) return offsetof( EEPROMConstants, rampEnableCount );
+		else if ( compare == "rampClimb" ) return offsetof( EEPROMConstants, rampClimb );
+		else if ( compare == "rampTopMode" ) return offsetof( EEPROMConstants, rampTopMode );
+		else if ( compare == "rampTimeout" ) return offsetof( EEPROMConstants, rampTimeout );
+		else if ( compare == "shortCyclePreventionInterval" ) return offsetof( EEPROMConstants, shortCyclePreventionInterval );
+		else if ( compare == "eyeLevel" ) return offsetof( EEPROMConstants, eyeLevel );
+		else if ( compare == "version" ) return offsetof( EEPROMConstants, version );
+		else return -1;
 	}
 
 #endif

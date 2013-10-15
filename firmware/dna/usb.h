@@ -33,6 +33,6 @@ void dnaUsbInputStream( unsigned char *data, unsigned char len );
 void dnaUsbCommand( unsigned char command, unsigned char data[5] );
 
 #define MAX_OUTSTANDING_PRINT_STRING_BYTES 200
-void dprint( char* string, unsigned char len );
+void usbprint( char* string, unsigned char len );
 			  
 #endif

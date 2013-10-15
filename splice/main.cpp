@@ -34,7 +34,8 @@ int usage()
 			"    remaining 5 will be passed as data\n\n"
 			
 			"-e, --load_eeprom <binfile>\n"
-			"    Load the OLED EEPROM with the binary data found in binfile\n\n"
+			"    Load the OLED EEPROM with the binary data found in binfile\n"
+			"    optional --offset <offset> into the eeprom image to start load at\n\n"
 
 			"-f, --flash <image>\n"
 			"    flash firmware <image>\n"
@@ -67,9 +68,14 @@ int usage()
 	return 0;
 }
 
+void test_dstring();
+
 //------------------------------------------------------------------------------
 int main( int argc, char *argv[] )
 {
+	//test_dstring();
+	//return 0;
+	
 	MainArgs args( argc, argv );
 
 	if ( (argc == 1) || args.isSet("-?") || args.isSet("-help") || args.isSet("--help") || args.isSet("--version") )
@@ -248,6 +254,10 @@ int main( int argc, char *argv[] )
 
 	if ( args.isStringSet("-e", image) || args.isStringSet("--load_eeprom", image) )
 	{
+		unsigned int position = 0;
+		args.isNumSet( "--offset", &position );
+		position = (position / 128) * 128;
+		
 		Cstr bin;
 		if ( !bin.fileToBuffer(image) )
 		{
@@ -255,19 +265,23 @@ int main( int argc, char *argv[] )
 			return usage();
 		}
 
-		unsigned int position = 0;
 		PacketEEPROMLoad load;
-		load.offset = 0;
+		load.offset = position;
 		while( position < bin.size() )
 		{
-			for( unsigned int i=0; position < bin.size() && i<sizeof(load.data); position++, i++ )
+			memset( load.data, 0xFF, sizeof(load.data) );
+			for( unsigned int i=0; position < bin.size() && i<sizeof(load.data); i++ )
 			{
-				load.data[i] = bin[position];
+				load.data[i] = bin[position++];
 			}
 
+			printf( "0x%04X:\n", position );
+			Arch::asciiDump( load.data, sizeof(load.data) );
+			
 			Splice::proxyRNA( device, ceCommandRNASend, RNADeviceOLED, RNATypeEEPROMLoad, &load, sizeof(PacketEEPROMLoad) );
-			load.offset += 128;
-			Arch::sleep( 1000 ); // give hardware a break to finish the write cycle
+			load.offset += sizeof(load.data);
+			
+			Arch::sleep( 100 ); // give hardware a break to finish the write cycle
 		}
 
 		return 0;

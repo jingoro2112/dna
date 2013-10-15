@@ -60,3 +60,20 @@ void write24c512( unsigned char i2cAddress, int address, unsigned char* bytes, u
 	i2cStop();
 }
 
+//------------------------------------------------------------------------------
+void erase24c512( unsigned char i2cAddress )
+{
+	for( unsigned int i=0; i<0xFFFF; i++ )
+	{
+		if ( !(i%128) )
+		{
+			stop24c512();
+			startWrite24c512( i2cAddress, i );
+		}
+
+		streamWrite24c512( 0xFF );
+	}
+
+	stop24c512();
+}
+

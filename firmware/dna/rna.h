@@ -45,6 +45,6 @@ void rnaInputStream( unsigned char *data, unsigned char dataLen );
 
 void rprint( char* string, unsigned char targetDevice );
 #define rprint_oled( string ) rprint( string, RNADeviceOLED )
-#define rprint_dna( string ) rprint( string, RNADeviceDNA )
+#define rprint_usb( string ) rprint( string, RNADeviceDNA )
 
 #endif

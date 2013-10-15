@@ -135,9 +135,11 @@ void rnaWaitForBusClear()
 void rnaInit()
 {
 	rnaSetIdle();
+#ifndef RNA_POLL_DRIVEN
 	rnaINTArm();
 	rnaClearINT();
 	rnaEnableINT();
+#endif
 }
 
 //------------------------------------------------------------------------------
@@ -237,7 +239,7 @@ void rprint( char* string, unsigned char targetDevice )
 {
 	char buf[64];
 	unsigned char pos = 0;
-	buf[pos++] = RNATypeDebugString;
+	buf[pos++] = RNATypeConsoleString;
 	unsigned char len;
 	for( len=0; string[len]; len++ )
 	{
@@ -265,17 +267,11 @@ ISR( RNA_ISR )
 
 #ifdef RNA_POLL_DRIVEN
 	ATOMIC_BLOCK( ATOMIC_RESTORESTATE )
-	{
 #endif
+	{
 		unsigned char header = rnaShiftInByte( 0 );
 
-		if ( (header & 0x0F) != RNA_MY_ADDRESS )
-		{
-			// not meant for me, wait for an idle bus so we do not try and
-			// interpret garbage on the next interrupt
-			rnaWaitForBusClear();
-		}
-		else
+		if ( (header & 0x0F) == RNA_MY_ADDRESS )
 		{
 			rnaSetLow(); // was meant for me, ack it!
 
@@ -373,10 +369,11 @@ ISR( RNA_ISR )
 		}
 		
 		rnaSetIdle();
-
-#ifdef RNA_POLL_DRIVEN
 	}
-#else
-		rnaClearINT();
+
+	rnaWaitForBusClear();
+	
+#ifndef RNA_POLL_DRIVEN
+	rnaClearINT();
 #endif
 }

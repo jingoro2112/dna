@@ -17,8 +17,9 @@ enum RNAPacketTypes
 	RNATypeCodePage,
 	RNATypeEnterApp,
 	RNATypeEEPROMLoad,
-	RNATypeDebugString,
+	RNATypeConsoleString,
 	RNATypeButtonStatus, // single byte bitvector of the buttons status, 0xFF means power off request
+	RNATypeReplay,
 };
 
 //------------------------------------------------------------------------------
@@ -47,6 +48,18 @@ struct PacketEEPROMLoad
 {
 	uint16 offset;
 	uint8 data[128];
+};
+
+//------------------------------------------------------------------------------
+struct PacketReplay
+{
+	unsigned char millisecondsRepresented; // how much time is valid
+
+	// each bit is always exactly 1 millisecond
+	unsigned char trigger[16];
+	unsigned char eye[16];
+	unsigned char solenoid1[16];
+	unsigned char solenoid2[16];
 };
 
 #endif

@@ -22,6 +22,14 @@
 #define DNA_VERSION					1
 
 //------------------------------------------------------------------------------
+enum ButtonBits
+{
+	ButtonBitBottom = 1<<0,
+	ButtonBitMiddle = 1<<1,
+	ButtonBitTop = 1<<2,
+};
+
+//------------------------------------------------------------------------------
 enum BootloaderCommands
 {
 	BootloaderCommandCommitPage = 0xFE,

@@ -95,16 +95,6 @@ void rnaInputStream( unsigned char *data, unsigned char dataLen )
 	{
 		usbRNAPacket[usbRNAPacketPos++] = data[i];
 	}
-
-	if ( usbRNAPacketPos < usbRNAPacketExpected )
-	{
-		return;
-	}
-
-	if ( *usbRNAPacket == RNATypeDebugString )
-	{
-		dprint( (char *)usbRNAPacket + 1, usbRNAPacketExpected - 1  );
-	}
 }
 
 //------------------------------------------------------------------------------
@@ -113,6 +103,7 @@ int __attribute__((OS_main)) main(void)
 	dnaUsbInit();
 	enableLed();
 	usbCommand = ceCommandIdle;
+	usbRNAPacketExpected = 1;
 	
 	TCCR0B = 1<<CS01 | 1<<CS00; // set 8-bit timer prescaler to div/64
 	TIMSK0 = 1<<TOIE0; // enable the interrupt
@@ -125,6 +116,8 @@ int __attribute__((OS_main)) main(void)
 
 	for(;;)
 	{
+		rnaPoll();
+		
 		if ( rnaPacketAvail )
 		{
 			setLedOn();
@@ -136,6 +129,18 @@ int __attribute__((OS_main)) main(void)
 			}
 			setLedOff();
 		}
+
+		/*
+		if ( usbRNAPacketPos == usbRNAPacketExpected )
+		{
+			usbRNAPacketPos = 0;
+			if ( *usbRNAPacket == RNATypeDebugString )
+			{
+				usbRNAPacket[usbRNAPacketExpected] = 0;
+				usbprint( (char *)usbRNAPacket + 1, usbRNAPacketExpected );
+			}
+		}
+		*/
 	}
 }
 

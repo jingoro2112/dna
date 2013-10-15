@@ -306,7 +306,7 @@ bool DNAUSB::getData( DNADEVICE device, unsigned char* data, unsigned char* size
 	
 	if ( !DNAUSB::HID_GetFeature(device, message, REPORT_DNA_DATA_SIZE + 1) )
 	{
-		printf( "failed to poll for available data" );
+		printf( "failed to poll for available data\n" );
 		return false;
 	}
 
@@ -330,12 +330,12 @@ bool DNAUSB::getPrintMessage( DNADEVICE device, char* buf, unsigned int* len /*=
 		return false;
 	}
 
-	Arch::sleep( 10 );
+	Arch::sleep( 15 );
 
 	packet[0] = REPORT_DNA_DATA;
 	if ( !DNAUSB::HID_GetFeature(device, packet, REPORT_DNA_DATA_SIZE + 1) )
 	{
-		printf( "failed to get print message data" );
+		printf( "failed to get print message data\n" );
 		return false;
 	}
 
@@ -347,9 +347,13 @@ bool DNAUSB::getPrintMessage( DNADEVICE device, char* buf, unsigned int* len /*=
 	if ( packet[1] )
 	{
 		memcpy( buf, packet + 2, packet[1] );
+		buf[packet[1]] = 0;
+
+		Log( "got[%d] bytes", packet[1] );
 	}
 	else
 	{
+		Log( "null message\n" );
 		buf[0] = 0;
 	}
 

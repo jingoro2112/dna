@@ -461,9 +461,9 @@ void rnaInputStream( unsigned char *data, unsigned char dataLen )
 		return;
 	}
 
-	if ( *usbRNAPacket == RNATypeDebugString )
+	if ( *usbRNAPacket == RNATypeConsoleString )
 	{
-		dprint( (char *)usbRNAPacket + 1, usbRNAPacketExpected - 1  );
+//		dprint( (char *)usbRNAPacket + 1, usbRNAPacketExpected - 1  );
 	}
 }
 

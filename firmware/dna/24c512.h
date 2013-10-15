@@ -12,5 +12,6 @@ void startWrite24c512( unsigned char i2cAddress, int address );
 #define stop24c512() do { i2cStop(); } while(0)
 void read24c512( unsigned char i2cAddress, int address, unsigned char* bytes, unsigned char len );
 void write24c512( unsigned char i2cAddress, int address, unsigned char* bytes, unsigned char len );
+void erase24c512( unsigned char i2cAddress );
 
 #endif

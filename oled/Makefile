@@ -1,6 +1,10 @@
 CPP = g++ -ggdb -O0 -Wall -Werror -MD -c
 
-all: fonttable stringtable
+OBJS = \
+	objs/font.o \
+	objs/eeprom.o \
+
+all: eeprom
 
 -include objs/*.d
 
@@ -8,13 +12,10 @@ clean:
 	@-rm -rf objs
 	@-mkdir objs
 
-stringtable: objs/stringtable.o
-	g++ -O3 -Wall -Werror $< -o $@
-	
-fonttable: objs/font.o objs/fonttable.o
-	g++ -O3 -Wall -lz -lpng -Werror objs/font.o objs/fonttable.o -o $@
+eeprom: $(OBJS)
+	g++ -O3 -Wall -lz -lpng -Werror $(OBJS) -o $@
 
-objs/font.o: font.cpp
+objs/font.o: ../util/font.cpp
 	$(CPP) -c $< -o $@
 
 objs/fonttable.o: fonttable.cpp
@@ -23,6 +24,6 @@ objs/fonttable.o: fonttable.cpp
 objs/reduce.o: reduce.cpp
 	$(CPP) -c $< -o $@
 
-objs/stringtable.o: stringtable.cpp
+objs/eeprom.o: eeprom.cpp
 	$(CPP) -c $< -o $@
 	

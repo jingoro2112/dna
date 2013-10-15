@@ -108,7 +108,6 @@ int __attribute__((OS_main)) main()
 	unsigned int deltaTargets[0xE]; // when a button is pressed, everyone gets a notice
 
 	_delay_ms( 500 ); // wait for everyone to boot before probing (the OLED in particular takes a few 100 ms)
-	
 	for( unsigned char probe=1; probe<0x10; probe++ )
 	{
 		if ( rnaProbe(probe) )
@@ -128,13 +127,21 @@ int __attribute__((OS_main)) main()
 		a2dStartConversion();
 		_delay_ms( 25 ); // wait for conversion plus debounce
 
-		rnaPacket[1] = (PINB & 0x1) | ((PINB & 0x2) << 1);
+		rnaPacket[1] = 0;
+		if ( PINB & 0x1 )
+		{
+			rnaPacket[1] |= ButtonBitBottom;
+		}
+
+		if ( PINB & 0x2 )
+		{
+			rnaPacket[1] |= ButtonBitTop;
+		}
 		
 		if ( ADCH < 0xE0 )
 		{
-			// power button not pressed, reset 'power off' logic and set state
-			cyclesOn = 0;
-			rnaPacket[1] = (PINB & 0x1) | ((PINB & 0x2) << 1) | 0x2;
+			cyclesOn = 0; // power button not pressed, reset 'power off' logic and set state
+			rnaPacket[1] |= ButtonBitMiddle;
 		}
 
 		// the buttons are 'active low' but keep things
@@ -151,10 +158,13 @@ int __attribute__((OS_main)) main()
 		if ( rnaPacket[1] != oldStatus )
 		{
 			oldStatus = rnaPacket[1];
+
 			for( pos = 0; deltaTargets[pos]; pos++ )
 			{
 				rnaSend( deltaTargets[pos], rnaPacket, 2 );
 			}
+
+//			rnaSend( RNADeviceOLED, rnaPacket, 2 );
 		}
 
 		// board has asked status, go ahead and answer

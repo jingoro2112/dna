@@ -88,8 +88,9 @@ unsigned char usbFunctionWrite( unsigned char *data, unsigned char len )
 				if ( ptr )
 				{
 					s_printQueueSize -= ptr[1];
+					unsigned char newQ = *ptr; 
 					dnaUsbQueueHandle( s_printQueue, ptr[1] );
-					s_printQueue = *ptr;
+					s_printQueue = newQ;
 					s_sendQueuePosition = 2; // fake transmission of the first two bytes
 				}
 			}
@@ -156,8 +157,11 @@ unsigned char usbFunctionRead( unsigned char *data, unsigned char len )
 
 			if ( s_sendQueuePosition == g_sendQueueLen )
 			{
-				gfree( s_sendQueueBufferHandle );
-				s_sendQueueBufferHandle = 0;
+				if ( queue != s_sendQueueBuffer )
+				{
+					gfree( s_sendQueueBufferHandle );
+					s_sendQueueBufferHandle = 0;
+				}
 				g_sendQueueLen = 0;
 			}
 		}
@@ -194,9 +198,9 @@ void dnaUsbQueueHandle( unsigned char handle, unsigned char len )
 }
 
 //------------------------------------------------------------------------------
-void dprint( char* string, unsigned char len )
+void usbprint( char* string, unsigned char len )
 {
-	if ( s_printQueueSize >= MAX_OUTSTANDING_PRINT_STRING_BYTES )
+	if ( (s_printQueueSize + len) >= MAX_OUTSTANDING_PRINT_STRING_BYTES )
 	{
 		return;
 	}

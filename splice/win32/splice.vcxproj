@@ -11,10 +11,19 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\firmware\dna\dstring.c">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsCpp</CompileAs>
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">CompileAsCpp</CompileAs>
+    </ClCompile>
+    <ClCompile Include="..\..\firmware\dna\dstring_unit.c">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsCpp</CompileAs>
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">CompileAsCpp</CompileAs>
+    </ClCompile>
     <ClCompile Include="..\main.cpp" />
     <ClCompile Include="..\splice.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\firmware\dna\dstring.h" />
     <ClInclude Include="..\splice.hpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
