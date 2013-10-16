@@ -1,4 +1,3 @@
-#include "oled.h"
 /*------------------------------------------------------------------------------*
  * Copyright: (c) 2013 by Curt Hartung avr@northarc.com
  * This work is released under the Creating Commons 3.0 license
@@ -6,8 +5,11 @@
  * and in the LICENCE.txt file included with this distribution
  */
 
+#include "cfal12832.h"
+
 #include <util/delay.h>
 #include <avr/io.h>
+#include <avr/interrupt.h>
 
 #include "i2c_interface.h"
 
@@ -40,11 +42,10 @@ void oledClear()
 	i2cWrite( 0xB0 );
 
 	// clock in 512 zeros
-	unsigned int i;
-	for( i=0; i<512; i++ )
+	for( unsigned int i=0; i<0x200; i++ )
 	{
 		i2cWrite( 0xC0 );
-		i2cWrite( 0 );
+		i2cWrite( 0x00 );
 	}
 
 	i2cStop();

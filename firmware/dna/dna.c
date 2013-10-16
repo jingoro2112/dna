@@ -6,6 +6,7 @@
  */
 
 #include "dna.h"
+#include "rna.h"
 #include <avr/io.h>
 #include <util/delay.h>
 
@@ -63,4 +64,3 @@ bootloader_jump:
 normalExit:
 	asm volatile ( "rjmp __ctors_end" ); // recovery not called for; return to the regularly scheduled C program
 }
-

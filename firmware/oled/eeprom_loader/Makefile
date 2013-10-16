@@ -9,11 +9,12 @@ OBJS = \
 	objs/rna.o \
 	objs/main.o \
 	objs/i2c_brute.o \
-	objs/oled.o \
+	objs/cfal12832.o \
 	objs/24c512.o \
 	objs/sram.o \
 	objs/dstring.o \
 	objs/text.o \
+	objs/frame.o \
 
 MCU = attiny84
 CPU_FREQUENCY = 8000000
@@ -35,7 +36,7 @@ $(TARGET).hex: $(OBJS)
 	avr-objdump -d $(TARGET).elf > $(TARGET).disassembly
 
 splice: $(TARGET).hex
-	..\..\..\splice\win32\splice -o oled.hex
+	..\..\..\splice\win32\splice -o $(TARGET).hex
 
 load:
 	..\..\..\splice\win32\splice -e ..\..\..\oled\eeprom_image.bin
@@ -44,6 +45,9 @@ objs/main.o: main.c
 	$(CC) -c $< -o $@
 
 objs/menu.o: menu.c
+	$(CC) -c $< -o $@
+
+objs/frame.o: ../frame.c
 	$(CC) -c $< -o $@
 
 objs/text.o: ../../dna/text.c
@@ -58,7 +62,7 @@ objs/dstring.o: ../../dna/dstring.c
 objs/usb.o: ../../dna/usb.c
 	$(CC) -c $< -o $@
 
-objs/oled.o: ../../dna/oled.c
+objs/cfal12832.o: ../../dna/cfal12832.c
 	$(CC) -c $< -o $@
 
 objs/24c512.o: ../../dna/24c512.c

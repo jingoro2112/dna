@@ -47,4 +47,15 @@ void rprint( char* string, unsigned char targetDevice );
 #define rprint_oled( string ) rprint( string, RNADeviceOLED )
 #define rprint_usb( string ) rprint( string, RNADeviceDNA )
 
+void oled_clear();
+void oled_pixel( char x, char y, char color );
+#define oled_setPixel( x, y ) oled_pixel( x, y, 0xFF )
+#define oled_resetPixel( x, y ) oled_pixel( x, y, 0x0 )
+#define oled_print( buf ) rprint_oled( buf )
+void oled_text( char* buf, char x, char y, char font );
+
+
+#define OLED_SAFE_DELAY _delay_ms(30);
+
+
 #endif

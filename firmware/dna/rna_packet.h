@@ -17,9 +17,13 @@ enum RNAPacketTypes
 	RNATypeCodePage,
 	RNATypeEnterApp,
 	RNATypeEEPROMLoad,
-	RNATypeConsoleString,
 	RNATypeButtonStatus, // single byte bitvector of the buttons status, 0xFF means power off request
 	RNATypeReplay,
+
+	RNATypeOledClear,
+	RNATypeOledPixel,
+	RNATypeOledConsole,
+	RNATypeOledText,
 };
 
 //------------------------------------------------------------------------------

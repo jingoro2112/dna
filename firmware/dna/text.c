@@ -5,10 +5,10 @@
  * and in the LICENCE.txt file included with this distribution
  */
 
+#include "text.h"
+
 #include <dna.h>
 #include <24c512.h>
-
-#include "text.h"
 
 #include "../../oled/eeprom_image.h"
 
@@ -102,65 +102,6 @@ void stringAtResidentEx( char flash, char* string, char x, char y )
 	}
 }
 
-#ifdef RESIDENT_FONT_TABLES
-//------------------------------------------------------------------------------
-void stringAtEmbeddedEx( char flash, char* string, char x, char y, unsigned char font, unsigned char dither )
-{
-	char c;
-	while( (c = flash ? pgm_read_byte(string++) : *string++) )
-	{
-		// find the FontCharEntry descriptor offset for this character
-		unsigned int offset = (c - 32) * sizeof(struct FontCharEntry) * NUMBER_OF_FONTS;
-		offset += (sizeof(struct FontCharEntry) * (unsigned int)font);
-		offset += c_lookupTable;
-
-		// and load it in from EEPROM
-		struct FontCharEntry entry;
-
-		for( unsigned int t=0; t<sizeof(struct FontCharEntry); t++ )
-		{
-			((unsigned char*)&entry)[t] = pgm_read_byte( offset + t );
-		}
-
-		x += entry.pre; // pre-increment value
-
-		unsigned char pos = 0;
-		unsigned char byte;
-
-		for( unsigned char h=0; h<entry.h; h++ )
-		{
-			unsigned char bit = 0;
-			for( unsigned char w = 0; w<entry.w; w++ )
-			{
-				if ( bit == 0 )
-				{
-					byte = pgm_read_byte( c_dataBlock + entry.dataOffset + pos++ );
-				}
-
-				if ( 1<<bit & byte )
-				{
-					char x1 = x + w;
-					char y1 = y + h;
-					if ( !dither || (dither && (x1 & 0x1) ^ (y1 & 0x1)) )
-					{
-						setPixel( x1, y1 );
-					}
-				}
-
-				if ( ++bit == 8 )
-				{
-					bit = 0;
-				}
-			}
-
-		}
-
-		x += entry.post + entry.w; // next character position (all fonts are scaled)
-	}
-}
-
-#else
-
 //------------------------------------------------------------------------------
 void stringAtEx( char flash, char* string, char x, char y, unsigned char font, unsigned char dither )
 {
@@ -211,8 +152,6 @@ void stringAtEx( char flash, char* string, char x, char y, unsigned char font, u
 		x += entry.post + entry.w; // next character position (all fonts are scaled)
 	}
 }
-
-#endif
 
 //------------------------------------------------------------------------------
 char* EEPROMString( unsigned int index )

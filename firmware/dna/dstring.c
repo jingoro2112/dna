@@ -1,26 +1,65 @@
 /*------------------------------------------------------------------------------*
- * Copyright: (c) 2013 by Curt Hartung avr@northarc.com
- * This work is released under the Creating Commons 3.0 license
- * found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
- * and in the LICENCE.txt file included with this distribution
+ * 2013 by Curt Hartung avr@northarc.com
+ * share and enjoy
+
+ history:
+ * blargg: Fixed bug where %10d format is treated as %1d, since code was ignoring all zeroes in column width.
+ * blargg: Added dvsprintf() and dvsprintf_P(). Moved pspace arg to end to avoid machine code having to move
+           arguments around in registers.
+ * blargg: Made val unsigned short so it doesn't need to be masked when built on PC.
+ * blargg: Negation of an unsigned is defined in C as subtracting it from 0, which is the same as inverting all
+           bits and adding one as your code was doing. This eliminates the need to know the width of val, so
+           val=-val works on PC or AVR.
+ * blargg: Original code never used first char of buffer, so I shrunk it by one byte.
+ * blargg: Eliminated unnecessary initializations of base, ptr, and chars in resetState. These make it harder for
+           the compiler to do lifetime analysis.
+ * blargg: % is already in c for a literal % (saves an ldi).
+ * blargg: Have int printing use %s's string-length calculation, simplifying int code.
+ * blargg: Simplify left/right justify code to just compare columns with chars on each iter.
+ * blargg: Since we never truncate a string, we just print until the null character. No need to mess with chars or columns.
+ * blargg: Now chars specifies with of integer. Doesn't count terminator anymore.
+ * blargg: Int conversion code is consolidated into one loop that runs 'chars' times. It prints int right-to-left in buffer,
+           stopping once it's written the first char of the buffer. It keeps track of the right-most non-zero digit.
+           It converts to hex as it goes.
+
+ * blargg: Moved declarations of variables only used by string/int handling to smaller scope.
+ * blargg: Renamed bits to flags to more clearly reflect its purpose (bits sounds like it might be related to integer handling).
+ * blargg: Renamed buf to out, for clarity. Before there was buf and buffer.
+ * blargg: Moved string and int handling to end, to minimize distance since int gotos into string print.
+ * blargg: Converted while + iter stmt loops to for loops.
+ *
+ * curt: shaved another 12 bytes off by removing va-arg() call from integer case
+
  */
 
 #include "stdarg.h"
 
-#ifdef AVR
+#ifdef __AVR__
 #include "avr/pgmspace.h"
 #else
 #define pgm_read_byte(p) *p
 #endif
 
-void dsprintfEx( char pspace, char *buf, const char *fmt, va_list list );
+void dsprintfEx( char *buf, const char *fmt, va_list list, char pspace );
+
+//------------------------------------------------------------------------------
+void dvsprintf( char* buf, const char* fmt, va_list args )
+{
+	dsprintfEx( buf, fmt, args, 0 );
+}
+
+//------------------------------------------------------------------------------
+void dvsprintf_P( char* buf, const char* fmt, va_list args )
+{
+	dsprintfEx( buf, fmt, args, 1 );
+}
 
 //------------------------------------------------------------------------------
 void dsprintf( char* buf, const char* fmt, ... )
 {
 	va_list list;
 	va_start( list, fmt );
-	dsprintfEx( 0, buf, fmt, list );
+	dsprintfEx( buf, fmt, list, 0 );
 	va_end( list );
 }
 
@@ -29,7 +68,7 @@ void dsprintf_P( char* buf, const char* fmt, ... )
 {
 	va_list list;
 	va_start( list, fmt );
-	dsprintfEx( 1, buf, fmt, list );
+	dsprintfEx( buf, fmt, list, 1 );
 	va_end( list );
 }
 
@@ -61,228 +100,212 @@ Spec      Example             Expected Output
 %-Nb      ("[%-7b]", 0x25)     [100101 ]
 %-0Nb     ("[%-07b]", 0x25)    [100101 ]
 
-%p
+%p        ("[%p]", 0x23AB)     [23AB]
 
-%%
+%%        ("[%%]")             [%]
 
-%c
+%c        ("[%c]", 'j')        [j]
 
-%s
-%Ns
-%-Ns
+%s        ("[%s]", "string")   [string]
+%Ns       ("[%9s]", "string")  [   string]
+%-Ns      ("[%-9s]", "string") [string   ]
 
-%S
-%NS
-%-NS
+%S        ("[%S]", PSTR("string")) [string]
+%NS       see %Ns
+%-NS      see %-Ns
 
 */
 
 //------------------------------------------------------------------------------
 enum
 {
-	zeroPad = 1<<0,
+	zeroPad         = 1<<0,
 	negativeJustify = 1<<1,
-	secondPass = 1<<2,
-	negativeSign = 1<<3,
+	secondPass      = 1<<2,
+	negativeSign    = 1<<3,
+	parsingSigned   = 1<<4,
 };
 
 //------------------------------------------------------------------------------
-void dsprintfEx( char pspace, char *buf, const char *fmt, va_list list )
+void dsprintfEx( char *out, const char *fmt, va_list list, char pspace )
 {
-	unsigned char base;
-	char bits;
-	unsigned char padChar;
-	char *ptr;
-	unsigned char columns;
-	unsigned char chars;
-
-	unsigned int val;
-	char buffer[18]; // for formatted ints
-
-resetState:
-	base = 16;
-	bits = 0;
-	ptr = buffer;
-	padChar = ' ';
-	columns = 0;
-	chars = 0;
-
+resetState:;
+	
+	char flags  = 0;
+	char padChar = ' ';
+	unsigned char columns = 0;
+	
 	for(;;)
 	{
 		char c = pspace ? pgm_read_byte( fmt ) : *fmt;
-
 		fmt++;
-		
+
 		if ( !c )
 		{
-			*buf = 0;
+			*out = 0;
 			break;
 		}
 
-		if ( !(secondPass & bits) )
+		if ( !(secondPass & flags) )
 		{
-			if ( c != '%' )
+			if ( c != '%' ) // literal
 			{
-				*buf++ = c; // unformatted text stream, just copy it in
+				*out++ = c;
 			}
-			else
+			else // possibly % format specifier
 			{
-				bits |= secondPass; // from initial to acquire
+				flags |= secondPass;
 			}
 		}
-		else
+		else if ( c >= '0' && c <= '9' ) // width
 		{
-			if( c >= '1' && c <= '9' ) // if it is a number, parse it in
+			columns *= 10;
+			columns += c - '0';
+			if ( !columns ) // leading zero
 			{
-				columns *= 10;
-				columns += c - '0';
-			}
-			else if ( c == '%' )
-			{
-				*buf++ = '%'; // literal %
-				goto resetState;
-			}
-			else if ( c == '-' )
-			{
-				bits |= negativeJustify;
-			}
-			else if ( c == '0' )
-			{
-				bits |= zeroPad;
+				flags |= zeroPad;
 				padChar = '0';
 			}
-			else if ( c == 's' || c == 'S' )
+		}
+		else if ( c == '%' ) // literal %
+		{
+			*out++ = c;
+			goto resetState;
+		}
+		else if ( c == '-' ) // left-justify
+		{
+			flags |= negativeJustify;
+		}
+		else if ( c == 'c' ) // character
+		{
+			*out++ = va_arg( list, unsigned int );
+			goto resetState;
+		}
+		else // string or integer
+		{
+			char buf [16+1]; // buffer for integer
+			const char *ptr; // pointer to first char of integer
+		
+			if ( c == 's' || c == 'S' ) // string
 			{
 				ptr = va_arg( list, char* );
 
-				// get the string length so it can be formatted, don't
-				// copy it, just count it
-				while ( ((c == 'S') ? pgm_read_byte(ptr) : *ptr) )
-				{
-					ptr++;
-					chars++;
-				}
-				ptr -= chars;
-
 				padChar = ' '; // in case some joker uses a 0 in their column spec
-copyToString:
 				
-				if ( columns < chars )
+copyToString:;
+				
+				// get the string length so it can be formatted, don't
+				// copy it yet, just count it so it can be properly justified
+				unsigned char len = 0;
+				for ( ; ((c == 'S') ? pgm_read_byte(ptr) : *ptr); ptr++ )
 				{
-					columns = chars;
+					len++;
 				}
-
-				if ( !(bits & negativeJustify) )
+				ptr -= len;
+				
+				// Right-justify
+				if ( !(flags & negativeJustify) )
 				{
-					while( columns > chars )
+					for ( ; columns > len; columns-- )
 					{
-						*buf++ = padChar;
-						columns--;
+						*out++ = padChar;
 					}
 				}
 				
-				if ( bits & negativeSign )
+				if ( flags & negativeSign )
 				{
-					*buf++ = '-';
+					*out++ = '-';
 				}
-
-				// now actually copy it in
-				while( chars )
-				{
-					// copyToString is used by ints as well, but none
-					// of them use 'S' so this is okay to do here
-					*buf++ = (c == 'S') ? pgm_read_byte(ptr) : *ptr;
-					ptr++;
-					chars--;
-					columns--;
-				}
-
-				while( columns-- )
-				{
-					*buf++ = ' ';
-				}
-
-				goto resetState;
-			}
-			else if ( c == 'x' || c == 'X' || c == 'p' ) // hexadecimal or pointer (pointer is treated as 'X'
-			{
-				chars = 5; // expect up to 4 character + terminator
-
-convertBasePre:
-				val = va_arg( list, unsigned int ); // this call is kind of expensive, make it as little as possible
-convertBase:
-
-				ptr[chars--] = 0;
-				for ( ; chars; chars-- ) // cheaper by 6 bytes to check for null and inc the pointer then check for < 0xFF wierd huh?
-				{
-					ptr[chars] = '0' + val % base;
-					val /= base;
-				}
-				ptr++;
 				
-				// make a passw where we figure out how long the string
-				// is, while at the same time convert any non-numeric
-				// characters into their alphabetical equivilant (only
-				// applies to hex, falls through on all other formats)
-				for( ; ptr[chars]; chars++ )
+				// Copy string (%S uses pgm read, all others use normal read)
+				char d;
+				while ( (d = (c == 'S') ? pgm_read_byte(ptr++) : *ptr++) )
 				{
-					if ( ptr[chars] > '9' )
-					{
-						ptr[chars] += (c == 'x') ? 39 : 7;
-					}
+					*out++ = d;
+				}
+				
+				// Left-justify
+				for ( ; columns > len; columns-- )
+				{
+					*out++ = ' ';
 				}
 
-				// format the number for display taking into account
-				// zero-padding, justification and column availability
-				if ( !(bits & zeroPad) || columns < chars || (bits & negativeJustify) )
-				{
-					while( *ptr == '0' && (chars > 1) )
-					{
-						ptr++;
-						chars--;
-					}
-				}
-
-				goto copyToString;
-			}
-			else if ( c == 'u' || c == 'd' || c == 'i' )
-			{
-				val = va_arg( list, unsigned int );
-
-				if ( (c != 'u') && (val & 0x8000) )
-				{
-					bits |= negativeSign;
-					#ifdef AVR
-					val = (val ^ 0xFFFF) + 1;
-					#else
-					val = (val ^ 0xFFFFFFFF) + 1;
-					#endif
-				}
-
-				#ifndef AVR
-				val &= 0xFFFF;
-				#endif
-
-				chars = 6;
-				base = 10;
-				goto convertBase;
-			}
-			else if ( c == 'b' ) // binary! nice to have
-			{
-				chars = 17;
-				base = 2;
-				goto convertBasePre;
-			}
-			else if ( c == 'c' )
-			{
-				*buf++ = va_arg( list, unsigned int );
 				goto resetState;
 			}
 			else
 			{
-				goto resetState;
+				unsigned char base;
+				unsigned char width;
+				unsigned short val;
+
+				if ( c == 'd' || c == 'i' ) // signed decimal
+				{
+					flags |= parsingSigned; // if it is negative, yes we care
+					goto parseDecimal;
+				}
+				else if ( c == 'u' ) // decimal
+				{
+parseDecimal:
+					base  = 10;
+					width = 5;
+					goto convertBase;
+				}
+				else if ( c == 'b' ) // binary! nice to have
+				{
+					base  = 2;
+					width = 16;
+					goto convertBase;
+				}
+				else if ( c == 'x' || c == 'X' || c == 'p' ) // hexadecimal or pointer (pointer is treated as 'X')
+				{
+					base = 16;
+					width = 4;
+convertBase:
+					val = va_arg( list, unsigned int );
+
+					if ( (flags & parsingSigned) && (val & 0x8000) ) // this might be negative, and we care, deal with it here
+					{
+						flags |= negativeSign;
+						val = -val;
+					}
+			
+					// Convert to given base, filling buffer backwards from least to most significant
+					char* p = buf + width;
+					*p = 0;
+					ptr = p; // keep track of one past left-most non-zero digit
+					do
+					{
+						char d = val % base;
+						val /= base;
+				
+						if ( d )
+						{
+							ptr = p;
+						}
+				
+						d += '0';
+						if ( d > '9' ) // handle bases higher than 10
+						{
+							d += 'A' - ('9'+1);
+							if ( c == 'x' ) // lowercase
+							{
+								d += 'a' - 'A';
+							}
+						}
+					
+						*--p = d;
+
+					} while ( p != buf );
+					
+					ptr--; // was one past char we want
+			
+					goto copyToString;
+				}
+				else // invalid format specifier
+				{
+					goto resetState;
+				}
 			}
 		}
 	}
 }
-

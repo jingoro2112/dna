@@ -68,14 +68,11 @@ int usage()
 	return 0;
 }
 
-void test_dstring();
+void dtest();
 
 //------------------------------------------------------------------------------
 int main( int argc, char *argv[] )
 {
-	//test_dstring();
-	//return 0;
-	
 	MainArgs args( argc, argv );
 
 	if ( (argc == 1) || args.isSet("-?") || args.isSet("-help") || args.isSet("--help") || args.isSet("--version") )
@@ -267,7 +264,7 @@ int main( int argc, char *argv[] )
 
 		PacketEEPROMLoad load;
 		load.offset = position;
-		while( position < bin.size() )
+		while( load.offset < bin.size() )
 		{
 			memset( load.data, 0xFF, sizeof(load.data) );
 			for( unsigned int i=0; position < bin.size() && i<sizeof(load.data); i++ )
@@ -275,13 +272,17 @@ int main( int argc, char *argv[] )
 				load.data[i] = bin[position++];
 			}
 
-			printf( "0x%04X:\n", position );
+			printf( "0x%04X:\n", load.offset );
 			Arch::asciiDump( load.data, sizeof(load.data) );
 			
-			Splice::proxyRNA( device, ceCommandRNASend, RNADeviceOLED, RNATypeEEPROMLoad, &load, sizeof(PacketEEPROMLoad) );
+			if ( !Splice::proxyRNA(device, ceCommandRNASend, RNADeviceOLED, RNATypeEEPROMLoad, &load, sizeof(PacketEEPROMLoad) ) )
+			{
+				printf( "Error loading [0x%04X]\n", position );
+				return -1;
+			}
 			load.offset += sizeof(load.data);
-			
-			Arch::sleep( 100 ); // give hardware a break to finish the write cycle
+
+			Arch::sleep( 75 ); // give hardware a break to finish the write cycle
 		}
 
 		return 0;

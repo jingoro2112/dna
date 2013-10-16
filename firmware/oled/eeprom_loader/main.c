@@ -6,16 +6,14 @@
  */
 
 #include <dna.h>
-#include <oled.h>
+#include <cfal12832.h>
 #include <i2c_brute.h>
 #include <24c512.h>
 #include <rna.h>
 #include <rna_packet.h>
 #include <sram.h>
-#include <galloc.h>
 #include <dstring.h>
-
-#include <stdio.h>
+#include <text.h>
 
 #include <util/delay.h>
 #include <avr/io.h>
@@ -25,16 +23,13 @@
 #include <avr/eeprom.h>
 
 #include "../../../oled/eeprom_image.h"
-#include "text.h"
-
-#define true 1
-#define false 0
+#include "../frame.h"
 
 volatile unsigned char rnaCommand;
 volatile unsigned char rnaFrom;
 volatile unsigned char rnaDataExpected;
 volatile unsigned char rnaDataReceived;
-unsigned char rnaPacket[132];
+unsigned char rnaPacket[sizeof(struct PacketEEPROMLoad) + 1];
 
 //------------------------------------------------------------------------------
 unsigned char rnaInputSetup( unsigned char *data, unsigned char dataLen, unsigned char from, unsigned char packetLen )
@@ -103,71 +98,6 @@ bootloader_jump:
 }
 
 //------------------------------------------------------------------------------
-void blit()
-{
-	i2cStartWrite( OLED_ADDRESS );
-
-	i2cWrite( 0x80 );
-	i2cWrite( 0x00 );
-	
-	i2cWrite( 0x80 );
-	i2cWrite( 0x10 );
-	
-	i2cWrite( 0x80 );
-	i2cWrite( 0xB0 );
-
-	sramStartRead( 0 ); // 0th location is the frame buffer
-
-	for( unsigned char i=0; i<0x80; i++ )
-	{
-		i2cWrite( 0xC0 );
-		i2cWrite( sramReadByte() );
-		i2cWrite( 0xC0 );
-		i2cWrite( sramReadByte() );
-		i2cWrite( 0xC0 );
-		i2cWrite( sramReadByte() );
-		i2cWrite( 0xC0 );
-		i2cWrite( sramReadByte() );
-	}
-
-	sramStop();
-	i2cWait();
-	i2cStop();
-}
-
-//------------------------------------------------------------------------------
-static uint16 computeAddress( unsigned char x, unsigned char y )
-{
-	return ((y & 0xF8) << 4) + x;
-}
-
-//------------------------------------------------------------------------------
-void setPixel( char x, char y )
-{
-	if ( (unsigned char)x < 128 && (unsigned char)y < 32 )
-	{
-		uint16 address = computeAddress( x, y );
-		sramAtomicWrite( address, sramAtomicRead(address) | (1 << (y & 0x07)) );
-	}
-}
-
-//------------------------------------------------------------------------------
-void clearFrameBuffer()
-{
-	sramStartWrite( 0 );
-	
-	for( unsigned char i=0; i<0x80; i++ )
-	{
-		sramWriteByte( 0 );
-		sramWriteByte( 0 );
-		sramWriteByte( 0 );
-		sramWriteByte( 0 );
-	}
-
-	sramStop();
-}
-
-//------------------------------------------------------------------------------
 int __attribute__((OS_main)) main()
 {
 	rnaInit();
@@ -212,6 +142,8 @@ int __attribute__((OS_main)) main()
 
 	blit();
 
+	unsigned int errors = 0;
+
 	for(;;)
 	{
 		if ( rnaDataReceived >= rnaDataExpected )
@@ -222,25 +154,25 @@ int __attribute__((OS_main)) main()
 			{
 				struct PacketEEPROMLoad *load = (struct PacketEEPROMLoad *)rnaPacket;
 
-				startWrite24c512( 0xA0, load->offset );
-				for ( unsigned char i=0; i<128; i++ )
-				{
-					i2cWrite( load->data[i] );
-				}
-				i2cStop();
-
+				write24c512( 0xA0, load->offset, load->data, sizeof(load->data) );
 				clearFrameBuffer();
-				char buf[32];
-				dsprintf_P( buf, PSTR("offset[0x%04X]"), load->offset );
+				
+				char buf[128];
+				dsprintf( buf, "heard block 0x%04X", load->offset );
 				stringAtResident( buf, 0, 0 );
-				dsprintf_P( buf, PSTR("[0x%02X] -> [0x%02X]"), load->data[0], load->data[127] );
+
+				read24c512( 0xA0, load->offset, (unsigned char *)buf, sizeof(load->data) );
+				for( unsigned char i=0; i<sizeof(load->data); i++ )
+				{
+					if ( buf[i] != load->data[i] )
+					{
+						errors++;
+					}
+				}
+
+				dsprintf( buf, "%d errors", errors );
 				stringAtResident( buf, 0, 8 );
-
-				read24c512( 0xA0, load->offset, load->data, 1 );
-				read24c512( 0xA0, load->offset + 127, load->data + 1, 1 );
-				dsprintf_P( buf, PSTR("read[0x%02X] -> [0x%02X]"),  load->data[0], load->data[1] );
-				stringAtResident( buf, 0, 16 );
-
+				
 				blit();
 			}
 		}

@@ -9,13 +9,14 @@ OBJS = \
 	objs/rna.o \
 	objs/main.o \
 	objs/i2c_brute.o \
-	objs/oled.o \
+	objs/cfal12832.o \
 	objs/24c512.o \
 	objs/sram.o \
 	objs/galloc.o \
 	objs/dstring.o \
 	objs/menu.o \
 	objs/text.o \
+	objs/frame.o \
 
 MCU = attiny84
 CPU_FREQUENCY = 8000000
@@ -32,7 +33,6 @@ clean:
 	@-rm -f $(OBJS) $(TARGET).hex $(TARGET).elf $(TARGET).disassembly
 	
 $(TARGET).hex: $(OBJS)
-#	$(CC) -o $(TARGET).elf -Wl,-gc-sections,-u,vfprintf -lprintf_min $(OBJS) 
 	$(CC) -o $(TARGET).elf -Wl,-gc-sections $(OBJS) 
 	avr-objcopy -j .text -j .data -O ihex $(TARGET).elf $(TARGET).hex
 	avr-objdump -d $(TARGET).elf > $(TARGET).disassembly
@@ -58,7 +58,7 @@ objs/dstring.o: ../dna/dstring.c
 objs/usb.o: ../dna/usb.c
 	$(CC) -c $< -o $@
 
-objs/oled.o: ../dna/oled.c
+objs/cfal12832.o: ../dna/cfal12832.c
 	$(CC) -c $< -o $@
 
 objs/24c512.o: ../dna/24c512.c
@@ -71,4 +71,7 @@ objs/rna.o: ../dna/rna.c
 	$(CC) -c $< -o $@
 
 objs/galloc.o: ../dna/galloc.c
+	$(CC) -c $< -o $@
+
+objs/frame.o: frame.c
 	$(CC) -c $< -o $@

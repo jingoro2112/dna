@@ -1,4 +1,4 @@
-/* Copyright: (c) 2013 by Curt Hartung
+/* CopyRenderSettingsight: (c) 2013 by Curt Hartung
  * This work is released under the Creating Commons 3.0 license
  * found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
  * and in the LICENCE.txt file included with this distribution
@@ -239,7 +239,7 @@ void rprint( char* string, unsigned char targetDevice )
 {
 	char buf[64];
 	unsigned char pos = 0;
-	buf[pos++] = RNATypeConsoleString;
+	buf[pos++] = RNATypeOledConsole;
 	unsigned char len;
 	for( len=0; string[len]; len++ )
 	{
@@ -248,6 +248,8 @@ void rprint( char* string, unsigned char targetDevice )
 	buf[pos++] = 0;
 
 	rnaSend( targetDevice, (unsigned char *)buf, pos );
+
+	OLED_SAFE_DELAY;
 }
 
 //------------------------------------------------------------------------------
@@ -341,7 +343,7 @@ ISR( RNA_ISR )
 						consumed = rnaInputSetup( data, index, header, len );
 					}
 
-					if ( consumed < index )
+					if ( consumed <= index )
 					{
 						rnaInputStream( data + consumed, index - consumed );
 					}
@@ -377,3 +379,48 @@ ISR( RNA_ISR )
 	rnaClearINT();
 #endif
 }
+
+
+//------------------------------------------------------------------------------
+void oled_clear()
+{
+	unsigned char command = RNATypeOledClear;
+	rnaSend( RNADeviceOLED, &command, 1 );
+
+	OLED_SAFE_DELAY;
+}
+
+//------------------------------------------------------------------------------
+void oled_pixel( char x, char y, char color )
+{
+	unsigned char packet[4];
+	packet[0] = RNATypeOledPixel;
+	packet[1] = color;
+	packet[2] = x;
+	packet[3] = y;
+	rnaSend( RNADeviceOLED, packet, 4 );
+
+	OLED_SAFE_DELAY;
+}
+
+//------------------------------------------------------------------------------
+void oled_text( char* buf, char x, char y, char font )
+{
+	unsigned char packet[36];
+	unsigned char *ptr = packet;
+	*ptr++ = RNATypeOledText;
+	*ptr++ = x;
+	*ptr++ = y;
+	*ptr++ = font;
+	unsigned char i = 0;
+	for( ; i<31 && buf[i]; i++ )
+	{
+		*ptr++ = buf[i];
+	}
+	*ptr++ = 0;
+	rnaSend( RNADeviceOLED, packet, ptr - packet );
+
+	OLED_SAFE_DELAY;
+}
+
+
