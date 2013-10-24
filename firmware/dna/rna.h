@@ -53,9 +53,10 @@ void oled_pixel( char x, char y, char color );
 #define oled_resetPixel( x, y ) oled_pixel( x, y, 0x0 )
 #define oled_print( buf ) rprint_oled( buf )
 void oled_text( char* buf, char x, char y, char font );
+void oled_line( char x0, char y0, char x1, char y1 );
 
 
-#define OLED_SAFE_DELAY _delay_ms(30);
+#define OLED_SAFE_DELAY _delay_ms(5);
 
 
 #endif

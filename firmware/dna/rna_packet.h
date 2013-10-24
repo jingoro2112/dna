@@ -24,6 +24,12 @@ enum RNAPacketTypes
 	RNATypeOledPixel,
 	RNATypeOledConsole,
 	RNATypeOledText,
+	RNATypeOledLine,
+
+	RNATypeGetConfigData,
+	RNATypeSetConfigData,
+
+	RNATypeRequestButtonStatus,
 };
 
 //------------------------------------------------------------------------------

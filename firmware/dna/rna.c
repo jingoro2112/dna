@@ -35,6 +35,8 @@ static unsigned char s_sendUnitTail;
 //------------------------------------------------------------------------------
 unsigned char rnaShiftOutByte( unsigned char data )
 {
+	cli();
+	
 	// coming into this the bus is expected to be held LOW, in
 	// preparation for the first clock pulse, which is always a rising
 	// edge
@@ -76,6 +78,8 @@ unsigned char rnaShiftOutByte( unsigned char data )
 		return 1;
 	}
 
+	sei();
+	
 	return 0;
 }
 
@@ -235,24 +239,6 @@ unsigned char rnaSendEx( unsigned char address, unsigned char fromAddress, unsig
 }
 
 //------------------------------------------------------------------------------
-void rprint( char* string, unsigned char targetDevice )
-{
-	char buf[64];
-	unsigned char pos = 0;
-	buf[pos++] = RNATypeOledConsole;
-	unsigned char len;
-	for( len=0; string[len]; len++ )
-	{
-		buf[pos++] = string[len];
-	}
-	buf[pos++] = 0;
-
-	rnaSend( targetDevice, (unsigned char *)buf, pos );
-
-	OLED_SAFE_DELAY;
-}
-
-//------------------------------------------------------------------------------
 #ifdef RNA_POLL_DRIVEN
 void rnaPoll()
 #else
@@ -380,6 +366,22 @@ ISR( RNA_ISR )
 #endif
 }
 
+//------------------------------------------------------------------------------
+void rprint( char* string, unsigned char targetDevice )
+{
+	char buf[64];
+	char *ptr = buf;
+	*ptr++ = RNATypeOledConsole;
+	for( unsigned char len=0; string[len] && len<62; len++ )
+	{
+		*ptr++ = string[len];
+	}
+	*ptr++ = 0;
+
+	rnaSend( targetDevice, (unsigned char *)buf, ptr - buf );
+
+	OLED_SAFE_DELAY;
+}
 
 //------------------------------------------------------------------------------
 void oled_clear()
@@ -423,4 +425,19 @@ void oled_text( char* buf, char x, char y, char font )
 	OLED_SAFE_DELAY;
 }
 
+//------------------------------------------------------------------------------
+void oled_line( char x0, char y0, char x1, char y1 )
+{
+	unsigned char packet[5];
+	unsigned char *ptr = packet;
+	*ptr++ = RNATypeOledLine;
+	*ptr++ = x0;
+	*ptr++ = y0;
+	*ptr++ = x1;
+	*ptr++ = y1;
+
+	rnaSend( RNADeviceOLED, packet, 5 );
+
+	OLED_SAFE_DELAY;
+}
 

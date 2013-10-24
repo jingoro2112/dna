@@ -1,0 +1,6 @@
+0 "norm" "invert"
+1 "off" "on"
+2 "semi" "semi" "response" "burst" "auto" "ramp" "cocker" "sniper"
+3 "no" "yes"
+4 "normal" "strong"
+5 "double" "single"

@@ -40,11 +40,16 @@
 #define SRAM_READ_COMMAND  0x03
 #define SRAM_READ_STATUS   0x05
 
+#define SRAM_SIZE 0x2000 // 8k (x8)
+
 void sramStartRead( unsigned int address );
 unsigned char sramReadByte();
 void sramStartWrite( unsigned int address );
 void sramWriteByte( unsigned char byte );
 #define sramStop() sramSetCSHigh();
+
+void sramRead( unsigned int address, unsigned char* bytes, unsigned char len );
+void sramWrite( unsigned int address, unsigned char* bytes, unsigned char len );
 
 unsigned char sramAtomicRead( unsigned int address );
 void sramAtomicWrite( unsigned int address, unsigned char data );

@@ -1,0 +1,30 @@
+"Config"
+"Exit" EntrySub 0 0 0 0 -1
+"Fire Modes" Entry8 fireMode 1 1 7 2
+"Eye Control" EntrySub 0 0 0 0 -1
+"Timing" EntrySub 0 0 0 0 -1
+"Settings" EntrySub 0 0 0 0 -1
+
+
+"Eye Control"
+"Back" EntrySub Config 0 0 0 -1
+"Enable" Entry8 eyeEnabled 1 0 1 1
+"Invert" Entry8 eyeHighBlocked 1 0 1 3
+"Holdoff" Entry8 eyeHoldoff 1 0 20 -1
+"Detect Lvl" Entry8 eyeDetectLevel 1 0 255 -1
+"Detect Holdoff" Entry8 eyeDetectHoldoff 1 0 20 -1
+"Drive" Entry8 eyeStrong 1 0 1 4
+
+
+"Timing"
+"Back" EntrySub Config 0 0 0 -1
+"Mode" Entry8 singleSolenoid 1 0 1 5
+
+
+"Settings"
+"Back" EntrySub Config 0 0 0 -1
+"Invert OLED" Entry8 invertDisplay 0 0 1 3
+"Brightness" Entry8 brightness 0 1 8 -1
+"Buttons" Entry8 invertButtons 0 0 1 0
+"Repeat Delay" Entry8 repeatDelay 0 1 10 -1
+

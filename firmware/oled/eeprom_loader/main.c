@@ -15,6 +15,8 @@
 #include <dstring.h>
 #include <text.h>
 
+//#include <stdio.h>
+
 #include <util/delay.h>
 #include <avr/io.h>
 #include <avr/wdt.h>
@@ -22,8 +24,15 @@
 #include <avr/pgmspace.h>
 #include <avr/eeprom.h>
 
-#include "../../../oled/eeprom_image.h"
+#include "../oled/eeprom_image.h"
 #include "../frame.h"
+
+// 1264 add for std
+// 786 for dstring
+// 662 for min dstring
+
+// 866 for min
+
 
 volatile unsigned char rnaCommand;
 volatile unsigned char rnaFrom;

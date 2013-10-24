@@ -14,11 +14,11 @@
 #include "../dna/dna_types.h"
 #pragma pack(push, 1)
 
-#elif !defined(AVR)
+#elif !defined(__AVR__)
 #include <arpa/inet.h>
 #endif
 
-#ifndef AVR
+#ifndef __AVR__
 #include "../../util/str.hpp"
 #include <stddef.h>
 #endif
@@ -74,7 +74,7 @@ enum USBCommands
 	ceCommandGetUtilityString,
 };
 
-#ifdef __AVR_ARCH__
+#ifdef __AVR__
 #define CONSTS consts.
 #else
 #define CONSTS
@@ -158,7 +158,7 @@ struct EEPROMConstants
 	uint8 eyeLevel;
 	uint8 version;
 
-#ifndef AVR
+#ifndef __AVR__
 
 	void installDefaults()
 	{

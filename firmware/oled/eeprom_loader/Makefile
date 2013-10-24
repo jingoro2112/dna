@@ -12,10 +12,10 @@ OBJS = \
 	objs/cfal12832.o \
 	objs/24c512.o \
 	objs/sram.o \
-	objs/dstring.o \
 	objs/text.o \
 	objs/frame.o \
-
+	objs/dstring.o \
+	
 MCU = attiny84
 CPU_FREQUENCY = 8000000
 
@@ -32,6 +32,7 @@ clean:
 	
 $(TARGET).hex: $(OBJS)
 	$(CC) -o $(TARGET).elf -Wl,-gc-sections $(OBJS) 
+#	$(CC) -o $(TARGET).elf -Wl,-gc-sections,-u,vfprintf -lprintf_min $(OBJS) 
 	avr-objcopy -j .text -j .data -O ihex $(TARGET).elf $(TARGET).hex
 	avr-objdump -d $(TARGET).elf > $(TARGET).disassembly
 
@@ -40,6 +41,9 @@ splice: $(TARGET).hex
 
 load:
 	..\..\..\splice\win32\splice -e ..\..\..\oled\eeprom_image.bin
+
+small:
+	..\..\..\splice\win32\splice -e ..\..\..\oled\eeprom_image.bin --offset 29600
 
 objs/main.o: main.c
 	$(CC) -c $< -o $@

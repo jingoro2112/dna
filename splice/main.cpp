@@ -47,10 +47,10 @@ int usage()
 			"-m, --monitor\n"
 			"    Monitor target for debug messages\n\n"
 
-			"-o, --oled <image>\n"
+			"-o, -2, --oled <image>\n"
 			"    send OLED boot image through morlock board\n\n"
 
-			"-b, --button <image>\n"
+			"-b, -3, --button <image>\n"
 			"    send Button board boot image through morlock board\n\n"
 
 			"-r, --report\n"
@@ -293,8 +293,15 @@ int main( int argc, char *argv[] )
 	ReadHex::Chunk *chunk = 0;
 	unsigned int percent;
 
-	if ( args.isStringSet("-o", image) || args.isStringSet("--oled", image) )
+	if ( args.isStringSet("-4", image) || args.isStringSet("-2", image) || args.isStringSet("-o", image) || args.isStringSet("--oled", image) )
 	{
+		int rna = 2;
+		if ( args.isStringSet("-4", image) )
+		{
+			rna = 4;
+			printf( "%d\n", rna );
+		}
+		
 		if ( !infile.fileToBuffer(image) )
 		{
 			printf( "Could not read [%s]\n", image );
@@ -314,9 +321,9 @@ int main( int argc, char *argv[] )
 		}
 		chunk = chunklist.getFirst();
 
-		Splice::proxyRNA( device, ceCommandRNASend, RNADeviceOLED, RNATypeEnterBootloader );
+		Splice::proxyRNA( device, ceCommandRNASend, rna, RNATypeEnterBootloader );
 		Arch::sleep( 100 );
-		Splice::proxyRNA( device, ceCommandRNASend, RNADeviceOLED, RNATypeEnterBootloader );
+		Splice::proxyRNA( device, ceCommandRNASend, rna, RNATypeEnterBootloader );
 		Arch::sleep( 100 );
 
 		unsigned short address = 64;
@@ -343,7 +350,7 @@ int main( int argc, char *argv[] )
 
 				address += 2;
 			}
-			Splice::proxyRNA( device, ceCommandRNASend, RNADeviceOLED, RNATypeCodePage, &code, sizeof(PacketCodePage) );
+			Splice::proxyRNA( device, ceCommandRNASend, rna, RNATypeCodePage, &code, sizeof(PacketCodePage) );
 			
 			Arch::sleep( 75 );
 
@@ -352,7 +359,7 @@ int main( int argc, char *argv[] )
 				Log( "[%d/%d]", chunk->size / 64, chunk->size / 64 );
 				Splice::proxyRNA( device,
 								  ceCommandRNASend,
-								  RNADeviceOLED,
+								  rna,
 								  RNATypeEnterApp,
 								  &enter, sizeof(PacketEnterApp) );
 				break;
@@ -369,7 +376,7 @@ int main( int argc, char *argv[] )
 		DNAUSB::closeDevice( device );
 	}
 
-	if ( args.isStringSet("-b", image) || args.isStringSet("--button", image) )
+	if ( args.isStringSet("-3", image) || args.isStringSet("-b", image) || args.isStringSet("--button", image) )
 	{
 		if ( !infile.fileToBuffer(image) )
 		{

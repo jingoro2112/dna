@@ -110,6 +110,7 @@ uint8 usbRNATo;
 uint8 usbRNAPacket[132];
 uint8 usbRNAPacketPos;
 uint8 usbRNAPacketExpected;
+uint8 rnaRequestsConfigData;
 
 uint8 eepromLoadPointer;
 volatile struct EEPROMConstants consts;
@@ -241,6 +242,25 @@ unsigned char dnaUsbInputSetup( unsigned char totalSize, unsigned char *data, un
 }
 
 //------------------------------------------------------------------------------
+uint8 eepromLoadDataHeard( unsigned char *data, unsigned char len )
+{
+	unsigned char i;
+	for( i=0; i<len; i++ )
+	{
+		((unsigned char *)&consts)[eepromLoadPointer++] = data[i];
+	}
+
+	if ( eepromLoadPointer >= sizeof(consts) )
+	{
+		eepromConstantsDirty = true;
+		eepromLoadPointer = 0;
+		return 1;
+	}
+
+	return 0;
+}
+
+//------------------------------------------------------------------------------
 void dnaUsbInputStream( unsigned char *data, unsigned char len )
 {
 	if ( usbCommand == ceCommandIdle ) // fast-fail
@@ -249,16 +269,8 @@ void dnaUsbInputStream( unsigned char *data, unsigned char len )
 	}
 	else if ( usbCommand == ceCommandSetEEPROMConstants )
 	{
-		unsigned char i;
-		for( i=0; i<len; i++ )
+		if ( eepromLoadDataHeard( data, len ) )
 		{
-			((unsigned char *)&consts)[eepromLoadPointer++] = data[i];
-		}
-
-		if ( eepromLoadPointer >= sizeof(consts) )
-		{
-			eepromConstantsDirty = true;
-			eepromLoadPointer = 0;
 			usbCommand = ceCommandIdle;
 		}
 	}
@@ -445,6 +457,13 @@ unsigned char rnaInputSetup( unsigned char *data, unsigned char dataLen, unsigne
 {
 	usbRNAPacketPos = 0;
 	usbRNAPacketExpected = packetLen;
+
+	if ( *data == RNATypeGetConfigData )
+	{
+		rnaRequestsConfigData = from;
+		return packetLen;
+	}
+
 	return 0;
 }
 
@@ -461,9 +480,10 @@ void rnaInputStream( unsigned char *data, unsigned char dataLen )
 		return;
 	}
 
-	if ( *usbRNAPacket == RNATypeConsoleString )
+	if ( *usbRNAPacket == RNATypeSetConfigData )
 	{
-//		dprint( (char *)usbRNAPacket + 1, usbRNAPacketExpected - 1  );
+		eepromLoadPointer = 0;
+		eepromLoadDataHeard( usbRNAPacket + 1, sizeof(consts) );
 	}
 }
 
@@ -531,6 +551,18 @@ int __attribute__((OS_main)) main(void)
 		while( !startFireCycle )
 		{
 			sampleEye = false;
+
+			if ( rnaRequestsConfigData )
+			{
+
+				usbRNAPacket[0] = RNATypeSetConfigData;
+				for( unsigned char c=0; c<sizeof(consts); c++ )
+				{
+					usbRNAPacket[c+1] = ((unsigned char *)&consts)[c];
+				}
+				rnaSend( rnaRequestsConfigData, usbRNAPacket, sizeof(consts) + 1 );
+				rnaRequestsConfigData = 0;
+			}
 
 			if ( !millisecondCountBox && consts.eyeEnabled )
 			{

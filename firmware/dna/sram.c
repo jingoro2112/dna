@@ -71,6 +71,28 @@ unsigned char sramReadByte()
 }
 
 //------------------------------------------------------------------------------
+void sramRead( unsigned int address, unsigned char* bytes, unsigned char len )
+{
+	sramStartRead( address );
+	while( len-- )
+	{
+		*bytes++ = sramReadByte();
+	}
+	sramStop();
+}
+
+//------------------------------------------------------------------------------
+void sramWrite( unsigned int address, unsigned char* bytes, unsigned char len )
+{
+	sramStartWrite( address );
+	while( len-- )
+	{
+		sramWriteByte( *bytes++ );
+	}
+	sramStop();
+}
+
+//------------------------------------------------------------------------------
 unsigned char sramAtomicRead( unsigned int address )
 {
 	sramStartRead( address );

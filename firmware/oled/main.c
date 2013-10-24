@@ -16,12 +16,14 @@
 #include <dstring.h>
 
 #include <util/delay.h>
+#include <avr/eeprom.h>
 #include <avr/io.h>
 #include <avr/wdt.h>
 #include <avr/interrupt.h>
 #include <avr/pgmspace.h>
 
-#include "../../oled/eeprom_image.h"
+#include "eeprom_image.h"
+#include "eeprom_types.h"
 #include "frame.h"
 #include "text.h"
 #include "menu.h"
@@ -44,6 +46,7 @@ struct Bits
 
 #define displayDirty		(bits[0].b0)
 #define displayBlit			(bits[0].b1)
+#define clearDisplay		(bits[0].b2)
 
 #define SRAM_CONSOLE_LINE_BUFFER_START 512
 #define SRAM_CONSOLE_LINE_BUFFER_WIDTH 30
@@ -61,11 +64,53 @@ unsigned char rnaPacket;
 unsigned char numberOfFonts;
 unsigned int dataBlockOrigin;
 
-#define RNA_PACKET_QUEUE_SIZE 64
+#define RNA_PACKET_QUEUE_SIZE 32
+#define RNA_PACKET_QUEUE_BYTE_SIZE 200
 unsigned char packetQueuePos;
 unsigned char packetQueue[RNA_PACKET_QUEUE_SIZE];
+unsigned int loadErrors;
 
 unsigned char frameMode;
+
+struct OledSettings settings;
+
+//------------------------------------------------------------------------------
+void loadEEPROMConstants()
+{
+	for( unsigned int i=0; i<sizeof(settings); i++ )
+	{
+		((uint8*)&settings)[i] = eeprom_read_byte( (uint8*)i );
+	}
+}
+
+//------------------------------------------------------------------------------
+void saveEEPROMConstants()
+{
+	for( unsigned int i=0; i<sizeof(settings); i++ )
+	{
+		eeprom_write_byte( (uint8*)i, *(((uint8*)&settings) + i) );
+		eeprom_busy_wait();
+	}
+	loadEEPROMConstants(); // be sure to do any translations that occur on load
+}
+
+//------------------------------------------------------------------------------
+void consolePrint( char *string )
+{
+	sramStartWrite( SRAM_CONSOLE_LINE_BUFFER_START + (currentConsoleLine * SRAM_CONSOLE_LINE_BUFFER_WIDTH) );
+
+	for( unsigned char c=0; string[c] && c<(SRAM_CONSOLE_LINE_BUFFER_WIDTH - 1); c++ )
+	{
+		sramWriteByte( string[c] );
+	}
+	sramWriteByte( 0 );
+	sramStop();
+
+	if ( ++currentConsoleLine >= SRAM_CONSOLE_LINE_BUFFER_LINES )
+	{
+		currentConsoleLine = 0;
+	}
+}
 
 //------------------------------------------------------------------------------
 unsigned char rnaInputSetup( unsigned char *data, unsigned char dataLen, unsigned char from, unsigned char packetLen )
@@ -102,12 +147,26 @@ void rnaInputStream( unsigned char *data, unsigned char bytes )
 	if ( rnaDataReceived >= rnaDataExpected )
 	{
 		rnaDataReceived = 0;
-		if ( packetQueuePos < RNA_PACKET_QUEUE_SIZE )
+		if ( rnaCommand == RNATypeOledClear )
+		{
+			clearDisplay = true;
+			goto freePacket;
+		}
+		else if ( rnaCommand == RNATypeSetConfigData )
+		{
+			// set aside 128 bytes to write the custom config data
+			// for this device
+			sramWrite( SRAM_SIZE - (rnaFrom * 128), ptr, 128 );
+			goto freePacket;
+		}
+		else if ( (packetQueuePos < RNA_PACKET_QUEUE_SIZE)
+				  && ((gramUsage() + rnaDataExpected) < RNA_PACKET_QUEUE_BYTE_SIZE) )
 		{
 			packetQueue[packetQueuePos++] = rnaPacket;
 		}
 		else
 		{
+freePacket:
 			gfree( rnaPacket );
 		}
 
@@ -143,8 +202,9 @@ void __attribute__((OS_main)) __init()
 
 	_delay_us(50); // give state a chance to settle
 
-	for( unsigned int i=0xFFFF; i; i-- )
+	for( unsigned int i=5000; i; i-- )
 	{
+		_delay_ms(1);
 		// pin must be HELD low, make sure spurious RNA requests do not reset us!
 		if ( PINB & 0b00000100 ) 
 		{
@@ -154,26 +214,6 @@ void __attribute__((OS_main)) __init()
 
 bootloader_jump:
 	asm	volatile ("ijmp" ::"z" (OLED_BOOTLOADER_ENTRY)); // emergency reboot time
-}
-
-#define consolePrint( string ) consolePrintEx(0, string)
-#define consolePrint_P( string ) consolePrintEx(1, string)
-//------------------------------------------------------------------------------
-void consolePrintEx( unsigned char flash, char *string )
-{
-	sramStartWrite( SRAM_CONSOLE_LINE_BUFFER_START + (currentConsoleLine * SRAM_CONSOLE_LINE_BUFFER_WIDTH) );
-	
-	for( unsigned char c=0; string[c] && c<(SRAM_CONSOLE_LINE_BUFFER_WIDTH - 1); c++ )
-	{
-		sramWriteByte( string[c] );
-	}
-	sramWriteByte( 0 );
-	sramStop();
-
-	if ( ++currentConsoleLine >= SRAM_CONSOLE_LINE_BUFFER_LINES )
-	{
-		currentConsoleLine = 0;
-	}
 }
 
 //------------------------------------------------------------------------------
@@ -186,15 +226,7 @@ void render()
 		unsigned char vertical = 0;
 		for( unsigned char l = 0; l<SRAM_CONSOLE_LINE_BUFFER_LINES; l++ )
 		{
-			sramStartRead( SRAM_CONSOLE_LINE_BUFFER_START + (line * SRAM_CONSOLE_LINE_BUFFER_WIDTH) );
-			for( unsigned char c = 0; c<SRAM_CONSOLE_LINE_BUFFER_WIDTH; c++ )
-			{
-				if ( !(out[c] = sramReadByte()) )
-				{
-					break;
-				}
-			}
-			sramStop();
+			sramRead( SRAM_CONSOLE_LINE_BUFFER_START + (line * SRAM_CONSOLE_LINE_BUFFER_WIDTH), (unsigned char*)out, SRAM_CONSOLE_LINE_BUFFER_WIDTH );
 
 			stringAt( out, 0, vertical, SRAM_CONSOLE_LINE_FONT, 0 );
 			vertical += SRAM_CONSOLE_LINE_SPACING;
@@ -206,6 +238,7 @@ void render()
 	}
 	else if ( frameMode == FrameReplay )
 	{
+		/*
 		char r[135];
 		for( unsigned char i=0; i<134; i++ )
 		{
@@ -341,12 +374,21 @@ void render()
 				}
 			}
 		}
+		*/
 	}
 	else if ( frameMode == FrameMenu )
 	{
 		menuRender();
 	}
 }
+
+/*
+settings.invertDisplay = 0;
+settings.invertButtons = 0;
+settings.brightness = 4;
+settings.repeatDelay = 2;
+saveEEPROMConstants();
+*/
 
 //------------------------------------------------------------------------------
 int __attribute__((OS_main)) main()
@@ -359,6 +401,8 @@ int __attribute__((OS_main)) main()
 
 	rnaInit();
 	sei();
+
+	TCCR0B = 1<<CS02 | 1<<CS00; // div/128
 
 	sramInit();
 	i2cInit();
@@ -378,9 +422,10 @@ int __attribute__((OS_main)) main()
 	}
 	sramStop();
 
+
 	rnaDataExpected = 1; // make sure nothing triggers
 
-	frameMode = FrameConsole;
+	frameMode = FrameMenu;
 
 	// read in font table
 	read24c512( 0xA0, 0, &numberOfFonts, 1 );
@@ -388,10 +433,23 @@ int __attribute__((OS_main)) main()
 
 	clearFrameBuffer();
 
-	stringAt_P( PSTR("Don't Panic"), 0, 0, 7, 0 );
-	blit();
+//	frameMode = FrameMenu;
+	
 
-//	displayDirty = true;
+	frameMode = FrameConsole;
+	consolePrint( "ready" );
+	displayDirty = true;
+
+	menuSetCurrent( 0 ); // root
+
+	// request the 128 bytes of config data from each device on the bus
+/*
+	for( unsigned char a=1; a<8; a++ )
+	{
+		unsigned char packet = RNATypeGetConfigData;
+		rnaSend( a, &packet, 1 );
+	}
+*/
 
 	for(;;)
 	{
@@ -405,24 +463,12 @@ int __attribute__((OS_main)) main()
 			}
 			packetQueue[RNA_PACKET_QUEUE_SIZE - 1] = 0;
 			packetQueuePos--;
-			sei();
 
 			uint8 *ptr = (uint8*)gpointer( packet );
 
-			if ( rnaCommand == RNATypeEEPROMLoad )
-			{
-				struct PacketEEPROMLoad *load = (struct PacketEEPROMLoad *)ptr;
-				write24c512( 0xA0, load->offset, load->data, sizeof(load->data) );
-			}
-			else if ( rnaCommand == RNATypeOledConsole )
-			{
-				frameMode = FrameConsole;
-				displayDirty = true;
-				ptr[31] = 0; // enforce termination
-				consolePrint( (char*)ptr );
-			}
-/*
-			else if ( rnaCommand == RNATypeButtonStatus )
+			sei();
+
+			if ( rnaCommand == RNATypeButtonStatus )
 			{
 				if ( frameMode == FrameMenu )
 				{
@@ -441,31 +487,31 @@ int __attribute__((OS_main)) main()
 					frameMode = 0;
 				}
 
-				displayDirty = true;
-
 				char buf[32];
-				dsprintf_P( buf, PSTR("%d %s %s %s"),
+				dsprintf_P( buf, PSTR("%d %s %s %s %d"),
 							rnaFrom,
-							ptr[0] & 0x1 ? "on " : "off",
-							ptr[0] & 0x2 ? "on " : "off",
-							ptr[0] & 0x4 ? "on " : "off" );
+							ptr[0] & ButtonBitTop ? "1" : "0",
+							ptr[0] & ButtonBitMiddle ? "1" : "0",
+							ptr[0] & ButtonBitBottom ? "1" : "0",
+							sizeof(struct Entry) );
 
 				if ( ptr[0] == 0xFF )
 				{
 					dsprintf_P( buf, PSTR("3: POWER OFF!!!") );
+					frameMode = FrameConsole;
 				}
 
 				consolePrint( buf );
+				displayDirty = true;
 			}
 			else if ( rnaCommand == RNATypeReplay )
 			{
 				frameMode = FrameReplay;
 				displayDirty = true;
 			}
-*/
-			else if ( rnaCommand == RNATypeOledClear )
+			else if ( rnaCommand == RNATypeOledText )
 			{
-				clearFrameBuffer();
+				stringAt( (char*)(ptr + 3), ptr[0], ptr[1], ptr[2], 0 );
 				displayBlit = true;
 			}
 			else if ( rnaCommand == RNATypeOledPixel )
@@ -480,10 +526,18 @@ int __attribute__((OS_main)) main()
 				}
 				displayBlit = true;
 			}
-			else if ( rnaCommand == RNATypeOledText )
+			else if ( rnaCommand == RNATypeOledLine )
 			{
-				stringAt( (char*)(ptr + 3), ptr[0], ptr[1], ptr[2], 0 );
+				line( ptr[0], ptr[1], ptr[2], ptr[3] );
 				displayBlit = true;
+			}
+			else if ( rnaCommand == RNATypeOledConsole )
+			{
+				frameMode = FrameConsole;
+				ptr[31] = 0; // enforce termination
+				consolePrint( (char*)ptr );
+				displayDirty = true;
+//				goto freePacket;
 			}
 
 			cli();
@@ -491,22 +545,35 @@ int __attribute__((OS_main)) main()
 			sei();
 		}
 
+		if ( TCNT0 > 200 )
+		{
+			if ( menuTick(TCNT0 / 8) )
+			{
+				displayDirty = true;
+			}
+			TCNT0 = 0;
+		}
+
 		if ( displayDirty )
 		{
-//			cli();
 			displayDirty = false;
+
 			clearFrameBuffer();
 			render();
 			displayBlit = true;
-//			sei();
+		}
+
+		if ( clearDisplay )
+		{
+			clearDisplay = false;
+			clearFrameBuffer();
+			displayBlit = true;
 		}
 
 		if ( displayBlit )
 		{
-//			cli();
 			displayBlit = false;
 			blit();
-//			sei();
 		}
 	}
 }

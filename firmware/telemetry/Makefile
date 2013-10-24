@@ -3,25 +3,21 @@
 #* found at http://creativecommons.org/licenses/by-nc-sa/3.0/legalcode
 #* and in the LICENCE.txt file included with this distribution
 
-TARGET = oled
+TARGET = telemetry
 
 OBJS = \
-	objs/rna.o \
 	objs/main.o \
-	objs/i2c_brute.o \
-	objs/cfal12832.o \
-	objs/24c512.o \
-	objs/sram.o \
+	objs/rna.o \
+	objs/i2c_atmega.o \
 	objs/galloc.o \
-	objs/dstring.o \
-	objs/menu.o \
-	objs/text.o \
-	objs/frame.o \
 
-MCU = attiny84
+INCLUDE = \
+	-I. \
+
+MCU = atmega88pa
 CPU_FREQUENCY = 8000000
 
-CC = avr-gcc -Wall -I. -I../dna -I../../usbdrv -MD -Os -std=gnu99 -fdata-sections -ffunction-sections -funsigned-char -funsigned-bitfields -fno-inline-small-functions -mmcu=$(MCU) -DF_CPU=$(CPU_FREQUENCY)
+CC = avr-gcc -Wall -I. -I../dna -MD -Os -std=gnu99 -fdata-sections -ffunction-sections -funsigned-char -funsigned-bitfields -fno-inline-small-functions -mmcu=$(MCU) -DF_CPU=$(CPU_FREQUENCY)
 
 all: $(TARGET).hex
 
@@ -31,37 +27,22 @@ clean:
 	@-rm -rf objs
 	@-mkdir objs
 	@-rm -f $(OBJS) $(TARGET).hex $(TARGET).elf $(TARGET).disassembly
-	
+
 $(TARGET).hex: $(OBJS)
 	$(CC) -o $(TARGET).elf -Wl,-gc-sections $(OBJS) 
 	avr-objcopy -j .text -j .data -O ihex $(TARGET).elf $(TARGET).hex
 	avr-objdump -d $(TARGET).elf > $(TARGET).disassembly
 
 splice: $(TARGET).hex
-	../../splice/win32/splice -o $(TARGET).hex
-
-load: $(TARGET).hex
-	../../splice/win32/splice -e eeprom_image.bin
+	../../splice/win32/splice -4 $(TARGET).hex
 
 objs/main.o: main.c
 	$(CC) -c $< -o $@
 
-objs/menu.o: menu.c
-	$(CC) -c $< -o $@
-
-objs/text.o: ../dna/text.c
-	$(CC) -c $< -o $@
-
-objs/i2c_brute.o: ../dna/i2c_brute.c
+objs/i2c_atmega.o: ../dna/i2c_atmega.c
 	$(CC) -c $< -o $@
 
 objs/dstring.o: ../dna/dstring.c
-	$(CC) -c $< -o $@
-
-objs/usb.o: ../dna/usb.c
-	$(CC) -c $< -o $@
-
-objs/cfal12832.o: ../dna/cfal12832.c
 	$(CC) -c $< -o $@
 
 objs/24c512.o: ../dna/24c512.c

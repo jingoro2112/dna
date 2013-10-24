@@ -10,12 +10,12 @@
 #include <dna.h>
 #include <24c512.h>
 
-#include "../../oled/eeprom_image.h"
+#include "../oled/eeprom_image.h"
 
 #include <avr/pgmspace.h>
 
 //------------------------------------------------------------------------------
-// font table is understood to be always 7x7 with -1 pre and post
+// non-scaled 7x7 with -1 pre and post
 const PROGMEM unsigned char c_vt100_7[658]=
 {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x08, 0x08, 0x08, 0x00, 0x08, 0x00, 0x14, 0x14, 
@@ -103,7 +103,7 @@ void stringAtResidentEx( char flash, char* string, char x, char y )
 }
 
 //------------------------------------------------------------------------------
-void stringAtEx( char flash, char* string, char x, char y, unsigned char font, unsigned char dither )
+char stringAtEx( char flash, char* string, char x, char y, unsigned char font, unsigned char dither, unsigned char lenOnly )
 {
 	char c;
 	while( (c = flash ? pgm_read_byte(string++) : *string++) )
@@ -118,39 +118,44 @@ void stringAtEx( char flash, char* string, char x, char y, unsigned char font, u
 
 		x += entry.pre; // pre-increment value
 
-		unsigned char pos = 0;
-		unsigned char byte;
-
-		for( unsigned char h=0; h<entry.h; h++ )
+		if ( !lenOnly )
 		{
-			unsigned char bit = 0;
-			for( unsigned char w = 0; w<entry.w; w++ )
-			{
-				if ( bit == 0 )
-				{
-					read24c512( 0xA0, entry.dataOffset + dataBlockOrigin + pos++, &byte, 1 );
-				}
+			unsigned char pos = 0;
+			unsigned char byte;
 
-				if ( 1<<bit & byte )
+			for( unsigned char h=0; h<entry.h; h++ )
+			{
+				unsigned char bit = 0;
+				for( unsigned char w = 0; w<entry.w; w++ )
 				{
-					char x1 = x + w;
-					char y1 = y + h;
-					if ( !dither || (dither && (x1 & 0x1) ^ (y1 & 0x1)) )
+					if ( bit == 0 )
 					{
-						setPixel( x1, y1 );
+						read24c512( 0xA0, entry.dataOffset + dataBlockOrigin + pos++, &byte, 1 );
+					}
+
+					if ( 1<<bit & byte )
+					{
+						char x1 = x + w;
+						char y1 = y + h;
+						if ( !dither || (dither && (x1 & 0x1) ^ (y1 & 0x1)) )
+						{
+							setPixel( x1, y1 );
+						}
+					}
+
+					if ( ++bit == 8 )
+					{
+						bit = 0;
 					}
 				}
 
-				if ( ++bit == 8 )
-				{
-					bit = 0;
-				}
 			}
-
 		}
 
-		x += entry.post + entry.w; // next character position (all fonts are scaled)
+		x += entry.post + entry.w; // next character position
 	}
+
+	return x;
 }
 
 //------------------------------------------------------------------------------
@@ -160,4 +165,3 @@ char* EEPROMString( unsigned int index )
 	read24c512( 0xA0, index, (unsigned char *)buf, MAX_EEPROM_STRLEN + 1 );
 	return buf;
 }
-

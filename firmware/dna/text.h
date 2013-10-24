@@ -15,9 +15,12 @@ extern unsigned int dataBlockOrigin;
 #define stringAtResident_P(string, x, y) stringAtResidentEx(1, string, x, y)
 void stringAtResidentEx( char flash, char* string, char x, char y );
    
-#define stringAt(string, x, y, font, dither) stringAtEx(0, string, x, y, font, dither)
-#define stringAt_P(string, x, y, font, dither) stringAtEx(1, string, x, y, font, dither)
-void stringAtEx( char flash, char* string, char x, char y, unsigned char font, unsigned char dither );
+#define stringAt(string, x, y, font, dither) stringAtEx(0, string, x, y, font, dither, 0)
+#define stringAt_P(string, x, y, font, dither) stringAtEx(1, string, x, y, font, dither, 0)
+#define stringFontLen( string, font ) stringAtEx(0, string, 0, 0, font, 0, 1)
+#define stringFontLen_P( string, font ) stringAtEx(1, string, 0, 0, font, 0, 1)
+char stringAtEx( char flash, char* string, char x, char y, unsigned char font, unsigned char dither, unsigned char lenOnly );
+
 
 #define MAX_EEPROM_STRLEN 32
 char* EEPROMString( unsigned int index );

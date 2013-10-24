@@ -25,7 +25,7 @@ unsigned char rnaInputSetup( unsigned char *data, unsigned char dataLen, unsigne
 	{
 		wdt_enable( WDTO_15MS ); // light the fuse
 	}
-	else
+	else if ( *data == RNATypeRequestButtonStatus )
 	{
 		buttonRequest = from; // echo the button status
 	}
@@ -67,8 +67,10 @@ void __attribute__((OS_main)) __init()
 
 	_delay_us(50); // give state a chance to settle
 
-	for( unsigned int i=0xFFFF; i; i-- )
+	for( unsigned int i=5000; i; i-- )
 	{
+		_delay_ms(1);
+		
 		// pin must be HELD low, make sure spurious RNA requests do not reset us!
 		if ( PINB & 0b00000100 ) 
 		{
@@ -105,9 +107,12 @@ int __attribute__((OS_main)) main()
 
 	unsigned char cyclesOn = 0;
 	unsigned char pos = 0;
-	unsigned int deltaTargets[0xE]; // when a button is pressed, everyone gets a notice
 
-	_delay_ms( 500 ); // wait for everyone to boot before probing (the OLED in particular takes a few 100 ms)
+	_delay_ms(1); // let values settle
+	
+/*	
+	_delay_ms( 500 ); // wait for everyone to boot before probing (the OLED in particular takes a few 100ms)
+	unsigned int deltaTargets[0xE]; // when a button is pressed, everyone gets a notice
 	for( unsigned char probe=1; probe<0x10; probe++ )
 	{
 		if ( rnaProbe(probe) )
@@ -116,10 +121,11 @@ int __attribute__((OS_main)) main()
 		}
 	}
 	deltaTargets[pos] = 0;
+*/
 
 	unsigned char oldStatus = 0;
 
-	unsigned char rnaPacket[2];
+	unsigned char rnaPacket[3];
 	rnaPacket[0] = RNATypeButtonStatus;
 	
 	for(;;)
@@ -137,7 +143,7 @@ int __attribute__((OS_main)) main()
 		{
 			rnaPacket[1] |= ButtonBitTop;
 		}
-		
+
 		if ( ADCH < 0xE0 )
 		{
 			cyclesOn = 0; // power button not pressed, reset 'power off' logic and set state
@@ -159,18 +165,26 @@ int __attribute__((OS_main)) main()
 		{
 			oldStatus = rnaPacket[1];
 
-			for( pos = 0; deltaTargets[pos]; pos++ )
-			{
-				rnaSend( deltaTargets[pos], rnaPacket, 2 );
-			}
+//			for( pos = 0; deltaTargets[pos]; pos++ )
+//			{
+//				while ( rnaSend(deltaTargets[pos], rnaPacket, 4) == -1 )
+//				{
+//					_delay_ms( 20 );
+//				}
+//			}
 
-//			rnaSend( RNADeviceOLED, rnaPacket, 2 );
+			if ( rnaSend( RNADeviceOLED, rnaPacket, 2 ) == -1 )
+			{
+				_delay_ms(20);
+				rnaSend( RNADeviceOLED, rnaPacket, 2 );
+			}
 		}
 
 		// board has asked status, go ahead and answer
 		if ( buttonRequest )
 		{
 			rnaSend( buttonRequest, rnaPacket, 2 );
+			buttonRequest = 0;
 		}
 		
 		if ( rnaPacket[1] == 0xFF )
