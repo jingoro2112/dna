@@ -35,10 +35,10 @@
 
 #define readTrigger() (PINA & 0b00010000)  // A4
 // eye A1
-#define fet1On() (PORTA |= 0b0000001)  // A0
-#define fet1Off() (PORTA &= 0b1111110)  // A0
-#define fet2On() (PORTA |= 0b0001000)  // A3
-#define fet2Off() (PORTA &= 0b1110111)  // A3
+#define fet1On() (PORTA |= 0b00000001)  // A0
+#define fet1Off() (PORTA &= 0b11111110)  // A0
+#define fet2On() (PORTA |= 0b00001000)  // A3
+#define fet2Off() (PORTA &= 0b11110111)  // A3
 
 #define setupA() (DDRA = 0b10001101); (PORTA = 0b00010100);
 #define setupB() (DDRB = 0b00000000); (PORTB = 0b00000000);
@@ -480,10 +480,18 @@ void rnaInputStream( unsigned char *data, unsigned char dataLen )
 		return;
 	}
 
-	if ( *usbRNAPacket == RNATypeSetConfigData )
+	if ( *usbRNAPacket == RNATypeSetConfigItem )
 	{
-		eepromLoadPointer = 0;
-		eepromLoadDataHeard( usbRNAPacket + 1, sizeof(consts) );
+		if ( usbRNAPacket[2] ) // 16-bit
+		{
+			((uint8*)&consts)[usbRNAPacket[1]] = usbRNAPacket[3];
+		}
+		else
+		{
+			((uint16*)&consts)[usbRNAPacket[1]] = *(uint16 *)(usbRNAPacket + 3);
+		}
+
+		eepromConstantsDirty = true;
 	}
 }
 
@@ -554,7 +562,6 @@ int __attribute__((OS_main)) main(void)
 
 			if ( rnaRequestsConfigData )
 			{
-
 				usbRNAPacket[0] = RNATypeSetConfigData;
 				for( unsigned char c=0; c<sizeof(consts); c++ )
 				{

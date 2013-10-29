@@ -32,7 +32,6 @@ clean:
 	
 $(TARGET).hex: $(OBJS)
 	$(CC) -o $(TARGET).elf -Wl,-gc-sections $(OBJS) 
-#	$(CC) -o $(TARGET).elf -Wl,-gc-sections,-u,vfprintf -lprintf_min $(OBJS) 
 	avr-objcopy -j .text -j .data -O ihex $(TARGET).elf $(TARGET).hex
 	avr-objdump -d $(TARGET).elf > $(TARGET).disassembly
 
@@ -51,7 +50,7 @@ objs/main.o: main.c
 objs/menu.o: menu.c
 	$(CC) -c $< -o $@
 
-objs/frame.o: ../frame.c
+objs/frame.o: ../../dna/frame.c
 	$(CC) -c $< -o $@
 
 objs/text.o: ../../dna/text.c

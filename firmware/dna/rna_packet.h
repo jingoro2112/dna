@@ -30,6 +30,8 @@ enum RNAPacketTypes
 	RNATypeSetConfigData,
 
 	RNATypeRequestButtonStatus,
+
+	RNATypeSetConfigItem,
 };
 
 //------------------------------------------------------------------------------

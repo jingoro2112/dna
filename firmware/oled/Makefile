@@ -17,6 +17,7 @@ OBJS = \
 	objs/menu.o \
 	objs/text.o \
 	objs/frame.o \
+	objs/eeprom_image.o \
 
 MCU = attiny84
 CPU_FREQUENCY = 8000000
@@ -76,5 +77,8 @@ objs/rna.o: ../dna/rna.c
 objs/galloc.o: ../dna/galloc.c
 	$(CC) -c $< -o $@
 
-objs/frame.o: frame.c
+objs/frame.o: ../dna/frame.c
+	$(CC) -c $< -o $@
+
+objs/eeprom_image.o: eeprom_image.c
 	$(CC) -c $< -o $@

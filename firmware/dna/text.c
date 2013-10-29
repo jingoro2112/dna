@@ -6,9 +6,9 @@
  */
 
 #include "text.h"
-
-#include <dna.h>
-#include <24c512.h>
+#include "frame.h"
+#include "dna.h"
+#include "24c512.h"
 
 #include "../oled/eeprom_image.h"
 
@@ -88,7 +88,7 @@ void stringAtResidentEx( char flash, char* string, char x, char y )
 
 				if ( 1<<bit & byte )
 				{
-					setPixel( x + w, y + h );
+					frameSetPixel( x + w, y + h );
 				}
 
 				if ( ++bit == 8 )
@@ -139,7 +139,7 @@ char stringAtEx( char flash, char* string, char x, char y, unsigned char font, u
 						char y1 = y + h;
 						if ( !dither || (dither && (x1 & 0x1) ^ (y1 & 0x1)) )
 						{
-							setPixel( x1, y1 );
+							frameSetPixel( x1, y1 );
 						}
 					}
 
@@ -161,7 +161,8 @@ char stringAtEx( char flash, char* string, char x, char y, unsigned char font, u
 //------------------------------------------------------------------------------
 char* EEPROMString( unsigned int index )
 {
-	static char buf[MAX_EEPROM_STRLEN + 1];
+	static char buf[MAX_EEPROM_STRLEN + 2];
 	read24c512( 0xA0, index, (unsigned char *)buf, MAX_EEPROM_STRLEN + 1 );
+	buf[MAX_EEPROM_STRLEN + 1] = 0; // enforce termination
 	return buf;
 }

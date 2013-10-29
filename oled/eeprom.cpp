@@ -20,6 +20,9 @@
 #include "../firmware/dna/dna_types.h"
 #include "../firmware/morlock/morlock_defs.h"
 
+//#define OUTPUT_FONT_DATA
+//#define OUTPUT_STRING_DATA
+
 /*
 
  this program collects and creates the entire EEPROM snapshot for the
@@ -52,15 +55,26 @@ uint16 hashString( const char* string )
 bool parseString( Cstr& in, unsigned int* pos, Cstr& string )
 {
 //	printf( "parsing [%d][%s]\n", *pos, in.c_str() + *pos );
-	
-	if ( *pos >= in.size() )
+
+	for(;;)
 	{
-		return false;
-	}
-	
-	while( isspace(in[*pos]) && (*pos < in.size()) )
-	{
-		(*pos)++;
+		if ( *pos >= in.size() )
+		{
+			return false;
+		}
+		
+		while( isspace(in[*pos]) && (*pos < in.size()) )
+		{
+			(*pos)++;
+		}
+		
+		if ( in[*pos] != '#' )
+		{
+			break;
+		}
+
+		// must be a comment line, consume until the end
+		for( ;*pos < in.size() && in[*pos] != '\n'; (*pos)++ );
 	}
 	
 	if ( *pos >= in.size() )
@@ -164,7 +178,10 @@ int addToStringTable( Cstr& in, Cstr& binout, Cstr& defines, Cstr& out )
 		}
 
 		defines.appendFormat( "#define S_%03d %d // \"%s\"\n", stringNum++, currentDataBlockPointer, temp.c_str() );
+
+#ifdef OUTPUT_STRING_DATA
 		out.appendFormat( "\t\"%s\",\n", temp.c_str() );
+#endif
 
 		stringList.addItem( temp, currentDataBlockPointer );
 		lastOffset = currentDataBlockPointer;
@@ -302,11 +319,13 @@ int main( int argn, char *argv[] )
 	out.appendFormat( "#define NUMBER_OF_FONTS %d\n", (int)numberOfFonts );
 	out.appendFormat( "#define FONT_BLOCK_SIZE %d\n", fontMetricsTableSize );
 	out.append( "\n" );
-	
+
+#ifdef OUTPUT_FONT_DATA
 	out.appendFormat( "//------------------------------------------------------------------------------\n"
 					  "#ifdef RESIDENT_FONT_TABLES\n"
 					  "const PROGMEM unsigned char c_lookupTable[%d]=\n"
-					  "{\n", fontMetricsTableSize, fontMetricsTableSize );
+					  "{\n", fontMetricsTableSize );
+#endif
 
 	binout.append( &numberOfFonts, 1 );
 	
@@ -316,6 +335,7 @@ int main( int argn, char *argv[] )
 	{
 		for( int i=0; i<numberOfFonts; i++ )
 		{
+#ifdef OUTPUT_FONT_DATA
 			out.appendFormat( "\t0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X,\n",
 							  (unsigned char)(ftable[g].entry[i].dataOffset),
 							  (unsigned char)(ftable[g].entry[i].dataOffset>>8),
@@ -323,6 +343,7 @@ int main( int argn, char *argv[] )
 							  (unsigned char)ftable[g].entry[i].h,
 							  (unsigned char)ftable[g].entry[i].pre,
 							  (unsigned char)ftable[g].entry[i].post );
+#endif
 
 			c = ftable[g].entry[i].dataOffset & 0xFF;
 			binout.append( &c, 1 );
@@ -332,32 +353,39 @@ int main( int argn, char *argv[] )
 		}		
 	}
 
-	out.appendFormat( "};\n\n"
-					  "#endif\n"
-					  "\n"
-					  "#define DATA_BLOCK_SIZE %d\n"
-					  "\n"
-					  "//------------------------------------------------------------------------------\n"
+#ifdef OUTPUT_FONT_DATA
+	out.append( "};\n\n#endif\n\n" );
+#endif
+
+	out.appendFormat( "#define DATA_BLOCK_SIZE %d\n\n", currentDataBlockPointer );
+
+
+#ifdef OUTPUT_FONT_DATA
+	out.appendFormat( "//------------------------------------------------------------------------------\n"
 					  "#ifdef RESIDENT_FONT_TABLES\n"
 					  "const PROGMEM unsigned char c_dataBlock[%d]=\n"
-					  "{\n", currentDataBlockPointer, currentDataBlockPointer );
+					  "{\n", currentDataBlockPointer );
+#endif
 	
 	for( int i=0; i<currentDataBlockPointer; i++ )
 	{
+#ifdef OUTPUT_FONT_DATA
 		if ( !(i%16) )
 		{
 			out.append( "\n\t" );
 		}
-
 		out.appendFormat( "0x%02X, ", (unsigned char)dataTable[i] );
+#endif
+
 		c = (unsigned char)dataTable[i];
 		binout.append( &c, 1 );
 	}
-	
+
+#ifdef OUTPUT_FONT_DATA
 	out.append( "\n};\n"
 				"#endif\n"
 				"\n" );
-
+#endif
 
 	Cstr in;
 	if ( !in.fileToBuffer( "strings.txt") )
@@ -368,9 +396,11 @@ int main( int argn, char *argv[] )
 
 	Cstr defines = "\n";
 	out.appendFormat( "//------------------------------------------------------------------------------\n"
-					  "#define STRING_TABLE_EEPROM_OFFSET %d\n"
-					  "#ifdef RESIDENT_FONT_TABLES\n"
-					  "const PROGMEM char *c_stringTable[]=\n{\n", currentDataBlockPointer );
+					  "#define STRING_TABLE_EEPROM_OFFSET %d\n", currentDataBlockPointer );
+#ifdef OUTPUT_STRING_DATA
+	out.append( "#ifdef RESIDENT_FONT_TABLES\n"
+				"const PROGMEM char *c_stringTable[]=\n{\n" );
+#endif
 
 	addToStringTable( in, binout, defines, out );
 
@@ -394,6 +424,8 @@ int main( int argn, char *argv[] )
 			printf( "Err<1>\n" );
 			return -1;
 		}
+
+		printf( "menu:%d [%s]\n", menus + 1, token.c_str() );
 
 		menuTitle[menus] = token;
 		
@@ -419,6 +451,8 @@ int main( int argn, char *argv[] )
 				break;
 			}
 			menu[menus].entry[i].stringItem = addToStringTable( title, binout, defines, out );
+
+			printf( "entry:%d [%s]\n", i + 1, title.c_str() );
 
 			if ( !parseString(in, &pos, token) )
 			{
@@ -453,9 +487,13 @@ int main( int argn, char *argv[] )
 			{
 				menu[menus].entry[i].type = EntrySubMenu;
 			}
+			else if ( token == "Entry10X" )
+			{
+				menu[menus].entry[i].type = Entry10X;
+			}
 			else
 			{
-				printf( "Err<5>\n" );
+				printf( "Err<5> [%s]\n", token.c_str() );
 				return -1;
 			}
 			
@@ -493,6 +531,13 @@ int main( int argn, char *argv[] )
 				return -1;
 			}
 			menu[menus].entry[i].max = atoi( token );
+
+			if ( !parseString(in, &pos, token) )
+			{
+				printf( "Err<10.5>\n" );
+				return -1;
+			}
+			menu[menus].entry[i].delta = atoi( token );
 
 			if ( !parseString(in, &pos, token) )
 			{
@@ -544,9 +589,11 @@ int main( int argn, char *argv[] )
 
 
 	// string table should be fully popiulated now, add it
+#ifdef OUTPUT_STRING_DATA
 	out.append( "};\n"
 				"#endif\n"
 				"\n" );
+#endif
 	
 	out += defines;
 
@@ -606,7 +653,7 @@ int main( int argn, char *argv[] )
 
 			if ( menu[m].entry[e].stringItem )
 			{
-				out.appendFormat( "//   e[%d] item[%d] type[%d] target[%d] value Offset[%d] enum[%d] [%d/%d]\n",
+				out.appendFormat( "//   e[%d] item[%d] type[%d] target[%d] value Offset[%d] enum[%d] [%d/%d:%d]\n",
 								  e,
 								  (int)menu[m].entry[e].stringItem,
 								  (int)menu[m].entry[e].type,
@@ -614,7 +661,8 @@ int main( int argn, char *argv[] )
 								  (int)menu[m].entry[e].valueOffset,
 								  (int)menu[m].entry[e].valueEnumSet,
 								  (int)menu[m].entry[e].min,
-								  (int)menu[m].entry[e].max );
+								  (int)menu[m].entry[e].max,
+								  (int)menu[m].entry[e].delta );
 			}
 		}
 

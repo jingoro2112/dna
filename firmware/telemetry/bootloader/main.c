@@ -57,18 +57,7 @@ void rnaInputStream( unsigned char *data, unsigned char dataLen )
 		}
 		else if ( packet[0] == RNATypeEnterApp )
 		{
-			struct PacketEnterApp *enter = (struct PacketEnterApp *)(packet + 1);
-
-			unsigned int crc = 0;
-			for( unsigned int i=0; i<enter->lastAddress; i += 2 )
-			{
-				crc += pgm_read_word( i );
-			}
-
-			if ( crc == enter->checksum )
-			{
-				jumpToApp = 1;
-			}
+			jumpToApp = 1;
 		}
 	}
 }
@@ -85,6 +74,7 @@ void ResetVector (void)
 //------------------------------------------------------------------------------
 int __attribute__((OS_main)) main(void)
 {
+	DDRD = 0x0;
 	PORTD = 0b00000100; // turn on pullup for D2 (RNA bus)
 
 	// if the source of the reset was a watchdog timeout, indicating a software
@@ -98,14 +88,9 @@ int __attribute__((OS_main)) main(void)
 	}
 	else
 	{
-		// The logic is a little tortured; the reason is to put the
-		// bootloader jump at the very end, since it's target location
-		// will vary and therefore can't be brute-force checked like the
-		// rest of this code by the loader
-
 		_delay_us(50); // give state a chance to settle
 
-		for( unsigned int i=5000; i; i-- )
+		for( unsigned int i=4000; i; i-- )
 		{
 			_delay_ms(1);
 			// pin must be HELD low, make sure spurious RNA requests do not reset us!
@@ -117,6 +102,7 @@ int __attribute__((OS_main)) main(void)
 	}
 
 	rnaInit();
+
 	for(;;)
 	{
 		rnaPoll(); // everything else happens through the RNA bus

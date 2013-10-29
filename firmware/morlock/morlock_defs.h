@@ -114,7 +114,7 @@ enum USBCommands
 // loaded and saved as a flat structure
 struct EEPROMConstants
 {
-	uint8 singleSolenoid;
+	uint8 singleSolenoid; 
 
 	uint8 fireMode; // what fire mode we're in
 	uint16 ballsPerSecondX10; // fixed-point x10 rate of fire

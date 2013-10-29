@@ -41,9 +41,7 @@ void sramWriteByte( unsigned char byte )
 		{
 			sramSetSILow();
 		}
-		sramDelay();
 		sramSetSCKHigh();
-		sramDelay();
 		sramSetSCKLow();
 
 	} while( bit >>= 1 );
@@ -56,13 +54,11 @@ unsigned char sramReadByte()
 	unsigned char ret = 0;
 	do
 	{
-		sramDelay();
 		sramSetSCKHigh();
 		if ( sramGetSO() )
 		{
 			ret |= bit;
 		}
-		sramDelay();
 		sramSetSCKLow();
 				
 	} while( bit >>= 1 );

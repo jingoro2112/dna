@@ -293,13 +293,15 @@ int main( int argc, char *argv[] )
 	ReadHex::Chunk *chunk = 0;
 	unsigned int percent;
 
-	if ( args.isStringSet("-4", image) || args.isStringSet("-2", image) || args.isStringSet("-o", image) || args.isStringSet("--oled", image) )
+	if ( args.isStringSet("-4", image)
+		 || args.isStringSet("-2", image)
+		 || args.isStringSet("-o", image)
+		 || args.isStringSet("--oled", image) )
 	{
 		int rna = 2;
 		if ( args.isStringSet("-4", image) )
 		{
 			rna = 4;
-			printf( "%d\n", rna );
 		}
 		
 		if ( !infile.fileToBuffer(image) )
@@ -356,7 +358,7 @@ int main( int argc, char *argv[] )
 
 			if ( address == 64 )
 			{
-				Log( "[%d/%d]", chunk->size / 64, chunk->size / 64 );
+				Log( "[%d/%d] <command enter>", chunk->size / 64, chunk->size / 64 );
 				Splice::proxyRNA( device,
 								  ceCommandRNASend,
 								  rna,

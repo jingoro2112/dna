@@ -1,4 +1,4 @@
-CPP = g++ -ggdb -O0 -Wall -Werror -MD -c
+CPP = g++ -I../firmware/dna -ggdb -O0 -Wall -Werror -MD -c
 
 OBJS = \
 	objs/font.o \

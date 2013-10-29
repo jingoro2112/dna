@@ -43,7 +43,6 @@ struct Bits
 	volatile uint8 b6:1;
 	volatile uint8 b7:1;
 } volatile bits[NUMBER_OF_BIT_ENTRIES];
-
 #define displayDirty		(bits[0].b0)
 #define displayBlit			(bits[0].b1)
 #define clearDisplay		(bits[0].b2)
@@ -154,9 +153,7 @@ void rnaInputStream( unsigned char *data, unsigned char bytes )
 		}
 		else if ( rnaCommand == RNATypeSetConfigData )
 		{
-			// set aside 128 bytes to write the custom config data
-			// for this device
-			sramWrite( SRAM_SIZE - (rnaFrom * 128), ptr, 128 );
+			menuSetConfigData( ptr, rnaFrom );
 			goto freePacket;
 		}
 		else if ( (packetQueuePos < RNA_PACKET_QUEUE_SIZE)
@@ -238,7 +235,6 @@ void render()
 	}
 	else if ( frameMode == FrameReplay )
 	{
-		/*
 		char r[135];
 		for( unsigned char i=0; i<134; i++ )
 		{
@@ -283,12 +279,12 @@ void render()
 
 		for( x=8; x<128; x+=3 )
 		{
-			setPixel( x, 8 );
+			frameSetPixel( x, 8 );
 		}
 
 		for( y=8; y<32; y+=3 )
 		{
-			setPixel( 7, y );
+			frameSetPixel( 7, y );
 		}
 
 		char lastTrigger = (replay->trigger[0] & 0x1) ? 1 : 0;
@@ -304,11 +300,11 @@ void render()
 			
 			if ( replay->eye[v1] & v2 )
 			{
-				setPixel( x, 9 );
+				frameSetPixel( x, 9 );
 			}
 			else
 			{
-				setPixel( x, 13 );
+				frameSetPixel( x, 13 );
 			}
 			char thisEye = (replay->eye[v1] & v2) ? 1 : 0;
 			if ( thisEye != lastEye )
@@ -316,17 +312,17 @@ void render()
 				lastEye = thisEye;
 				for( y=9; y<=13; y++ )
 				{
-					setPixel( x, y );
+					frameSetPixel( x, y );
 				}
 			}
 			
 			if ( replay->trigger[v1] & v2 )
 			{
-				setPixel( x, 14 );
+				frameSetPixel( x, 14 );
 			}
 			else
 			{
-				setPixel( x, 19 );
+				frameSetPixel( x, 19 );
 			}
 			char thisTrigger = (replay->trigger[v1] & v2) ? 1 : 0;
 			if ( thisTrigger != lastTrigger )
@@ -334,17 +330,17 @@ void render()
 				lastTrigger = thisTrigger;
 				for( y=14; y<=19; y++ )
 				{
-					setPixel( x, y );
+					frameSetPixel( x, y );
 				}
 			}
 
 			if ( replay->solenoid1[v1] & v2 )
 			{
-				setPixel( x, 20 );
+				frameSetPixel( x, 20 );
 			}
 			else
 			{
-				setPixel( x, 25 );
+				frameSetPixel( x, 25 );
 			}
 			char thisSolenoid1 = (replay->solenoid1[v1] & v2) ? 1 : 0;
 			if ( thisSolenoid1 != lastSolenoid1 )
@@ -352,17 +348,17 @@ void render()
 				lastSolenoid1 = thisSolenoid1;
 				for( y=20; y<=25; y++ )
 				{
-					setPixel( x, y );
+					frameSetPixel( x, y );
 				}
 			}
 
 			if ( replay->solenoid2[v1] & v2 )
 			{
-				setPixel( x, 26 );
+				frameSetPixel( x, 26 );
 			}
 			else
 			{
-				setPixel( x, 31 );
+				frameSetPixel( x, 31 );
 			}
 			char thisSolenoid2 = (replay->solenoid2[v1] & v2) ? 1 : 0;
 			if ( thisSolenoid2 != lastSolenoid2 )
@@ -370,11 +366,10 @@ void render()
 				lastSolenoid2 = thisSolenoid2;
 				for( y=26; y<=31; y++ )
 				{
-					setPixel( x, y );
+					frameSetPixel( x, y );
 				}
 			}
 		}
-		*/
 	}
 	else if ( frameMode == FrameMenu )
 	{
@@ -382,23 +377,17 @@ void render()
 	}
 }
 
-/*
-settings.invertDisplay = 0;
-settings.invertButtons = 0;
-settings.brightness = 4;
-settings.repeatDelay = 2;
-saveEEPROMConstants();
-*/
-
 //------------------------------------------------------------------------------
 int __attribute__((OS_main)) main()
 {
 	// clear RNA queue
-	for( unsigned int i=0; i<RNA_PACKET_QUEUE_SIZE; i++ )
+	unsigned int i;
+	unsigned char c;
+	for( c =0; c<RNA_PACKET_QUEUE_SIZE; c++ )
 	{
-		packetQueue[i] = 0;
+		packetQueue[c] = 0;
 	}
-
+	
 	rnaInit();
 	sei();
 
@@ -409,60 +398,62 @@ int __attribute__((OS_main)) main()
 	oledInit( 0 );
 
 	// clear bits
-	for( unsigned char c = 0; c<NUMBER_OF_BIT_ENTRIES; c++ )
+	for( c = 0; c<NUMBER_OF_BIT_ENTRIES; c++ )
 	{
 		*(((unsigned char*)&bits) + c) = 0;
 	}
 
 	// clear SRAM
 	sramStartWrite( 0 );
-	for( unsigned int a=0; a<8192; a++ )
+	for( i=0; i<8192; i++ )
 	{
 		sramWriteByte( 0x0 );
 	}
 	sramStop();
 
-
-	rnaDataExpected = 1; // make sure nothing triggers
-
-	frameMode = FrameMenu;
+	// grab RNA tables from other devices
+	c = RNATypeGetConfigData;
+	rnaSend( 0x1, &c, 1 );
 
 	// read in font table
 	read24c512( 0xA0, 0, &numberOfFonts, 1 );
 	dataBlockOrigin = ((unsigned int)numberOfFonts * sizeof(struct FontCharEntry) * 95) + 1;
 
-	clearFrameBuffer();
+	rnaDataExpected = 1; // make sure nothing triggers
 
-//	frameMode = FrameMenu;
-	
+	frameMode = FrameMenu; // initial state
+	displayDirty = true;
+
+
+	settings.invertDisplay = 0;
+	settings.invertButtons = 0;
+	settings.brightness = 4;
+	settings.repeatDelay = 2;
+	saveEEPROMConstants();
+
 
 	frameMode = FrameConsole;
 	consolePrint( "ready" );
 	displayDirty = true;
 
+	
 	menuSetCurrent( 0 ); // root
-
-	// request the 128 bytes of config data from each device on the bus
-/*
-	for( unsigned char a=1; a<8; a++ )
-	{
-		unsigned char packet = RNATypeGetConfigData;
-		rnaSend( a, &packet, 1 );
-	}
-*/
 
 	for(;;)
 	{
-		while ( packetQueuePos )
+		while ( packetQueuePos ) // message pump
 		{
-			cli();
+			cli(); // must hold the lock while manipulating the heap
+
+			// shift an entry off the queue, brute-force for now, will
+			// implement a linked-list if deemed necessary
 			uint8 packet = packetQueue[0];
-			for( unsigned char i=0; i<RNA_PACKET_QUEUE_SIZE - 1; i++ )
+			for( unsigned char i=1; i<packetQueuePos; i++ )
 			{
-				packetQueue[i] = packetQueue[i+1];
+				packetQueue[i - 1] = packetQueue[i];
 			}
-			packetQueue[RNA_PACKET_QUEUE_SIZE - 1] = 0;
 			packetQueuePos--;
+			packetQueue[packetQueuePos] = 0;
 
 			uint8 *ptr = (uint8*)gpointer( packet );
 
@@ -487,21 +478,11 @@ int __attribute__((OS_main)) main()
 					frameMode = 0;
 				}
 
-				char buf[32];
-				dsprintf_P( buf, PSTR("%d %s %s %s %d"),
-							rnaFrom,
-							ptr[0] & ButtonBitTop ? "1" : "0",
-							ptr[0] & ButtonBitMiddle ? "1" : "0",
-							ptr[0] & ButtonBitBottom ? "1" : "0",
-							sizeof(struct Entry) );
-
 				if ( ptr[0] == 0xFF )
 				{
-					dsprintf_P( buf, PSTR("3: POWER OFF!!!") );
-					frameMode = FrameConsole;
+					clearDisplay = true;
 				}
 
-				consolePrint( buf );
 				displayDirty = true;
 			}
 			else if ( rnaCommand == RNATypeReplay )
@@ -518,17 +499,17 @@ int __attribute__((OS_main)) main()
 			{
 				if ( *ptr++ )
 				{
-					setPixel( ptr[0], ptr[1] );
+					frameSetPixel( ptr[0], ptr[1] );
 				}
 				else
 				{
-					resetPixel( ptr[0], ptr[1] );
+					frameResetPixel( ptr[0], ptr[1] );
 				}
 				displayBlit = true;
 			}
 			else if ( rnaCommand == RNATypeOledLine )
 			{
-				line( ptr[0], ptr[1], ptr[2], ptr[3] );
+				frameLine( ptr[0], ptr[1], ptr[2], ptr[3] );
 				displayBlit = true;
 			}
 			else if ( rnaCommand == RNATypeOledConsole )
@@ -537,7 +518,6 @@ int __attribute__((OS_main)) main()
 				ptr[31] = 0; // enforce termination
 				consolePrint( (char*)ptr );
 				displayDirty = true;
-//				goto freePacket;
 			}
 
 			cli();
@@ -558,7 +538,7 @@ int __attribute__((OS_main)) main()
 		{
 			displayDirty = false;
 
-			clearFrameBuffer();
+			frameClear();
 			render();
 			displayBlit = true;
 		}
@@ -566,14 +546,14 @@ int __attribute__((OS_main)) main()
 		if ( clearDisplay )
 		{
 			clearDisplay = false;
-			clearFrameBuffer();
+			frameClear();
 			displayBlit = true;
 		}
 
 		if ( displayBlit )
 		{
 			displayBlit = false;
-			blit();
+			frameBlit();
 		}
 	}
 }

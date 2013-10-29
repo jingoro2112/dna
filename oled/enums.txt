@@ -3,4 +3,5 @@
 2 "semi" "semi" "response" "burst" "auto" "ramp" "cocker" "sniper"
 3 "no" "yes"
 4 "normal" "strong"
-5 "double" "single"
+5 "double solenoid" "single solenoid"
+6 "normal" "invert"

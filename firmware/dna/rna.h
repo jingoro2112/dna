@@ -56,7 +56,7 @@ void oled_text( char* buf, char x, char y, char font );
 void oled_line( char x0, char y0, char x1, char y1 );
 
 
-#define OLED_SAFE_DELAY _delay_ms(5);
+#define OLED_SAFE_DELAY //_delay_ms(5);
 
 
 #endif

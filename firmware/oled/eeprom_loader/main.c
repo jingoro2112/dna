@@ -14,8 +14,7 @@
 #include <sram.h>
 #include <dstring.h>
 #include <text.h>
-
-//#include <stdio.h>
+#include <frame.h>
 
 #include <util/delay.h>
 #include <avr/io.h>
@@ -24,15 +23,7 @@
 #include <avr/pgmspace.h>
 #include <avr/eeprom.h>
 
-#include "../oled/eeprom_image.h"
-#include "../frame.h"
-
-// 1264 add for std
-// 786 for dstring
-// 662 for min dstring
-
-// 866 for min
-
+#include "../eeprom_image.h"
 
 volatile unsigned char rnaCommand;
 volatile unsigned char rnaFrom;
@@ -113,7 +104,7 @@ int __attribute__((OS_main)) main()
 	sei();
 
 	sramInit();
-	clearFrameBuffer();
+	frameClear();
 	
 	i2cInit();
 	oledInit( 0 );
@@ -149,7 +140,7 @@ int __attribute__((OS_main)) main()
 
 	stringAtResident( "awaiting firmware image", 0, 16 );
 
-	blit();
+	frameBlit();
 
 	unsigned int errors = 0;
 
@@ -164,7 +155,7 @@ int __attribute__((OS_main)) main()
 				struct PacketEEPROMLoad *load = (struct PacketEEPROMLoad *)rnaPacket;
 
 				write24c512( 0xA0, load->offset, load->data, sizeof(load->data) );
-				clearFrameBuffer();
+				frameClear();
 				
 				char buf[128];
 				dsprintf( buf, "heard block 0x%04X", load->offset );
@@ -182,7 +173,7 @@ int __attribute__((OS_main)) main()
 				dsprintf( buf, "%d errors", errors );
 				stringAtResident( buf, 0, 8 );
 				
-				blit();
+				frameBlit();
 			}
 		}
 	}
