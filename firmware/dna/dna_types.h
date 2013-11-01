@@ -7,7 +7,7 @@
  * and in the LICENCE.txt file included with this distribution
  */
 
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(__CYGWIN__)
 typedef unsigned short uint16;
 typedef short int16;
 typedef unsigned char uint8;

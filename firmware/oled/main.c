@@ -421,22 +421,18 @@ int __attribute__((OS_main)) main()
 
 	rnaDataExpected = 1; // make sure nothing triggers
 
-	frameMode = FrameMenu; // initial state
-	displayDirty = true;
-
-
 	settings.invertDisplay = 0;
 	settings.invertButtons = 0;
 	settings.brightness = 4;
 	settings.repeatDelay = 2;
 	saveEEPROMConstants();
 
-
+//	frameMode = FrameMenu;
 	frameMode = FrameConsole;
 	consolePrint( "ready" );
+
 	displayDirty = true;
 
-	
 	menuSetCurrent( 0 ); // root
 
 	for(;;)
@@ -461,6 +457,10 @@ int __attribute__((OS_main)) main()
 
 			if ( rnaCommand == RNATypeButtonStatus )
 			{
+//				char buf[10];
+//				dsprintf( buf, "0x%02X", *ptr );
+//				consolePrint( buf ); 
+
 				if ( frameMode == FrameMenu )
 				{
 					if ( menuProcessButtonState(*ptr) )
@@ -468,7 +468,7 @@ int __attribute__((OS_main)) main()
 						frameMode++;
 					}
 				}
-				else if ( ptr[0] & ButtonBitMiddle )
+				else if ( *ptr & ButtonBitMiddle )
 				{
 					frameMode++;
 				}
@@ -478,9 +478,10 @@ int __attribute__((OS_main)) main()
 					frameMode = 0;
 				}
 
-				if ( ptr[0] == 0xFF )
+				if ( *ptr & ButtonBitPowerOff )
 				{
-					clearDisplay = true;
+					consolePrint( "POWER OFF" ); 
+//					clearDisplay = true;
 				}
 
 				displayDirty = true;

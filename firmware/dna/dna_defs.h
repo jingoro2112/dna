@@ -24,9 +24,13 @@
 //------------------------------------------------------------------------------
 enum ButtonBits
 {
-	ButtonBitBottom = 1<<0,
+	ButtonBitTop = 1<<0,
 	ButtonBitMiddle = 1<<1,
-	ButtonBitTop = 1<<2,
+	ButtonBitBottom = 1<<2,
+	
+	ButtonBitDouble = 1<<3,
+	
+	ButtonBitPowerOff = 1<<4,
 };
 
 //------------------------------------------------------------------------------

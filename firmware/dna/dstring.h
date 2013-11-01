@@ -12,7 +12,7 @@
 // final equation, but it will be close
 // base size: ~495 bytes
 #define DSFORMAT_COLUMNS     // 98 bytes: column spcifiers %10d %-10d %04X %4s etc..
-//#define DSFORMAT_BINARY      // 12 bytes: %b printing binary
+#define DSFORMAT_BINARY      // 12 bytes: %b printing binary
 //#define DSFORMAT_OCTAL       // 10 bytes: octal
 //#define DSFORMAT_CAPITAL_S   // 28 bytes: '%S' reading a pgm_space string
 //#define DSFORMAT_ALT_REP     // 84 bytes: the '#' thingy which adds a 0x to pointers and hex

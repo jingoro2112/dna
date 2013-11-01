@@ -51,8 +51,8 @@ void sramWriteByte( unsigned char byte );
 void sramRead( unsigned int address, unsigned char* bytes, unsigned char len );
 void sramWrite( unsigned int address, unsigned char* bytes, unsigned char len );
 
-//unsigned char sramAtomicRead( unsigned int address );
-//void sramAtomicWrite( unsigned int address, unsigned char data );
+unsigned char sramAtomicRead( unsigned int address );
+void sramAtomicWrite( unsigned int address, unsigned char data );
 
 void sramInit();
 

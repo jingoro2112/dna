@@ -28,6 +28,8 @@
  this program collects and creates the entire EEPROM snapshot for the
  OLED board
 
+ it requires imagemagick (convert) to be on the command-line path
+
 */
 
 bool parseInfile( Cstr const& in, Cstr &out );

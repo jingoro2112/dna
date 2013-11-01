@@ -7,10 +7,21 @@
 #define ARCHITECTURE_H
 
 #if defined(_WIN32)
+
  #include <conio.h>
  #include <winsock2.h>
  #include <windows.h>
  #include <process.h>
+
+#elif defined(__CYGWIN__)
+
+ #include <time.h>
+ #include <unistd.h>
+ #include <sys/time.h>
+ #include <sys/types.h>
+ #define InterlockedIncrement(V) __sync_add_and_fetch((V), 1)
+ #define InterlockedDecrement(V) __sync_sub_and_fetch((V), 1)
+
 #else
 
  #ifdef __MACH__
@@ -56,7 +67,7 @@ inline int kbhit()
 //------------------------------------------------------------------------------
 inline void sleep( unsigned int milliseconds )
 {
-#if defined(_WIN32) || defined(__CYGWIN__)
+#if defined(_WIN32)
 	::Sleep( milliseconds );
 #else
 	usleep( milliseconds * 1000 );
@@ -76,8 +87,10 @@ inline int getpid()
 //------------------------------------------------------------------------------
 inline int gettid()
 {
-#if defined(_WIN32) || defined(__CYGWIN__)
+#if defined(_WIN32)
 	return (int)GetCurrentThreadId();
+#elif defined(__CYGWIN__)
+	return (int)-1;
 #else
 	return (int)syscall(SYS_gettid);
 #endif

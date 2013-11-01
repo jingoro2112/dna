@@ -15,8 +15,8 @@
 "Back" EntrySub Config 0 0 0 0 -1
 "Enable" Entry8 eyeEnabled 1 0 1 1 1
 "Sense" Entry8 eyeHighBlocked 1 0 1 1 6
-"Holdoff" Entry8 eyeHoldoff 1 0 20 1 -1
-"Detect Lvl" Entry8 eyeDetectLevel 1 0 255 1 -1
+"Eye Holdoff" Entry8 eyeHoldoff 1 0 20 1 -1
+"Eye Level" Entry8 eyeDetectLevel 1 0 255 1 -1
 "Detect Holdoff" Entry8 eyeDetectHoldoff 1 0 20 1 -1
 "Drive" Entry8 eyeStrong 1 0 1 1 4
 
@@ -26,7 +26,7 @@
 "Mode" Entry8 singleSolenoid 1 0 1 1 5
 "Ramp" EntrySub 0 0 0 0 0 -1
 "Burst Count" Entry8 burstCount 1 1 4 1 -1
-"Enhanced Mode Timeout" Entry16 enhancedTriggerTimeout 1 50 750 25 -1
+"Enhanced Time" Entry16 enhancedTriggerTimeout 1 50 750 25 -1
 "Debounce" Entry8 debounce 1 1 50 1 -1
 "Rebounce" Entry8 rebounce 1 1 50 1 -1
 
@@ -38,11 +38,11 @@
 "Dwell 2" Entry8 dwell2 1 1 75 1 -1
 "Dwell 2 Holdoff" Entry8 dwell2Holdoff 1 1 25 1 -1
 "Dwell 2 Max" Entry8 maxDwell2 1 1 250 1 -1
-"Shortcycle Prevent" Entry8 shortCyclePreventionInterval 1 1 25 1 -1
+"S.Cycle Hold" Entry8 shortCyclePreventionInterval 1 1 25 1 -1
 "Bolt Holdoff" Entry8 boltHoldoff 1 1 25 1 -1
 "ABS Timeout" Entry16 ABSTimeout 1 1 30 1 -1
 "ABS Addition" Entry8 ABSAddition 1 1 15 1 -1
-"Accessory Time" Entry8 accessoryRunTime 1 1 250 25 -1
+"Acc. Time" Entry8 accessoryRunTime 1 1 250 25 -1
 
 
 "Settings"

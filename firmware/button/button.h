@@ -14,12 +14,4 @@ enum ButtonRequest
 	ButtonRequestPowerOff,
 };
 
-//------------------------------------------------------------------------------
-enum ButtonBit
-{
-	button1 = 1<<0,
-	button2 = 1<<1,
-	button3 = 1<<2,
-};
-
 #endif

@@ -13,7 +13,7 @@ clean:
 	@-mkdir objs
 
 eeprom: $(OBJS)
-	g++ -O3 -Wall -lz -lpng -Werror $(OBJS) -o $@
+	g++ -O0 -Wall -lz -lpng -Werror $(OBJS) -o $@
 
 objs/font.o: ../util/font.cpp
 	$(CPP) -c $< -o $@
