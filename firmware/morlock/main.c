@@ -516,8 +516,8 @@ int __attribute__((OS_main)) main(void)
 
 	dnaUsbInit();
 
-//	INSTALL_MORLOCK_DEFAULTS;
-//	saveEEPROMConstants();
+	INSTALL_MORLOCK_DEFAULTS;
+	saveEEPROMConstants();
 
 	loadEEPROMConstants();
 

@@ -411,10 +411,6 @@ int __attribute__((OS_main)) main()
 	}
 	sramStop();
 
-	// grab RNA tables from other devices
-	c = RNATypeGetConfigData;
-	rnaSend( 0x1, &c, 1 );
-
 	// read in font table
 	read24c512( 0xA0, 0, &numberOfFonts, 1 );
 	dataBlockOrigin = ((unsigned int)numberOfFonts * sizeof(struct FontCharEntry) * 95) + 1;
@@ -427,8 +423,8 @@ int __attribute__((OS_main)) main()
 	settings.repeatDelay = 2;
 	saveEEPROMConstants();
 
-//	frameMode = FrameMenu;
-	frameMode = FrameConsole;
+	frameMode = FrameMenu;
+//	frameMode = FrameConsole;
 	consolePrint( "ready" );
 
 	displayDirty = true;
@@ -477,7 +473,13 @@ int __attribute__((OS_main)) main()
 				{
 					frameMode = 0;
 				}
-
+/*
+				if ( frameMode == FrameMenu )
+				{
+					c = RNATypeGetConfigData; // grab RNA tables from other devices
+					rnaSend( 0x1, &c, 1 );
+				}
+*/
 				if ( *ptr & ButtonBitPowerOff )
 				{
 					consolePrint( "POWER OFF" ); 

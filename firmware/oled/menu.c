@@ -123,7 +123,7 @@ void renderEntry( uint8 position, uint8 screenPosX, uint8 screenPosY, uint8 font
 	int value = getValue( &entry );
 	char buf[MAX_EEPROM_STRLEN + 1];
 
-	if ( entry.valueEnumSet & 0x80 )
+//	if ( entry.valueEnumSet & 0x80 )
 	{
 		if ( entry.type == Entry10X )
 		{
@@ -134,6 +134,7 @@ void renderEntry( uint8 position, uint8 screenPosX, uint8 screenPosY, uint8 font
 			dsprintf_P( buf, PSTR("%d"), value );
 		}
 	}
+/*
 	else
 	{
 		unsigned int offset = pgm_read_word( enumVectors + entry.valueEnumSet );
@@ -152,6 +153,7 @@ void renderEntry( uint8 position, uint8 screenPosX, uint8 screenPosY, uint8 font
 
 		read24c512( 0xA0, offset, (unsigned char *)buf, MAX_EEPROM_STRLEN + 1 );
 	}
+*/
 
 	int valueWidth = stringFontLen(buf, font);
 
